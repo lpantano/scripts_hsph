@@ -1,1 +1,0 @@
-../slack_cel_network/run_seqcluster.sh
