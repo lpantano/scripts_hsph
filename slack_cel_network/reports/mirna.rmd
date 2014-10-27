@@ -17,13 +17,13 @@ library(rmarkdown)
 library(knitrBootstrap)
 library(ggplot2)
 library(reshape)
-library(dplyr)
 library(DESeq2)
 library(genefilter)
 library(CHBUtils)
 library(gtools)
 library(gridExtra)
 library(devtools)
+library(dplyr)
 devtools::load_all("~/repos/isomiRs")
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
@@ -98,6 +98,7 @@ to get similar results in this step, having as consequences problem in the norma
 
 ```{r adapter}
 ad_recog<-data.frame()
+total_reads<-data.frame()
 for (nr in 1:nrow(files)){
     type <- unlist(strsplit(as.character(files[nr,2]),split="-",fixed=3))
     ad <- read.table(paste0( root_path,"/",gsub("-ann.mirna",".info",files[nr,1]) ),
@@ -108,6 +109,8 @@ for (nr in 1:nrow(files)){
                                             cell=paste0(type[1],"-",type[3]),
                                             rep=type[2]
                                             ))
+    ad <- read.table(paste0( root_path,"/",gsub("-ann.mirna",".info",files[nr,1]) ),nrows = 1,sep=":")
+    total_reads = rbind(total_reads, data.frame(sample = files[nr,2], totalreads=ad[1,2]))
 }
 
 ggplot(ad_recog)+
@@ -116,12 +119,21 @@ ggplot(ad_recog)+
              position='dodge')+
     xlim(c(0,50))+
     facet_wrap(~cell,nrow=3)
+
+```
+
+Here we can see how much of the total reads has adapter
+
+```{r adapter-step,results='asis'}
+adapter_step = cbind(ad_recog %>% group_by(sample) %>% summarize(total=sum(value)),total_reads)
+adapter_step$ratio = adapter_step$total/adapter_step$totalreads*100
+
 ```
 
 ### After alignment
 
 ```{r align}
-#total_clus %>% group_by(sample) %>% summarise(total=sum(reads))
+clus_step = as.data.frame(total_clus %>% group_by(sample) %>% summarize(total=sum(reads)))
 total_clus$rep <- as.character(unlist(as.data.frame(
         strsplit(total_clus$sample,"-",fixed=3))[2,]))
 total_clus$type <- gsub("-[123]-","",total_clus$sample)
@@ -183,8 +195,21 @@ ggplot(melt(dd)) +
 ggplot(data.frame(sample=colnames(obj@counts), total=colSums(obj@counts))) +
     geom_bar(aes(x=sample,y=total), stat='identity')+
     scale_y_log10()
-colSums(obj@counts)
+mirna_step <- as.data.frame(colSums(obj@counts))
 ```
+
+### Distribution of reads
+```{r reads-each-step}
+#adapter_step
+row.names(clus_step) <- clus_step$sample
+#mirna_step
+reads_summary = cbind(adapter_step, mirna_step, clus_step[ as.character(adapter_step$sample), ])
+names(reads_summary) = c("sample","adapter","sample","total","ratio","mirna","sample","mapping")
+reads_summary = reads_summary[,c(1,4,2,8,6)]
+reads_summary = cbind(reads_summary[,1:2],sweep(reads_summary[,3:5],1,reads_summary[,2],"/"))
+knitr::kable(reads_summary)
+```
+
 
 ### Distribution of mirna expression
 
