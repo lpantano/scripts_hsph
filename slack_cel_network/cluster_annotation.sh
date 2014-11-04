@@ -9,16 +9,17 @@ export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
 PATH=~/soft/bcbiome/anaconda/bin:~/soft/bcbiotools/bin:$PATH
 GENOME="/groups/bcbio/bcbio/genomes/Celegans/WBcel235/bowtie/WBcel235"
-DB="/home/lp113/projects/celegans_network_raw/data"
-DIR=~/projects/celegans_network_raw/celegans_smallrna
+DB="/n/data1/cores/bcbio/celegans_network/celegans_network_raw/data"
+DIR=/n/data1/cores/bcbio/celegans_network/celegans_network_raw/celegans_smallrna
 OUT=cluster
 cd $DIR
+rm -rf cluster/*
 #if [ ! -e $OUT ] ; then
      mkdir -p  $OUT/pre
      mkdir -p  $OUT/res
-     seqcluster prepare -c $1 -o $OUT/pre --minc 2 --minl 18 --maxl 42 
+     seqcluster prepare -c $1 -o $OUT/pre --minc 2 --minl 17 --maxl 42 
      bowtie -a --best --strata -m 5000 -f $GENOME $OUT/pre/seqs.fa -S  $OUT/pre/seqs.sam
-     samtools view -Sbh $OUT/pre/seqs.sam | samtools sort -o /dev/stdin  tmp | samtools view -h /dev/stdin > $OUT/pre/seqs.sort.sam
-     seqcluster cluster -a $OUT/pre/seqs.sort.sam -m $OUT/pre/seqs.ma -o $OUT/res  -b $DB/tRNA.bed,$DB/miRNA.bed,$DB/repeat.bed,$DB/rRNA.bed,$DB/snoRNA.bed,$DB/snRNA.bed,$DB/ncRNA.bed 
+     samtools view -Sbh $OUT/pre/seqs.sam | samtools sort -o /dev/stdin  tmp > $OUT/pre/seqs.sort.bam
+     seqcluster cluster -a $OUT/pre/seqs.sort.bam -m $OUT/pre/seqs.ma -o $OUT/res  -b $DB/tRNA.bed,$DB/miRNA.bed,$DB/repeat.bed,$DB/rRNA.bed,$DB/snoRNA.bed,$DB/snRNA.bed,$DB/ncRNA.bed 
 #fi
 

@@ -9,7 +9,7 @@ export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
 SB_HOME=~/soft/seqbuster/
 SB_DB="./"
-DIR=/n/data1/cores/bcbio/celegans_network/celegans_network_raw/celegans_smallrna
+DIR=/n/data1/cores/bcbio/tina_exosomes/mirna
 ADAPTER=AGATCGGAAGAGCACACGTCT
 
 cd $DIR 
@@ -25,23 +25,22 @@ if [ ! -e DB ] ; then
     cd ..
 fi
 
-rm -rf mirna.files seqcluster.files
+rm -rf ../mirna.files ../seqcluster.files
 
-while read file cell rep time x adap; do
- cd $file
- NAME=$cell-$rep-$time
- NAME=`echo $NAME | sed 's/(.*)//'`
- fastq=`ls *fastq.gz`
+
+while read file cell ; do
+ NAME=$cell
+ fastq=$file
  if [ ! -e  $NAME.ad ] ; then
-    zcat $fastq| java -jar "$SB_HOME"/modules/adrec/adrec.jar -a $ADAPTER -s 15 -e 50 -m 1 -c 0.3 -i /dev/stdin -l 8 -o $NAME
+    cat ../raw/$fastq | java -jar "$SB_HOME"/modules/adrec/adrec.jar -a $ADAPTER -s 15 -e 50 -m 1 -c 0.3 -i /dev/stdin -l 8 -o $NAME
  fi
  awk '{i=i+1; print ">seq_"i"_x"$2"\n"$1}' $NAME.ad > $NAME.fa
  if [ ! -e $NAME-ann.mirna ] ; then
-    java -jar "$SB_HOME"/modules/miraligner/miraligner.jar  -sub 1 -trim 3 -add  3 -s cel -i $NAME.ad -db ../DB -o $NAME-ann -pre -freq -minl 17
+    java -jar "$SB_HOME"/modules/miraligner/miraligner.jar  -sub 1 -trim 3 -add  3 -s hsa -i $NAME.ad -db DB -o $NAME-ann -pre -freq -minl 17
  fi
- cd ..
- echo $file/$NAME-ann.mirna $NAME>>mirna.files
- echo $file/$NAME.fa $NAME>>seqcluster.files
+ 
+ echo $NAME-ann.mirna $NAME>>../mirna.files
+ echo $NAME.fa $NAME>>../seqcluster.files
 done < $1 #smalrna.csv
 
 
