@@ -1,0 +1,530 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+
+```{r setup}
+library(knitr)
+library(rmarkdown)
+library(knitrBootstrap)
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+devtools::load_all("~/repos/isomiRs")
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+               cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+source("~/repos/myRfunctions/transactions.R")
+dn <- "slack_mirna_mrna"
+root_path<-"~/orch/scratch/celegans_network/celegans_network_raw/celegans_smallrna/"
+```
+
+```{r render,eval=FALSE}
+render_2_drop("~/repos/pipelines/slack_cel_network/reports/mirna.rmd",dn)
+```
+
+```{r load}
+setwd(root_path)
+files <- read.table("mirna.files")
+files[,2] <- gsub("mir-","mir",files[,2])
+row.names(files) <- files[,2]
+design <- as.data.frame(t(as.data.frame(sapply(as.character(files[,2]),strsplit,split="-",fixed=3))))
+names(design ) <- c("sample","rep","time")
+obj <- loadIso(files = files[,1], design = design ,header = T)
+
+clus <- read.table("cluster/res/counts.tsv",header=T,sep="\t",row.names=1)
+names(clus) <- gsub("mir.71","mir71",names(clus))
+ann <- as.vector(unlist(as.data.frame((sapply(as.character(clus[,1]),strsplit, split="\\|")))[1,]))
+clus_ma <- clus[,2:ncol(clus)]
+clus_ma <- clus_ma[,row.names(design)]
+
+total_clus <- read.table("cluster/res/stats_align.dat")
+names(total_clus) <- c("size","sample","reads")
+total_clus$sample <- gsub("mir-71","mir71",total_clus$sample)
+```
+
+# Methods
+
+## mirnas
+
+I used [miranalizer](https://github.com/lpantano/seqbuster/wiki/miraligner) to get the mirnas. The mainly different with mirdeep is that it
+can take a look at isomirs. We can add this to your analysis, if you are interestd.
+I used [isomiR](https://github.com/lpantano/isomiRs) package to manipulate the output of miranalizer.
+
+
+## other small RNA
+
+I used [seqcluster](https://github.com/lpantano/seqcluster), that can generate clusters of sequences over the genome, and 
+annotate them to some type of small RNA, like rRNA, tRNA ... The main advantage is that
+will count sequences that map in multi-places only once, so you can use the 
+standard packages to analyze this data. We can add DE of other smallRNAs after we 
+discuss these results. The mapping was done with bowtie1 in this case.
+
+# Exploration
+
+There are some reads mapping to the miRNA, but this could be cross-mapping events.
+The majority of the sequences have some mistmach or some trimming events that could
+lead to a wrong mapping.
+
+
+```{r detect-mir}
+obj@counts[grepl("cel-miR-71",row.names(obj@counts)),]
+```
+
+
+## small RNA size distribution
+
+### After adapter recognition
+
+In small RNA is important to get very similar replicates in terms of small RNA
+content. Small RNA size distribution shows normally that. In this case, we see 
+many difference among replicates, probably due to experimental protocol steps. One
+important point in small RNA experiments is size selection accuracy. It is very difficult
+to get similar results in this step, having as consequences problem in the normalization step.
+
+```{r adapter}
+ad_recog<-data.frame()
+total_reads<-data.frame()
+for (nr in 1:nrow(files)){
+    type <- unlist(strsplit(as.character(files[nr,2]),split="-",fixed=3))
+    ad <- read.table(paste0( root_path,"/",gsub("-ann.mirna",".info",files[nr,1]) ),
+                     skip=12,sep=" ")
+    ad_recog <- rbind(ad_recog, data.frame( pos=ad$V2,
+                                            value=ad$V6,
+                                            sample=files[nr,2],
+                                            cell=paste0(type[1],"-",type[3]),
+                                            rep=type[2]
+                                            ))
+    ad <- read.table(paste0( root_path,"/",gsub("-ann.mirna",".info",files[nr,1]) ),nrows = 1,sep=":")
+    total_reads = rbind(total_reads, data.frame(sample = files[nr,2], totalreads=ad[1,2]))
+}
+
+ggplot(ad_recog)+
+    geom_bar(aes(x=pos,y=value,fill=rep),
+             stat='identity',
+             position='dodge')+
+    xlim(c(0,50))+
+    facet_wrap(~cell,nrow=3)
+
+```
+
+Here we can see how much of the total reads has adapter
+
+```{r adapter-step,results='asis'}
+adapter_step = cbind(ad_recog %>% group_by(sample) %>% summarize(total=sum(value)),total_reads)
+adapter_step$ratio = adapter_step$total/adapter_step$totalreads*100
+
+```
+
+### After alignment
+
+```{r align}
+clus_step = as.data.frame(total_clus %>% group_by(sample) %>% summarize(total=sum(reads)))
+total_clus$rep <- as.character(unlist(as.data.frame(
+        strsplit(total_clus$sample,"-",fixed=3))[2,]))
+total_clus$type <- gsub("-[123]-","",total_clus$sample)
+ggplot(total_clus)+
+    geom_bar(aes(x=size,y=reads,fill=rep),
+             stat='identity',
+             position='dodge')+
+    xlim(c(0,50))+
+    facet_wrap(~type,nrow=3)
+
+```
+
+Plot again without "problematic replicates"
+
+```{r remove-rep}
+remove <- c("N2-3-Day0","N2-1-Day5","mir71-1-Day0","mir71-1-Day5")
+ggplot(total_clus[!total_clus$sample %in% remove,])+
+    geom_bar(aes(x=size,y=reads,fill=rep),
+             stat='identity',
+             position='dodge')+
+    xlim(c(0,50))+
+    facet_wrap(~type,nrow=3)
+t <- total_clus[!total_clus$sample %in% remove,] %>% group_by(sample) %>% summarise(total=sum(reads))
+t$ratio <- t$total/mean(t$total)
+library_size <- t$ratio
+names(library_size) <- gsub("-",".",t$sample)
+```
+
+## Depth
+
+### type of small RNA
+
+```{r types,fig.width=12}
+rRNA <- colSums(clus_ma[grepl("rRNA",ann) & grepl("miRNA",ann)==F,])
+miRNA <- colSums(clus_ma[grepl("miRNA",ann),])
+tRNA <- colSums(clus_ma[grepl("tRNA",ann) & grepl("rRNA",ann)==F & grepl("repeat",ann)==F & grepl("miRNA",ann)==F,])
+rmsk <- colSums(clus_ma[grepl("repeat",ann) & grepl("rRNA",ann)==F & grepl("miRNA",ann)==F,])
+total <- colSums(clus_ma)
+
+dd <- data.frame(samples=names(rRNA),
+                 rRNA=rRNA,
+                 miRNA=miRNA,
+                 tRNA=tRNA,
+                 rmsk=rmsk,
+                total=total)
+ggplot(melt(dd)) +
+    geom_bar(aes(x=samples,y=value,fill=variable),
+             stat='identity',
+             position="dodge")+
+    scale_fill_brewer(palette = "Set1")+
+    scale_y_log10()
+#colSums(clus_ma)
+```
+
+### total miRNA expression annotated with mirbase
+
+```{r mirna-mirbase}
+
+ggplot(data.frame(sample=colnames(obj@counts), total=colSums(obj@counts))) +
+    geom_bar(aes(x=sample,y=total), stat='identity')+
+    scale_y_log10()
+mirna_step <- as.data.frame(colSums(obj@counts))
+```
+
+### Distribution of reads
+```{r reads-each-step}
+#adapter_step
+row.names(clus_step) <- clus_step$sample
+#mirna_step
+reads_summary = cbind(adapter_step, mirna_step, clus_step[ as.character(adapter_step$sample), ])
+names(reads_summary) = c("sample","adapter","sample","total","ratio","mirna","sample","mapping")
+reads_summary = reads_summary[,c(1,4,2,8,6)]
+reads_summary = cbind(reads_summary[,1:2],sweep(reads_summary[,3:5],1,reads_summary[,2],"/"))
+knitr::kable(reads_summary)
+```
+
+
+### Distribution of mirna expression
+
+```{r depth}
+ggplot(melt(obj@counts)) +
+    geom_boxplot(aes(x=X2,y=value))+
+    scale_y_log10()
+```
+
+### cumulative distribution of miRNAs
+
+Only a few miRNA are expressed, this could mean no enough coverage.
+
+```{r cum}
+tab <- data.frame()
+cs <- as.data.frame(apply(obj@counts,2,cumsum))
+cs$pos <- 1:nrow(cs)
+ggplot((melt(cs,id.vars = "pos")))+
+    geom_point(aes(x=pos,y=value,color=variable))+
+    scale_y_log10()
+```
+
+### Correlation
+```{r try-norm}
+above <- rowSums(clus_ma>10)>10
+clus_dse <- DESeqDataSetFromMatrix(countData = clus_ma[above,],
+                       colData = design,
+                       design = ~ sample)
+clus_dse <- estimateSizeFactors( clus_dse )
+
+idx <- grepl("tRNA",ann)  | grepl("miRNA",ann)
+clus_clean_dse <- DESeqDataSetFromMatrix(countData = clus_ma[idx*above,],
+                       colData = design,
+                       design = ~ sample)
+clus_clean_dse <- estimateSizeFactors( clus_clean_dse )
+
+
+mirna_dse <- DESeqDataSetFromMatrix(countData = obj@counts[rowSums(obj@counts>2)>2,],
+                       colData = design,
+                       design = ~ sample)
+
+sizeFactors(mirna_dse) <- sizeFactors(clus_dse)
+norm_w_clus <- counts(mirna_dse,normalized=T)
+
+sizeFactors(mirna_dse) <- sizeFactors(clus_clean_dse)
+norm_w_clus_clean <- counts(mirna_dse,normalized=T)
+
+mirna_dse_alone <- estimateSizeFactors(mirna_dse)
+norm_w_mirna <- counts(mirna_dse_alone,normalized=T)
+
+raw <- obj@counts
+
+get_ratio <- function(norm){
+        data.frame(n2.rep1=norm[,1]/norm[,2],
+           n2.rep2=norm[,3]/norm[,4],
+           n2.rep3=norm[,5]/norm[,6],
+           ko.rep1=norm[,7]/norm[,8],
+           ko.rep2=norm[,9]/norm[,10],
+           ko.rep3=norm[,11]/norm[,12])
+}
+
+```
+
+
+The correlation should be in log scale to avoid bias toward the highly 
+expressed mirnas.
+
+First using miRNA alone:
+
+```{r cor-fn}
+get_cor <- function(norm, design,size=NULL){
+    dse <- DESeqDataSetFromMatrix(countData = norm,
+                       colData = design,
+                       design = ~ sample +time+ sample*time)
+    dse <- estimateSizeFactors(dse)
+    if (! is.null(size)){
+        sizeFactors(dse) = size
+    }
+    dse <- estimateDispersions(dse)
+    rdse <- rlog(dse, blind = TRUE)
+    par(mfrow=c(2,1))
+    ggheatmap.show(ggheatmap(cor(assay(rdse))))
+    mds(assay(rdse),condition = design$sample,d="cor",xi = 1, yi = 2)
+}
+get_cor(raw[rowSums(raw>2)>2,],design)
+```
+
+Using rRNA to normalize:
+
+```{r cor-clean}
+get_cor(raw[rowSums(raw>2)>2,],design,size=sizeFactors(clus_clean_dse))
+
+```
+
+Using miRNA and tRNA to normalize:
+
+```{r cor-total}
+get_cor(raw[rowSums(raw>2)>2,],design,size=sizeFactors(clus_dse))
+```
+
+Using total aligned reads but removing weird replicates:
+
+```{r cor-remove}
+get_cor(raw[rowSums(raw>2)>2,names(library_size)],design[names(library_size),],size=library_size)
+```
+
+`r par(mfrow=c(1,1))`
+
+### Change with time
+
+
+There is no clear normalization that show the expected behavior, wild-type at day 0
+should has more miRNA expression than day 5. And this difference should
+disappear in the KO samples.
+
+
+```{r plot-diff}
+ggplot(melt(get_ratio(raw))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("raw counts")
+
+ggplot(melt(get_ratio(norm_w_mirna))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized with miRNAs")
+
+ggplot(melt(get_ratio(norm_w_clus))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized with total")
+
+ggplot(melt(get_ratio(norm_w_clus_clean))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized with tRNA and miRNA")
+
+ggplot(melt(get_ratio(prop.table(raw,2)*1000000))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("RPM normalization with miRNAs")
+
+ggplot(melt(get_ratio(sweep(raw,2,colSums(clus_ma),"/")*1000000))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("RPM normalization with total sequences mapped")
+```
+
+The only thing that could improve this it would ask for especific miRNAs that don't change and use them to normalize.
+
+Instead of plotting we can calculate the DE mirnas that change with time in 
+the both groups. The correct normalization should detect more DE mirnas.
+
+I tried to normalize with total mirnas, with total small rna, and
+with total trna + mirna. Only using the ones that are expressed always.
+
+```{r test-de}
+get_DE <- function(norm, design,size=NULL){
+    dse <- DESeqDataSetFromMatrix(countData = norm,
+                       colData = design,
+                       design = ~ sample +time+ sample*time)
+    dse <- estimateSizeFactors(dse)
+    if (! is.null(size)){
+        sizeFactors(dse) = size
+    }
+    dse <- estimateDispersions(dse)
+    dse <- nbinomWaldTest(dse)
+    #plotDispEsts(dse)
+    res <- results(dse)
+    resultsNames(dse)
+    down<-(subset(res,res$padj<0.1)[,2]<0)
+    up<-(subset(res,res$padj<0.1)[,2]>0)
+    list(subset(res,res$padj<0.1))
+}
+```
+
+Number of DEG mirna using mirna normalization
+
+```{r num-de-mirna}
+get_DE(raw[rowSums(raw>2)>2,],design)
+```
+
+Number of DEG mirna using total annotated data
+
+```{r num-de-total}
+get_DE(raw[rowSums(raw>2)>2,],design,size=sizeFactors(clus_dse))
+```
+
+Number of DEG mirna using mirna + tRNA
+
+```{r num-de-mirna-trna}
+get_DE(raw[rowSums(raw>2)>2,],design,size=sizeFactors(clus_clean_dse))
+```
+
+Number of DEG mirna removing "bad" replicates
+
+```{r num-de-removed}
+get_DE(raw[rowSums(raw>2)>2,names(library_size)],design[names(library_size),],size=library_size)
+```
+
+# DE
+
+```{r handle}
+
+dse_handle <- function(res){
+    res_nona <- res[!is.na(res$padj),]
+    keep <- res_nona$padj < 0.1 
+    res_nona[keep,]
+}
+```
+
+
+I think we can use only miRNAs because the correlation plots is separating the samples.
+
+## along time
+
+```{r de}
+design$conditions <- paste0(design$sample,design$time)
+dse <- DESeqDataSetFromMatrix(countData = raw[rowSums(raw>2)>2,],
+                       colData = design,
+                       design = ~ conditions)
+dse <- DESeq(dse)
+plotDispEsts(dse)
+resultsNames(dse)
+```
+
+### DEG mirnas in N2 strain
+
+```{r de-n2,results='asis'}
+res <- results(dse, contrast = c("conditions","N2Day5","N2Day0"))
+plotMA(as.data.frame(res))
+res <- dse_handle(res)
+write.table(res,"mirna_n2_de_genes.txt",sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](mirna_n2_de_genes.txt)
+
+### DEG mirnas in KO strain
+
+```{r de-mir71,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71Day5","mir71Day0"))
+plotMA(as.data.frame(res))
+res <- dse_handle(res)
+write.table(res,"mirna_ko_de_genes.txt",sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+``` 
+
+There is no difference in term of mirnas that change differently. But we can
+just see the miRNAs that are different among both sets.
+
+## between strains
+
+### At day 0
+
+```{r de-nw-ko-day0,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71Day0","N2Day0"))
+plotMA(as.data.frame(res))
+res <- dse_handle(res)
+write.table(res,"mirna_day0_de_genes.txt",sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](mirna_day0_de_genes.txt)
+
+
+### At day 5
+
+```{r de-nw-ko-day5,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71Day5","N2Day5"))
+plotMA(as.data.frame(res))
+res <- dse_handle(res)
+write.table(res,"mirna_day5_de_genes.txt",sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](mirna_day5_de_genes.txt)
+
+
+At day 5 it seems there are more differences, maybe this help to detect some
+miRNA network in the future.
+
+```{r copy-txt-png,echo=FALSE}
+setwd("~/repos/pipelines/slack_cel_network/reports")
+copy_batch_2_drop('.txt$', dn)
+```
+
+
+# Conclusion
+
+* __RNA-seq seems good__. We did the main quality control figures, and differential expression analysis. However, we need you put some context in the results, and tell us if it makes sense or not.
+
+* smallRNA-seq seems to have some problems: 
+    * __small RNA content is different among replicates__. That means that at some point in the experimental steps were some difference. The most difficult problem is to do similar size selection. It seems that some samples got more longer small RNA than others. People normally don't look at this because they are only focus on miRNA, and can be fixed it using only miRNA. In this case, you expect total down-regulation, so it would be good to have other type of small RNA to normalize. I think we can not use the total amount to small RNA mapped to the genome, because it will increase difference among replicates. And, it may generate more false positive due to outliers.
+    * __The coverage of small RNA-seq is low__. We are only detecting 200 thousand of reads as average. And the cumulative curve shows that all the coverage is capture for a few amount of miRNAs. I would suggest to have at least 1-2 mill reads to detect everything with enough accuracy. I think the coverage is the main responsible of not seeing the general down-regulation of the micro-oma.
+* For both analysis we did comparison between strains, between time, and between the interaction of both (genes that change differently).
+
+
+
+# isomir exploration
+
+Just to show easily how isomirs look like here
+
+```{r isomirs}
+obj@design$condition <- paste0(obj@design$sample,obj@design$time)
+
+obj <- plotIso(obj, type = 't5')
+obj <- plotIso(obj, type = 't3')
+obj <- plotIso(obj, type = 'add')
+obj <- plotIso(obj, type = 'sub')
+```
+

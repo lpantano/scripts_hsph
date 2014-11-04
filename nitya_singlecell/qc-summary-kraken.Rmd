@@ -1,0 +1,99 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', fig.width=9, bootstrap.show.code=FALSE)
+```
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(gtools)
+library(knitr)
+library(rmarkdown)
+project_summary = "/home/lpantano/ody/projects/nytia_singlecell/singlecell/final/2014-10-23_singlecell/project-summary.csv"
+project_summary_h = "/home/lpantano/ody/projects/nytia_singlecell/singlecell3/final/2014-10-22_singlecell3/project-summary.csv"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+summarydata = read.table(project_summary, header=TRUE, sep=",")
+summarydata$Name <- factor(summarydata$Name, levels=mixedsort(summarydata$Name))
+rownames(summarydata) = summarydata$Name
+
+summarydata_h = read.table(project_summary_h, header=TRUE, sep=",")
+summarydata_h$Name <- factor(summarydata_h$Name, levels=mixedsort(summarydata_h$Name))
+rownames(summarydata_h) = summarydata_h$Name
+
+```
+
+```{r path-info}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "nitya_singlecell"
+root_path<-"~/repos/pipelines/nitya_singlecell"
+setwd(root_path)
+```
+
+```{r render,eval=FALSE}
+render_2_drop("~/repos/pipelines/nitya_singlecell/qc-summary-kraken.Rmd",dn)
+```
+
+
+# Quality control metrics
+
+```{r kraken}
+dd = data.frame()
+for (i in summarydata$Name){
+    kraken_file = paste0("~/ody/projects/nytia_singlecell/singlecell/final/",
+                         i,"/qc/kraken/kraken_summary")
+    if (file.exists(kraken_file)){
+        f = read.table(kraken_file, sep = "\t")
+        h = subset(f,grepl("Homo sapiens",V6))[,1]
+        m = subset(f,grepl("Mus musculus",V6))[,1]
+        d = subset(f,grepl("Danio rerio",V6))[,1]
+        dd = rbind(dd,data.frame(Mapped = c(m,h,d),
+                                 Name =i , type = summarydata[i,"type"],
+                                 Genome=c("mm10","hg19","dr"),db="kraken"))
+    }
+}
+```
+
+## Mapping rate
+```{r mapped-plot}
+dd = rbind(dd,data.frame(Mapped = summarydata$Mapping.Rate ,
+                Name = summarydata$Name,
+                type = summarydata$type,
+                Genome = "mm10",db="genome"),
+           data.frame(Mapped = summarydata_h$Mapping.Rate ,
+                Name = summarydata_h$Name,
+                type = summarydata_h$type,
+                Genome = "hg19",db="genome"))
+```
+
+```{r plot-rate}
+dd$Name = factor(dd$Name,levels=mixedsort(levels(dd$Name)))
+ggplot(dd, aes(x=Name, y=Mapped, fill = Genome, colours=type)) + 
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    facet_wrap(~db, nrow=3,scales="free_y")+
+    scale_fill_brewer(palette = "Set1")+
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+

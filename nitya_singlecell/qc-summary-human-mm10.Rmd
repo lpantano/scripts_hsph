@@ -1,0 +1,99 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', fig.width=9)
+```
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(gtools)
+project_summary_mm10 = "/home/lpantano/ody/projects/nytia_singlecell/singlecell/final/2014-10-08_singlecell/project-summar-2y.csv"
+counts_file = "/home/lpantano/ody/projects/nytia_singlecell/singlecell3/final/2014-10-22_singlecell3/combined.counts"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+summarydata = read.table(project_summary, header=TRUE, sep=",")
+rownames(summarydata) = summarydata$Name
+summarydata$Name <- factor(summarydata$Name, levels=mixedsort(summarydata$Name))
+summarydata_mm10= read.table(project_summary_mm10, header=TRUE, sep=",")
+rownames(summarydata_mm10) = summarydata_mm10$Name
+summarydata_mm10$type = gsub("-[0-9]+","",summarydata_mm10$Name)
+summarydata = summarydata[order(rownames(summarydata)),]
+summarydata_mm10$Name <- factor(summarydata_mm10$Name, levels=mixedsort(summarydata_mm10$Name))
+counts = read.table(counts_file, header=TRUE, row.names="id")
+counts = counts[, order(colnames(counts))]
+```
+
+```{r path-info}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "nitya_singlecell"
+root_path<-"~/repos/pipelines/nitya_singlecell"
+setwd(root_path)
+```
+
+```{r render,eval=FALSE}
+render_2_drop("~/repos/pipelines/nitya_singlecell/qc-summary-human-mm10.Rmd",dn)
+```
+
+
+# Quality control metrics
+
+## Mapped reads
+```{r mapped-plot}
+dd = rbind(data.frame(Mapped = summarydata$Mapped ,
+                Name = summarydata$Name,
+                type = summarydata$type,
+                Genome = "hg19"),
+           data.frame(Mapped = summarydata_mm10$Mapped ,
+                Name = summarydata_mm10$Name,
+                type = summarydata_mm10$type,
+                Genome = "mm10"))
+ggplot(dd, aes(x=Name, y=Mapped, fill = Genome)) + 
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    facet_wrap(~type, nrow=3)+
+    scale_fill_brewer(palette = "Set1")+
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+
+## Genomic mapping rate
+```{r mapping-rate-plot}
+dd = rbind(data.frame(Mapping.Rate = summarydata$Mapping.Rate ,
+                Name = summarydata$Name,
+                type = summarydata$type,
+                Genome = "hg19"),
+           data.frame(Mapping.Rate = summarydata_mm10$Mapping.Rate ,
+                Name = summarydata_mm10$Name,
+                type = summarydata_mm10$type,
+                Genome = "mm10"))
+ggplot(dd, aes(x=Name, y=Mapping.Rate, fill = Genome)) + 
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    facet_wrap(~type, nrow=3)+
+    scale_fill_brewer(palette = "Set1")+
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+
