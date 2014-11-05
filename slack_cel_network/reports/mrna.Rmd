@@ -15,7 +15,8 @@ library(rmarkdown)
 library(knitr)
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
-               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE,
+               cache.path = "~/.cache/slack_celegans")
 source("~/repos/myRfunctions/transactions.R")
 dn <- "slack_mirna_mrna"
 root_path<-"~/repos/pipelines/slack_cel_network/reports"
@@ -27,6 +28,16 @@ render_2_drop("~/repos/pipelines/slack_cel_network/reports/mrna.Rmd",dn)
 ```
 
 # Overview
+
+## Methods
+
+* we used bcbio to run all the samples (https://bcbio-nextgen.readthedocs.org/)
+* the GO enrichment functions can be found here (https://github.com/hbc/CHBUtils/blob/master/R/runGO.R). 
+it was used the standard function `hyperGTest` with a pvalue = 0.05. The FDR was calculated with
+`p.adjust` functin. Only terms inside this condition were selected `fdr<0.1 & Count > 5 & OddsRatio > 1.5 )`:
+FDR < 10%, more than 5 genes, and Odds ratio > 1.5
+
+
 
 ```{r qc-setup}
 library(ggplot2)
@@ -220,10 +231,21 @@ annotate_df = function(df, dataset, filter, symbol) {
 ```
 
 
+## Specific genes
+
+### INS-7
+```{r ins-7}
+dd <- summarydata[, c("Name", "type", "time")]
+dd$exp = rlogMat["WBGene00002090",]
+ggplot(dd, aes(y=exp, x=time, colour=type)) +
+    geom_point()
+```
+
+
 ## N2 along time
 
 ```{r N2-time}
-res <- results(dds, contrast = c("conditions","N2Day5","N2Day0"))
+res <- results(dds, contrast = c("conditions","N2Day0","N2Day5"))
 DESeq::plotMA(as.data.frame(res))
 res_nona <- res[!is.na(res$padj),]
 keep <- res_nona$padj < 0.01 & abs(res_nona$log2FoldChange)>2 & res_nona$baseMean>20
@@ -248,10 +270,13 @@ top50<- keep_entrez$entrezgene
 g.entrez <- as.character(top50[!is.na(top50)])
 bp<- runGO(g.entrez,set,"BP",as.list(GOBPCHILDREN))
 plotGO(bp, 'bp_content', 'png' )
+write.table(bp[[1]], "N2_along_time_BP_GO.txt")
 mf<-runGO(g.entrez,set,"MF",as.list(GOMFCHILDREN))
 plotGO(mf, 'mf_content')
+write.table(mf[[1]], "N2_along_time_MF_GO.txt")
 ```
 
+[MF](N2_along_time_MF_GO.txt) and [BP](N2_along_time_BP_GO.txt) tables.
 
 BP:
 <a href="bp_content.png"><img src="bp_content.png" width="150px" /></a>
@@ -262,7 +287,7 @@ MF:
 ## KO along time
 
 ```{r KO-time}
-res <- results(dds, contrast = c("conditions","mir.71Day5","mir.71Day0"))
+res <- results(dds, contrast = c("conditions","mir.71Day0","mir.71Day5"))
 DESeq::plotMA(as.data.frame(res))
 res_nona <- res[!is.na(res$padj),]
 keep <- res_nona$padj < 0.01 & abs(res_nona$log2FoldChange)>2 & res_nona$baseMean>20
@@ -281,10 +306,13 @@ top50<- keep_entrez$entrezgene
 g.entrez <- as.character(top50[!is.na(top50)])
 bp<- runGO(g.entrez,set,"BP",as.list(GOBPCHILDREN))
 plotGO(bp, 'ko_bp_content', 'png' )
+write.table(bp[[1]], "KO_along_time_BP_GO.txt")
 mf<-runGO(g.entrez,set,"MF",as.list(GOMFCHILDREN))
 plotGO(mf, 'ko_mf_content')
+write.table(mf[[1]], "KO_along_time_MF_GO.txt")
 ```
 
+[MF](KO_along_time_MF_GO.txt) and [BP](KO_along_time_BP_GO.txt) tables.
 
 BP:
 <a href="ko_bp_content.png"><img src="ko_bp_content.png" width="150px" /></a>
@@ -323,9 +351,13 @@ top50<- keep_entrez$entrezgene
 g.entrez <- as.character(top50[!is.na(top50)])
 bp<- runGO(g.entrez,set,"BP",as.list(GOBPCHILDREN))
 plotGO(bp, 'n2kotime_bp_content', 'png' )
+write.table(mf[[1]], "N2KO_along_time_BP_GO.txt")
 mf<-runGO(g.entrez,set,"MF",as.list(GOMFCHILDREN))
 plotGO(mf, 'n2kotime_mf_content')
+write.table(mf[[1]], "N2KO_along_time_MF_GO.txt")
 ```
+
+[MF](N2KO_along_time_MF_GO.txt) and [BP](N2KO_along_time_BP_GO.txt) tables.
 
 BP:
 <a href="n2kotime_bp_content.png"><img src="n2kotime_bp_content.png" width="150px" /></a>

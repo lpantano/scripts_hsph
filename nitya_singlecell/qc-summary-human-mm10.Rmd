@@ -26,7 +26,8 @@ library(edgeR)
 library(CHBUtils)
 library(gtools)
 project_summary_mm10 = "/home/lpantano/ody/projects/nytia_singlecell/singlecell/final/2014-10-08_singlecell/project-summar-2y.csv"
-counts_file = "/home/lpantano/ody/projects/nytia_singlecell/singlecell3/final/2014-10-22_singlecell3/combined.counts"
+project_summary = "/home/lpantano/ody/projects/nytia_singlecell/singlecell3/final/2014-10-22_singlecell3/project-summary.csv"
+counts_file = "/home/lpantano/ody/projects/nytia_singlecell/singlecell2/final/2014-10-21_singlecell2/combined.counts"
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 "#0072B2", "#D55E00", "#CC79A7")
 summarydata = read.table(project_summary, header=TRUE, sep=",")
@@ -94,6 +95,20 @@ ggplot(dd, aes(x=Name, y=Mapping.Rate, fill = Genome)) +
     facet_wrap(~type, nrow=3)+
     scale_fill_brewer(palette = "Set1")+
     theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+## ERCC 
+```{r-ercc}
+metadata = read.table("/home/lpantano/ody/projects/nytia_singlecell/singlecell3.csv", header=T,sep=",")
+row.names(metadata) = gsub("-ready.*$", "", metadata[,1])
+ercc = counts[grepl("ERCC",row.names(counts)),]
+names(ercc) = metadata[gsub("[::.::]","-",gsub(".ready.*$" ,"", names(ercc))),2]
+dd = melt(ercc)
+dd$type = gsub("-.*$", "", dd$variable)
+ggplot(dd)+
+    geom_point(aes(y=value,x=variable,colour=type)) +
+    scale_y_log10() +
+    theme_bw()
 ```
 
 
