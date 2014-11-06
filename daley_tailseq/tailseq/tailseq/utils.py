@@ -9,6 +9,7 @@ lifted from bcbio-nextgen
 https://github.com/chapmanb/bcbio-nextgen
 """
 import os
+import gzip
 import shutil
 import tempfile
 import contextlib

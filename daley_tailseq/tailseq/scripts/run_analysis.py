@@ -50,8 +50,10 @@ if __name__ == "__main__":
                         choices=["lsf", "slurm", "torque", "sge"])
     parser.add_argument("--resources", default=None, help="Extra scheduler resource flags.")
     parser.add_argument("--queue", default=None, help="Queue to submit jobs to.")
-    parser.add_argument("--parallel", choices = ["local", "ipyton"], default="local",
+    parser.add_argument("--parallel", choices = ["local", "ipython"], default="local",
                         help="Run in parallel on a local machine.")
+    parser.add_argument("--local", action="store_true",
+                        default=False, help="Run parallel locally")
 
     args = parser.parse_args()
 
