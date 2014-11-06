@@ -1,5 +1,11 @@
 from cluster_helper import cluster as ipc
 
+resources = {"align": [45, 12],
+             "qc": [8, 1],
+             "cleaning": [4, 1],
+             "polyA": [4, 1]}
+
+
 def get_cluster_view(args):
     return ipc.cluster_view(args.scheduler, args.queue,
                           args.num_jobs, args.cores_per_job,
@@ -7,17 +13,23 @@ def get_cluster_view(args):
                           extra_params={"resources": args.resources,
                                         "mem": args.memory_per_job,
                                         "tag": "tailseq",
-                                        "run_local": args.local})
+                                        "run_local": False})
 
 
 def wait_until_complete(jobs):
     return [j.get() for j in jobs]
 
 
-def send_jobs(fn, data, args):
+def send_job(fn, data, args, step):
     """decide if send jobs with ipython or run locally"""
     res = []
-    if args.parallel:
+    print "doing %s" % step
+    if step not in resources:
+        raise ValueError("step not in resources %s" % step)
+    else:
+        args.memory_per_job = resources[step][0]
+        args.cores_per_job = resources[step][1]
+    if args.parallel == "ipython":
         with get_cluster_view(args) as view:
             for sample in data:
                 res.append(view.apply_async(fn, *data[sample]))

@@ -4,7 +4,7 @@ import re
 import numpy
 import os
 from collections import Counter
-from utils import open_fastq, transaction_file
+from utils import open_fastq, file_transaction
 
 w = {}
 w['A'] = -8
@@ -36,7 +36,7 @@ def poly_A_percentage(seq):
                         predicted[(e-s+1, scoreT)] = (s, e)
     if len(predicted.keys()) > 0:
         sorted_scores = sorted(predicted.keys(), reverse=True)
-        print "max score %s pos %s " % (sorted_scores[0], predicted[sorted_scores[0]])
+        #print "max score %s pos %s " % (sorted_scores[0], predicted[sorted_scores[0]])
         return predicted[sorted_scores[0]]
     else:
         False
@@ -104,7 +104,7 @@ def _adapter(seq, qual):
     """
     TAG = "GTCAG"
     tag_pos = seq.find(TAG, 15, 25)
-    print tag_pos
+    #print tag_pos
     if tag_pos:
         tag_pos += 5
         return seq[tag_pos:], qual[tag_pos:]
@@ -123,24 +123,27 @@ def _test():
 
 
 def detect(in_file, out_prefix):
-    out_name = out_prefix + "-polyA.dat"
+    out_name = out_prefix + "-polyA.dat.gz"
     out_name_false = out_prefix + "-none.dat.gz"
     counts = Counter()
+    print "reading file %s" % in_file
+    print "creating files %s %s" % (out_name, out_name)
     if os.path.exists(out_name):
         return out_name
-    with transaction_file(out_name) as tx_out_file:
-        with open_fastq(in_file) as handle, gzip.open(tx_out_file, 'bw') as out, gzip.open(out_name_false, 'bw') as out_false:
+    with file_transaction(out_name) as tx_out_file:
+        with open_fastq(in_file) as handle, gzip.open(tx_out_file, 'w') as out, gzip.open(out_name_false, 'w') as out_false:
             for line in handle:
                 #print line
-                if line.startswith("^@"):
+                if line.startswith("@HISEQ"):
                     #print line
                     name = line.strip()
                     seq = handle.next().strip()
-                    #print "seq is " + s1
                     handle.next().strip()
                     qual = handle.next().strip()
                     find = _adapter(seq, qual)
+                    #print "%s %s" % (seq, find)
                     if find:
+                        seq, qual = find
                         ns = poly_A_percentage(seq)
                         if ns:
                             if ns[1]-ns[0] >= 6:
@@ -165,5 +168,5 @@ def detect(in_file, out_prefix):
                         out_false.write("%s\t%s\t%s\t%s\n" % ("No_tag", name, seq, qual))
                         counts['notag'] += 1
         with open(out_name + ".stat", 'w') as handle:
-            handle.out(counts)
+            handle.write("%s" % counts)
     return out_name

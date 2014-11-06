@@ -1,6 +1,5 @@
 from argparse import ArgumentParser
 import os
-from collections import OrderedDict
 from itertools import izip
 from tailseq import align
 from tailseq import cluster
@@ -9,7 +8,7 @@ from tailseq import detect
 
 def get_sample(line, sample_map_filename):
     keys = ["sample_id", "r1_path", "r2_path"]
-    sample_id, r1_filename, r2_filename = line.split(",")
+    sample_id, r1_filename, r2_filename = line.strip().split(",")
     return dict(zip(keys, [sample_id, r1_filename, r2_filename]))
 
 
@@ -58,26 +57,19 @@ if __name__ == "__main__":
 
     samples = get_samples_to_process(args.sample_map)
     prepped = []
-
-    print "Beginning alignment."
+    data = {}
     for sample in samples:
         data[sample['sample_id']] = [sample['r1_path'], args.aligner_index, get_star_prefix(sample['r1_path']), args.cores_per_job]
-    aligned = cluster.send_job(align.star_align, data, args)
-    print "Finished alignment."
+    aligned = cluster.send_job(align.star_align, data, args, "align")
 
-    print "Beginning QC."
-    for sample, sam_file in izip(samples,aligned):
+    for sample, sam_file in izip(samples, aligned):
         data[sample['sample_id']] = [sam_file]
-    qc.append(cluster.send_job(align.qc, data, args))
-    print "Finished QC."
+    cluster.send_job(align.qc, data, args, "qc")
 
-    print "Begin cleaning of poorly mapped reads."
     for sample, sam_file in izip(samples, aligned):
         data[sample['sample_id']] = [sam_file, get_cleaned_outfile(sam_file)]
-    cleaned.append(cluster.send_job(align.clean_align, data, args)
-    print "Finished cleaning."
+    cleaned = cluster.send_job(align.clean_align, data, args, "cleaning")
 
-    print "Detecting polyA and modifications."
     for sample in samples:
         data[sample['sample_id']] = [sample['r2_path'], sample['sample_id']]
-    polyA.append(cluster.send_job(detect.detect, data, args))
+    polyA = cluster.send_job(detect.detect, data, args, "polyA")
