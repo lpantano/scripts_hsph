@@ -3,6 +3,7 @@ from utils import file_transaction, file_exists
 import pysam
 import os
 from tailseq import do
+from tailseq import logger
 
 accepted_barcode_pattern = re.compile(r"[ACGT]+[ACG]$")
 polyA_tail_pattern = re.compile(r"A{20,}$")
@@ -10,35 +11,41 @@ MAX_EDIT_DISTANCE = 15
 MAX_BEST = 10
 
 
-def star_align(fastq_path, reference_prefix, out_prefix, cores=1):
+def star_align(data, args):
+    cores = args.cores_per_job
+    fastq_path = data['r1_path']
+    reference_prefix = args.aligner_index
+    out_prefix = data['sample_id'] + "_"
     max_best = MAX_BEST
     out_file = out_prefix + "Aligned.out.sam"
-    if file_exists(out_file):
-        print ("%s has already been aligned, skipping." % (fastq_path))
-        return out_file
-
-    cmd = ("STAR --genomeDir {reference_prefix} --readFilesIn {fastq_path} --readFilesCommand zcat "
+    if not file_exists(out_file):
+        cmd = ("STAR --genomeDir {reference_prefix} --readFilesIn {fastq_path} --readFilesCommand zcat "
            "--runThreadN {cores} --outFileNamePrefix {out_prefix} "
            "--outFilterMultimapNmax {max_best} "
            "--outSAMattributes NH HI NM MD AS "
            "--outSAMstrandField intronMotif").format(**locals())
-    do.run(cmd)
-    return out_file
+        do.run(cmd)
+    data['align'] = out_file
+    data['clean'] = clean_align(out_file, out_prefix + "cleaned.sam")
+    return data
 
 
-def qc(sam_file):
+def qc(data, args):
     """fastqc for the sam file"""
+    sam_file = data['align']
     out_dir = os.path.basename(sam_file) + "_fastq"
     cmd = "fastqc {sam_file} -f sam -o {out_dir}".format(**locals())
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
         do.run(cmd)
-    return out_dir
+    else:
+        logger.my_logger.info("%s has already been QC, skipping." % (sam_file))
+    return data
 
 
 def clean_align(align_file, out_file):
     if file_exists(out_file):
-        print ("%s has already been UMI deduped, skipping." % (align_file))
+        logger.my_logger.info("%s has already been cleaned, skipping." % (align_file))
         return out_file
 
     count_total_reads = 0

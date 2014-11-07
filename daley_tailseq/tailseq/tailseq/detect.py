@@ -5,6 +5,7 @@ import numpy
 import os
 from collections import Counter
 from utils import open_fastq, file_transaction
+from tailseq import logger
 
 w = {}
 w['A'] = -8
@@ -23,7 +24,7 @@ def getsc(nt):
 def poly_A_percentage(seq):
     predicted = {}
     if re.search("TTT", seq):
-        for s in range(30):
+        for s in range(0, 30):
             #print s
             if seq[s:].startswith("TT"):
             #string[s]=="T":
@@ -33,36 +34,38 @@ def poly_A_percentage(seq):
                     scoreT = 1.0 * sc / (e-s)
                     #print "%s %s %s" % (s, e, scoreT)
                     if scoreT > 0.70:
-                        predicted[(e-s+1, scoreT)] = (s, e)
+                        predicted[(e-s+1, s)] = (s, e)
     if len(predicted.keys()) > 0:
         sorted_scores = sorted(predicted.keys(), reverse=True)
-        #print "max score %s pos %s " % (sorted_scores[0], predicted[sorted_scores[0]])
-        return predicted[sorted_scores[0]]
+        max_ties = [sc[1] for sc in sorted_scores if sc[0] == sorted_scores[0][0]]
+        sooner = sorted(max_ties)[0]
+        #print "max score %s pos %s " % (sorted_scores[0][0], predicted[(sorted_scores[0][0], sooner)])
+        return predicted[(sorted_scores[0][0], sooner)]
     else:
         False
 
 
-def polyA(string):
+def polyA(string, maxl=30, endl=50):
     smax = -1
     emax = -1
     scmax = -100
     if re.search("TTT", string):
-        for s in range(30):
+        for s in range(0, maxl):
             sc = 0
-            #print s
-            if re.match("TT", string[s:]):
-            #string[s]=="T":
-                for e in range(s+5, 50-s, 2):
-                    #print e
-                    sc = numpy.sum(map(getsc, string[s:(e)]))
-                    nT = string[s:(e)].count("T")
-                    nO = len(string[s:(e)])-nT
+            converge = 0
+            if string[s:].startswith("TT"):
+                for e in range(s+5, endl-2, 2):
+                    if converge > 10:
+                        break
+                    if emax >= e - 3 and scmax < 0:
+                        converge += 1
+                    sc = numpy.sum(map(getsc, string[s:e]))
+                    nT = string[s:e].count("T")
+                    nO = len(string[s:e])-nT
                     if nO > 0:
                 #       print "other N %s" % nO
                         sc = nT - nO + sc
-                    #print string[s:(s+e)] 
-                    #print sc
-                    #print "%s %s %s %s %s" % (sc,scmax,s,e,string[s:(e)])
+                    #print "%s %s %s %s %s %s %s %s" % (sc,scmax,s,e,string[s:e], converge, len(string), endl)
                     if string[e] == "T" and string[e-1] != "T":
                         sc += 2
                         if sc >= scmax+6:
@@ -114,6 +117,7 @@ def _adapter(seq, qual):
 
 def _test():
         s1 = "CCCCGCATTAAACTTGTCAGAACCAGAGTNATCTTTTTTTTATTTTTTATCTTTTTGATTTATTTTCAGCTCTTCTTTTTCAGTCAAGAATTCTTGCTATTAGGAAAATAATTCCAGATACCATTATAGTAAATATTGCTAAAATGCAAAATACTAATAAAACCTTAGTAAAGTATGAAACTAAAACTAATAGGAAAATTAGAATTGGTGATAATGCTGATAATGAACAATATGAAGTAA"
+        s1 = "CAACTGTCGAGGGGGGTCAGTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTGTTCGTTGTTTTCTTTTCTATTTATTATTTATTT"
         seq, qual = _adapter(s1, s1)
         print seq
         ns = poly_A_percentage(seq)
@@ -122,18 +126,25 @@ def _test():
         print seq[ns[0]:ns[1]]
 
 
-def detect(in_file, out_prefix):
-    out_name = out_prefix + "-polyA.dat.gz"
-    out_name_false = out_prefix + "-none.dat.gz"
+def detect(data, args):
+    in_file = data['r2_path']
+    out_prefix = data['sample_id']
+    out_file = out_prefix + "_polyA.dat.gz"
+    out_name_false = out_prefix + "_none.dat.gz"
     counts = Counter()
-    print "reading file %s" % in_file
-    print "creating files %s %s" % (out_name, out_name)
-    if os.path.exists(out_name):
-        return out_name
-    with file_transaction(out_name) as tx_out_file:
+    num_line = 0
+    logger.my_logger.info("reading file %s" % in_file)
+    logger.my_logger.info("creating files %s %s" % (out_file, out_name_false))
+    data['detect'] = out_file
+    if os.path.exists(out_file):
+        return data
+    with file_transaction(out_file) as tx_out_file:
         with open_fastq(in_file) as handle, gzip.open(tx_out_file, 'w') as out, gzip.open(out_name_false, 'w') as out_false:
             for line in handle:
                 #print line
+                num_line += 1
+                if num_line % 1000000 == 0:
+                    logger.my_logger.info("read %s lines:" % num_line)
                 if line.startswith("@HISEQ"):
                     #print line
                     name = line.strip()
@@ -144,7 +155,8 @@ def detect(in_file, out_prefix):
                     #print "%s %s" % (seq, find)
                     if find:
                         seq, qual = find
-                        ns = poly_A_percentage(seq)
+                        #ns = poly_A_percentage(seq)
+                        ns = polyA(seq)
                         if ns:
                             if ns[1]-ns[0] >= 6:
                                 #print "positions are" + str(ns[0]) + ".." + str(ns[1])
@@ -167,6 +179,24 @@ def detect(in_file, out_prefix):
                     else:
                         out_false.write("%s\t%s\t%s\t%s\n" % ("No_tag", name, seq, qual))
                         counts['notag'] += 1
-        with open(out_name + ".stat", 'w') as handle:
+        with open(out_prefix + ".stat", 'w') as handle:
             handle.write("%s" % counts)
-    return out_name
+        logger.my_logger.info("%s" % counts)
+    return data
+
+
+def tune(mod, polya):
+    """correct mod"""
+    if mod == "":
+        return [mod, polya]
+    if sum([1 for nt in mod if nt == "T"]) == len(mod):
+        return ["", mod+polya]
+    seq = mod + polya
+    start_limit = len(mod) + 10 if len(polya) > 16 else len(mod) + len(polya) - 7
+    end_limit = 50 + len(mod) if len(polya) > 54 else len(seq)-3
+    find = polyA(seq, start_limit, end_limit)
+    if find:
+        mod = seq[:find[0]]
+        polya = seq[find[0]:]
+        return [mod, polya]
+    return False

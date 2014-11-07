@@ -6,7 +6,8 @@ from cluster_helper import cluster as ipc
 resources = {"align": [45, 12],
              "qc": [8, 1],
              "cleaning": [4, 1],
-             "polyA": [4, 1]}
+             "polyA": [4, 1],
+             "counts": [16, 4]}
 
 
 def get_cluster_view(args):
@@ -47,10 +48,10 @@ def send_job(fn, data, args, step):
         if not is_done(step):
             with get_cluster_view(args) as view:
                 for sample in data:
-                    res.append(view.apply_async(fn, *data[sample]))
-            res = wait_until_complete(res)
+                    res.append(view.apply_async(fn, sample, args))
+                res = wait_until_complete(res)
             flag_done(step)
             return res
     for sample in data:
-        res.append(fn(*data[sample]))
+        res.append(fn(sample, args))
     return res

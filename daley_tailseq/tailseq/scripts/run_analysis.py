@@ -1,9 +1,9 @@
 from argparse import ArgumentParser
 import os
-from itertools import izip
 from tailseq import align
 from tailseq import cluster
 from tailseq import detect
+from tailseq import counts
 
 
 def get_sample(line, sample_map_filename):
@@ -24,12 +24,16 @@ def get_r2_prepped_outfile(sample, alignment_dir):
 
 def get_star_prefix(fastq_file):
     base, _ = os.path.splitext(fastq_file)
-    return base
+    return base + "_base"
 
 
 def get_cleaned_outfile(align_file):
     base, ext = os.path.splitext(align_file)
-    return base + ".cleaned" + ext
+    return base + "_cleaned" + ext
+
+
+def get_prefix(in_file):
+    return in_file.split("_base")[0]
 
 
 if __name__ == "__main__":
@@ -57,21 +61,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    samples = get_samples_to_process(args.sample_map)
-    prepped = []
-    data = {}
-    for sample in samples:
-        data[sample['sample_id']] = [sample['r1_path'], args.aligner_index, get_star_prefix(sample['r1_path']), args.cores_per_job]
-    aligned = cluster.send_job(align.star_align, data, args, "align")
+    data = get_samples_to_process(args.sample_map)
 
-    for sample, sam_file in izip(samples, aligned):
-        data[sample['sample_id']] = [sam_file]
+    data = cluster.send_job(align.star_align, data, args, "align")
+    print data
     cluster.send_job(align.qc, data, args, "qc")
 
-    for sample, sam_file in izip(samples, aligned):
-        data[sample['sample_id']] = [sam_file, get_cleaned_outfile(sam_file)]
-    cleaned = cluster.send_job(align.clean_align, data, args, "cleaning")
+    data = cluster.send_job(detect.detect, data, args, "polyA")
 
-    for sample in samples:
-        data[sample['sample_id']] = [sample['r2_path'], sample['sample_id']]
-    polyA = cluster.send_job(detect.detect, data, args, "polyA")
+    data = cluster.send_job(counts.counts, data, args, "counts")
