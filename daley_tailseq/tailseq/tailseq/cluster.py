@@ -6,14 +6,17 @@ from cluster_helper import cluster as ipc
 resources = {"align": [45, 12],
              "qc": [8, 1],
              "cleaning": [4, 1],
-             "polyA": [4, 1],
+             "polyA": [8, 1],
              "counts": [16, 4]}
 
 
 def get_cluster_view(args):
+    if not os.path.exists("ipython"):
+        os.mkdir("ipython")
     return ipc.cluster_view(args.scheduler, args.queue,
                           args.num_jobs, args.cores_per_job,
                           start_wait=args.timeout,
+                          profile="ipython",
                           extra_params={"resources": args.resources,
                                         "mem": args.memory_per_job,
                                         "tag": "ts",

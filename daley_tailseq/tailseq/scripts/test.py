@@ -1,6 +1,11 @@
 from tailseq import cluster
 from argparse import ArgumentParser
 
+def sumnum(l):
+    return sum(l)
+
+def get_res(res):
+    return res
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Run a single cell analysis.")
@@ -24,6 +29,6 @@ if __name__ == "__main__":
     res = []
     with cluster.get_cluster_view(args) as view:
         for sample in [1, 2, 3]:
-            res.append(view.apply_async(sum, [1, 2, 3]))
-    res = cluster.wait_until_complete(res)
+            res.append(view.apply_async(sumnum, [1, 2, 3]))
+        res = cluster.wait_until_complete(res)
     print res
