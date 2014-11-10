@@ -50,15 +50,6 @@ row.names(files) <- files[,2]
 design <- data.frame(type=files[,2],row.names=files[,2])
 obj <- loadIso(files = files[,1], design = design ,header = T)
 
-# clus <- read.table("cluster/res/counts.tsv",header=T,sep="\t",row.names=1)
-# names(clus) <- gsub("mir.71","mir71",names(clus))
-# ann <- as.vector(unlist(as.data.frame((sapply(as.character(clus[,1]),strsplit, split="\\|")))[1,]))
-# clus_ma <- clus[,2:ncol(clus)]
-# clus_ma <- clus_ma[,row.names(design)]
-
-# total_clus <- read.table("cluster/res/stats_align.dat")
-# names(total_clus) <- c("size","sample","reads")
-# total_clus$sample <- gsub("mir-71","mir71",total_clus$sample)
 ```
 
 
@@ -113,12 +104,21 @@ this could mean that we have mRNA there, and there is no enrichment in small RNA
 But the small RNA that there is, is enriched in 22 nt long, meaning miRNA, so that is good.
 The exosomes samples are not enriched in miRNA, but we have a peak at 33. I would
 say these fragments are tRNA, but need to proceed with the analysis to confirm. 
-The bad thin is there is no 22 nt long enrichmend, so no miRNA enrichment.
+The bad thing is there is no 22 nt long enrichmend, so no miRNA enrichment.
 
 
 ## small RNA annotation
 
-Mainly tRNA in exosomes
+Mainly tRNA in exosomes.
+
+The colors mean:
+
+* red : sequences aligned
+* blue : sequences that are part of clusters of sequences (not sequences that are
+alone in one region)
+* green: sequences inside miRNAs
+* purple: other types like genes, snoRNAs
+* orange: sequences in tRNAs
 
 ```{r clusters}
 dd = read.table("~/orch/scratch/tina_exosomes/work/res/stats/stats_align.dat")
@@ -131,19 +131,40 @@ dd$ann[dd$V4=="json"] = "cluster"
 bytype = dd %>% group_by(V1,V2,ann) %>% summarise(total=sum(V3))
 ggplot(bytype, aes(y=total,x=V1,fill=ann))+
     geom_bar(stat = "identity", position = "dodge")+
-    facet_wrap(~V2)
+    facet_wrap(~V2, ncol=2) + 
+    scale_fill_brewer(palette = "Set1")
 ```
 
 
-## fragmens
+## fragments
 
-The bigger fragments don't seem to be transcriptomic. There is big ammount that are unkown.
+The bigger fragments(sequences without adapter) don't seem to be transcriptomic. There is big ammount that are unkown.
 
 ```{r rna}
 dd = read.table("~/orch/scratch/tina_exosomes/work/exosomes_large/work/project-summary.csv", header=1,sep=",",row.names=1)
-head(dd)
 knitr::kable(dd[,c(11,12,8,2)])
 ```
+
+## detection of unknown fragments
+I will map the a fraction of the sequences to the patents sequences. Normally there are primers of different protocols
+
+```{r pat}
+path_pat = paste0( root_path, "/work/exosomes_large/work/trimmed" )
+tab = data.frame()
+for (file in list.files(path_pat, ".counts")){
+    content = read.table( paste0(path_pat, "/", file) ) 
+    top = content[ order(content$V1, decreasing = T), ]
+    tab = rbind(tab, data.frame( sample=file, seq = top[1,2], abundance = top[1,1]/1000 * 100 ))
+}
+knitr::kable(tab)
+```
+
+There are a big ammount of other stuff there. Look for the meaning in this page:
+
+http://www.ncbi.nlm.nih.gov/nuccore/GI_ID (GI_ID is the number after "gi|" 
+in the `seq` column).
+
+("http://www.ncbi.nlm.nih.gov/nuccore/550574664")
 
 
 # Methods
