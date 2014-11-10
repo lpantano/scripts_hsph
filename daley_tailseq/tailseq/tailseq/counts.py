@@ -41,27 +41,29 @@ def _assign_gene(in_file, prefix):
 
 
 def _summarize(in_file, count_file, out_file):
+    logger.my_logger.info("summarize results")
     read_gene, counts_gene = _get_first_read(count_file)
     stats = defaultdict(Counter)
-    with gzip.open(in_file) as handle_polya:
-        for line in handle_polya:
-            cols = line.strip().split("\t")
-            find = tune(cols[3], cols[4])
-            read = cols[0].split(" ")[0].replace("@", "")
-            print "%s %s -----> %s " % (cols[3], cols[4], find)
-            if find:
+    if not os.path.exists(out_file):
+        with gzip.open(in_file) as handle_polya:
+            for line in handle_polya:
+                cols = line.strip().split("\t")
+                read = cols[0].split(" ")[0].replace("@", "")
                 if read in read_gene:
-                    gene = read_gene[read]
-                    stats[gene]["polyA"] += 1
-                    if find[0] != "":
-                        stats[gene][find[0]] += 1
-    with file_transaction(out_file) as tx_out_file:
-        with open(tx_out_file, 'w') as out:
-            for gene in counts_gene:
-                out.write("%s %s\n" % (gene, counts_gene[gene]))
-                if gene in stats:
-                    for mod, c in stats[gene].iteritems():
-                        out.write("%s %s\n" % (mod, c))
+                    find = tune(cols[3], cols[4])
+                #print "%s %s -----> %s " % (cols[3], cols[4], find)
+                    if find:
+                        gene = read_gene[read]
+                        stats[gene]["polyA"] += 1
+                        if find[0] != "":
+                            stats[gene][find[0]] += 1
+        with file_transaction(out_file) as tx_out_file:
+            with open(tx_out_file, 'w') as out:
+                for gene in counts_gene:
+                    out.write("%s counts %s\n" % (gene, counts_gene[gene]))
+                    if gene in stats:
+                        for mod, c in stats[gene].iteritems():
+                            out.write("%s %s %s\n" % (gene, mod, c))
 
 
 def _get_first_read(in_file):

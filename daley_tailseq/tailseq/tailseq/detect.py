@@ -3,6 +3,7 @@ import gzip
 import re
 import numpy
 import os
+from pandas import Series
 from collections import Counter
 from utils import open_fastq, file_transaction
 from tailseq import logger
@@ -26,15 +27,23 @@ def poly_A_percentage(seq):
     if re.search("TTT", seq):
         for s in range(0, 30):
             #print s
+            negative = 0
+            scoreT = 0
             if seq[s:].startswith("TT"):
             #string[s]=="T":
                 for e in range(s+5, s+60, 2):
                     #print e
+                    if negative > 9:
+                        break
                     sc = sum([1 for nt in seq[s:e] if nt == "T"])
                     scoreT = 1.0 * sc / (e-s)
                     #print "%s %s %s" % (s, e, scoreT)
                     if scoreT > 0.70:
                         predicted[(e-s+1, s)] = (s, e)
+                    else:
+                        negative += 1
+                if scoreT > 0.95:
+                    break
     if len(predicted.keys()) > 0:
         sorted_scores = sorted(predicted.keys(), reverse=True)
         max_ties = [sc[1] for sc in sorted_scores if sc[0] == sorted_scores[0][0]]
@@ -155,8 +164,8 @@ def detect(data, args):
                     #print "%s %s" % (seq, find)
                     if find:
                         seq, qual = find
-                        #ns = poly_A_percentage(seq)
-                        ns = polyA(seq)
+                        ns = poly_A_percentage(seq)
+                        #ns = polyA(seq)
                         if ns:
                             if ns[1]-ns[0] >= 6:
                                 #print "positions are" + str(ns[0]) + ".." + str(ns[1])
@@ -179,8 +188,9 @@ def detect(data, args):
                     else:
                         out_false.write("%s\t%s\t%s\t%s\n" % ("No_tag", name, seq, qual))
                         counts['notag'] += 1
-        with open(out_prefix + ".stat", 'w') as handle:
-            handle.write("%s" % counts)
+        with file_transaction(out_prefix + ".stat") as tx_stat_file:
+            df = Series(counts)
+            df.to_csv(tx_stat_file, sep="\t")
         logger.my_logger.info("%s" % counts)
     return data
 
