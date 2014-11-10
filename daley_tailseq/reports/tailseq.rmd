@@ -1,0 +1,145 @@
+---
+    output:
+    knitrBootstrap::bootstrap_document:
+    theme: readable
+highlight: zenburn
+theme.chooser: TRUE
+highlight.chooser: TRUE
+html_document:
+    toc: true
+highlight: zenburn
+---
+    
+# Report
+    
+### Setup: loading packages and data
+    
+```{r setup}
+library(knitr)
+library(rmarkdown)
+library(knitrBootstrap)
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(rjson)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+source("~/repos/myRfunctions/transactions.R")
+dn <- "daley_tailseq"
+root_path<-"~/ody/projects/daley_mRNA_mod/tailseq-112014"
+```
+
+```{r go}
+library(org.Hs.eg.db)
+set <- universeGO(org.Hs.egGO,"Homo sapiens")
+get_entrez = function(g){
+  require(biomaRt)
+  ensembl = useMart('ensembl', dataset = "hsapiens_gene_ensembl")
+  df = getBM(attributes=c("ensembl_gene_id", "entrezgene"), filters="ensembl_gene_id", values=g,mart=ensembl)
+  return(df[,2])
+}
+
+run_one_go = function(g, name){
+    s3_mf <- runGO(g_ezid[[1]],set,"MF",as.list(GOMFCHILDREN))
+    plotGO(s3_mf, name)
+    write.table(s3_mf[[1]], paste0(name, ".txt") )
+}
+
+run_go_enrichment = function(g){
+    run_one_go(g[[1]], "mf_polyA")
+    run_one_go(g[[2]], 'mf_mod')
+    run_one_go(g[[3]], 'mf_a')
+    run_one_go(g[[4]], 'mf_aa')
+    run_one_go(g[[5]], 'mf_c')
+}
+
+```
+
+```{r render,eval=FALSE}
+render_2_drop("~/repos/pipelines/daley_tailseq/report/tailseq.rmd",dn)
+```
+
+
+```{r load}
+setwd(root_path)
+
+```
+
+
+### polyA in read-2
+
+Red (reads with polyA), blue (reasd without polyA) and purple (reads with polyA < 6 nt) are the total amount of reads. Green (modifications) are reads with modifications afer polyA.
+
+```{r ploya}
+dd = data.frame()
+for (file in list.files("work", "stat$") ){
+    data = fromJSON(file = paste0(root_path, "/work/", file) )
+    dd = rbind(dd, as.data.frame(data))
+}
+dd$sample = c("s1", "s2", "s3" , "s4")
+ggplot( melt(dd), aes( x=sample, y=value, fill=variable ) ) +
+    geom_bar( stat = 'identity', position = 'dodge') + 
+    scale_fill_brewer( palette = "Set1" ) +
+    labs( list( y="reads" ) )
+
+```
+
+## Genes detected
+
+```{r read-summary}
+read_summary = function(dd){
+    dd = dd %>% filter(V3 > 1 & !grepl("N", V2) & !is.na(V2))
+    dd$type = as.character(dd$V2)
+    dd$type[ dd$type!="counts" & dd$type!="polyA" ] = "Mod"
+    dd_melt = dd %>% group_by(type) %>% summarise(genes=length(unique(V1)))
+    p = ggplot(dd_melt, aes(y=genes, x=type)) + 
+        geom_bar( stat = 'identity') 
+    print(p)
+    dd_melt = dd %>% group_by(V1,type) %>% summarise(total=sum(V3))
+    p <- ggplot(as.data.frame(dd_melt) , aes(x=type, y=total, fill=type))+
+        geom_boxplot() + 
+        scale_fill_brewer( palette = "Set1" ) + 
+        scale_y_log10()
+    print(p)
+    dd_melt = dd %>% filter(V2=="AA" | V2=="A" | V2=="C") 
+    ggplot(dd_melt, aes(x=V2, y=V3, fill=V2)) + 
+        geom_boxplot() +
+        scale_fill_brewer( palette = "Set1" ) + 
+        scale_y_log10()
+    ggplot(dd_melt, aes(x=V2)) + 
+        geom_bar()
+}
+
+get_set_genes = function(dd){
+    dd = dd %>% filter(V3 > 1 & !grepl("N", V2) & !is.na(V2))
+    poly = unique((dd %>% filter(V2=="polyA"))[,1])
+    aa = unique((dd %>% filter(V2=="AA"))[,1])
+    a = unique((dd %>% filter(V2=="A"))[,1])
+    c = unique((dd %>% filter(V2=="C"))[,1])
+    mod = unique((dd %>% filter(V2!="counts" & V2!="polyA"))[,1])
+    return( list(poly, mod, a, aa, c) )
+}
+
+```
+
+
+### Sample 3
+
+```{r}
+s3 = read.table("work/s3_summary.dat")
+read_summary(s3)
+genes = get_set_genes(s3)
+g_ezid = lapply(genes, get_entrez)
+run_go_enrichment(g_ezid)
+```
+
+
+
+
