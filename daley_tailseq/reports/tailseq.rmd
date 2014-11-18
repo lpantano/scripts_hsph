@@ -111,7 +111,7 @@ get_set_genes = function(dd){
 }
 
 filter_out = function(dd){
-    dd = dd %>% filter(V3 > 1 & !grepl("N", V2) & !is.na(V2))
+    dd = dd %>% filter(V3 > 2 & !grepl("N", V2) & !is.na(V2))
     genes = (dd %>% filter( V2=="polyA" & V3>=30 ))[,1]
     dd[ dd$V1 %in%  genes, ]
 }
@@ -258,12 +258,24 @@ void = lapply(1:7, function(x){
 all_genes = rbind(data.frame(gene=genes_s1[[1]],sample="s1",is=1),
       data.frame(gene=genes_s2[[1]],sample="s2",is=1),
       data.frame(gene=genes_s3[[1]],sample="s3",is=1),
-      data.frame(gene=genes_s4[[1]],sample="s4",is=1)
+      data.frame(gene=genes_s4[[1]],sample="s4",is=1),
+      data.frame(gene=sp.f[sp.f[,3]>1,1],sample="public",is=1)
       )
+
+total_genes = all_genes %>% group_by(sample) %>% summarise(total = sum(is)) %>% ungroup()
 all_genes = reshape(all_genes, timevar = "sample",idvar = "gene", direction = "wide")
 all_genes[is.na(all_genes)] = 0
-detect = rowSums(all_genes[,2:5])
+detect = rowSums(all_genes[,2:6])
 table(detect)
+
+all_genes_sum = all_genes %>% group_by(is.s1, is.s2, is.s3, is.s4,is.public) %>% summarise(total = n()) %>% ungroup()
+per = apply( all_genes_sum, 1, function(x){
+     unlist((x[6]/as.vector(total_genes[,2])) * x[1:5] *100 )
+    })
+per[per==0] = NA
+all_genes_sum = cbind( all_genes_sum, t(per) )
+cols = brewer.pal(5,"")
+aheatmap( t(as.matrix(all_genes_sum[,7:11])), annCol = all_genes_sum[,1:5], Colv = NA, Rowv = NA,cellheight = 45,  fontsize=9)
 ```
 
 ### s1/s2 with public data
