@@ -1,0 +1,314 @@
+---
+title: "mirna as predictor of HIV"
+author: "Lorena Pantano"
+date: "09/15/2014"
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    highlight: zenburn
+
+---
+
+```{r setup}
+library(knitr)
+library(rmarkdown)
+library(knitrBootstrap)
+library(ggplot2)
+library(reshape)
+library(dplyr)
+library(edgeR)
+library(DESeq2)
+library(RUVSeq)
+library(limma)
+library(genefilter)
+library(CHBUtils)
+library(NMF)
+library(dendextend)
+library(pscl)
+library(gtools)
+library(seqinr)
+library(gridExtra)
+library(scde)
+library(dendextend)
+theme_set(theme_bw())
+opts_chunk$set(tidy=TRUE, highlight=T, figalign="center",
+               fig.height=6, fig.width=9, message=F, error=F, warning=F, bootstrap.show.code=FALSE)
+source("~/repos/myRfunctions/transactions.R")
+dn <- "fichorova_mirna"
+root_path<-"~/repos/pipelines/fichorova_mirna"
+```
+
+```{r render,eval=FALSE}
+render_2_drop("~/repos/pipelines/fichorova_mirna/reports/minra.rmd",dn)
+```
+
+
+```{r load}
+setwd(root_path)
+counts = read.table(paste0(root_path, "/fichorova_mirna.csv"), header=T, row.names = 1, sep="\t")
+metadata = read.table(paste0(root_path, "/metadata.csv"), header=T, row.names = 1, sep="\t", stringsAsFactors = F)
+metadata[is.na(metadata)] = "None"
+row.names(metadata) = names(counts)
+counts = counts[ ,grepl("Exosome",metadata$SampleID) ]
+metadata = metadata[ grepl("Exosome",metadata$SampleID), ]
+metadata$pato = c("None","PB","Normal","Normal","Activator","None","Activator","PB","PB_activator","TV","Normal","None","AV")
+```
+
+
+# Intro
+
+
+### Average expression
+
+
+```{r raw-data}
+type = as.character( row.names(counts) )
+type[ grepl("miR", type) ] = "miR"
+type[ grepl("let", type) ] = "miR"
+type[ grepl("HK_", row.names(counts) ) ] = "HK"
+type[ grepl("ANT", row.names(counts) ) ] = "NEG"
+type[ grepl("POS", row.names(counts) ) ] = "POS"
+
+
+
+dd = melt(cbind(counts, type))
+dd$exp = metadata[ dd$variable, 2 ]
+ggplot( dd, aes(y=log2(value+1),x=variable, fill=exp) ) +
+    geom_boxplot()+
+    theme_bw() +
+    facet_wrap(~type) 
+    
+```
+
+It seems positive controls are quite similar. No problems in the technology itself.
+
+And negative controls show no technology noise.
+
+### Total counts detected
+
+```{r raw-total}
+dd = dd %>% group_by(type,variable,exp) %>%
+     summarise(total=sum(value))
+ggplot( dd, aes(y=total, x=variable, fill= exp) ) +
+    geom_bar( stat = 'identity', position = "dodge" ) +
+    theme_bw() +
+    scale_fill_brewer( palette = "Set1" )+
+    facet_wrap(~type)
+```
+
+There are some samples with low number of counts compared to others, that will 
+affect the comparison because non_seen miRNAs are difficult to predict as 
+expressed or not expressed.
+
+
+### cumulative curve
+
+This helps to see if the complexity of miRNA detected is similar.
+
+```{r raw-cumulative}
+dd = data.frame()
+for (i in 1:ncol(counts)){
+    y = cumsum( sort(counts[grepl("miR",type),i], decreasing = T) )[1:100]
+    dd = rbind(dd, data.frame(y=y, rank = 1:length(y) , sample = i, exp = metadata$Expcode[i]))
+}
+
+
+ggplot( dd, aes(y=y, x=rank, colour= as.factor(sample)) ) +
+    geom_point() +
+    theme_bw() +
+    scale_fill_brewer( palette = "Set1" )
+
+
+```
+
+It is quite diverse. And it looks like only around 10 miRNAs are the ones that explain
+all the data.
+
+The same plot but with percentages of total data.
+
+```{r raw-cum-percentage}
+dd = data.frame()
+for (i in 1:ncol(counts)){
+    y = cumsum( sort(counts[grepl("miR",type),i], decreasing = T) )[1:100] / sum(counts[,i])
+    dd = rbind(dd, data.frame(y=y, rank = 1:length(y) , sample = i, exp = metadata$Expcode[i]))
+}
+
+
+ggplot( dd, aes(y=y, x=rank, colour= as.factor(sample)) ) +
+    geom_point() +
+    theme_bw() +
+    scale_fill_brewer( palette = "Set1" ) +
+    labs(list(y="% of data"))
+
+```
+
+
+
+## Normalize by library size
+
+```{r norm}
+dge <- DGEList(counts=counts)
+dge <- calcNormFactors(dge)
+cpm = cpm(dge,lib.size = T,log = T)
+dd = melt( as.data.frame(cbind(cpm, type)), id.vars = "type" )
+dd$exp = metadata[ dd$variable, 2 ]
+dd$value = as.numeric(as.character(dd$value))
+ggplot( dd, aes(y=value,x=variable, fill=exp) ) +
+    geom_boxplot()+
+    theme_bw() +
+    facet_wrap(~type) 
+
+```
+
+
+### positive mirnas and quantile 60%
+
+It helps to see the positive probes expression and the lowest expressed
+miRNA in case
+
+```{r q20}
+q60 <- apply(counts[type=="miR",],2,quantile,.60)
+pos_values <- colMeans(counts[type=="POS",])
+
+ggplot(data.frame(values=c(q60,pos_values), measure=c(rep("q60",length(q60)),
+                                                      rep("positive",length(pos_values))
+                                                      )
+                  ))+
+                      geom_jitter(aes(y=values,x=measure))
+
+```
+
+I think there is no background noise, so I will keep any miRNA with more than 5
+counts in average? (some groups only have 1 sample, avoiding to remove miRNAs
+only expressed in more than X samples)
+
+### filtering
+
+I will keep only miRNAs that have a good expression, like average expression more than > 5 counts.
+
+```{r keep}
+keep <- apply(counts[type=="miR" | type=="POS",],1, function(x){
+    mean(x) >= 5
+})
+
+counts_filter = counts[ type == "miR" | type == "POS",][keep,]
+```
+
+Getting after that `r sum(keep)` miRNAs.
+
+```{r norm-filter}
+dge <- DGEList(counts=counts_filter)
+dge <- calcNormFactors(dge)
+cpm = cpm(dge,lib.size = T,log = T)
+
+type = as.character( row.names(cpm) )
+type[ grepl("miR-", type) ] = "miR"
+type[ grepl("let-", type) ] = "miR"
+type[ grepl("HK_", type) ] = "HK"
+type[ grepl("ANT", type ) ] = "NEG"
+type[ grepl("POS", type ) ] = "POS"
+
+dd = melt( as.data.frame(cbind(cpm, type)), id.vars = "type" )
+dd$exp = metadata[ dd$variable, 2 ]
+dd$value = as.numeric(as.character(dd$value))
+ggplot( dd, aes(y=value,x=variable, fill=exp) ) +
+    geom_boxplot()+
+    theme_bw() +
+    facet_wrap(~type) 
+
+```
+
+## Normalization by positive control 
+
+In addition to library size, we will normalize using the positive controls as well.
+I will use RUVseq package. With this will get a factor that should help to make
+samples equal. At least, to remove noise coming from technical problems.
+
+```{r ruv-neg}
+controls = row.names(counts_filter)[type=="POS"]
+set = newSeqExpressionSet(as.matrix(counts_filter), phenoData = metadata[,c(1,2)])
+set_norm = RUVg(set, controls, k=1)
+
+```
+
+
+### Expression after normalization
+
+```{r after-ruv}
+dge_ruv <- DGEList(counts=set_norm@assayData$normalizedCounts)
+dge_ruv <- calcNormFactors(dge_ruv)
+cpm_ruv = cpm(dge_ruv,lib.size = T,log = T)
+
+dd = melt( as.data.frame(cbind(cpm_ruv, type)), id.vars = "type" )
+dd$exp = metadata[ dd$variable, 2 ]
+dd$value = as.numeric(as.character(dd$value))
+ggplot( dd, aes(y=value,x=variable, fill=exp) ) +
+    geom_boxplot()+
+    theme_bw() +
+    facet_wrap(~type) 
+
+```
+
+
+It seems good enough to try to do some comparison samples.
+
+
+There is a correlation among library_size and the factor extracted by RUVseq.
+
+```{r ruv-w-cor}
+dd = data.frame( weight = set_norm@phenoData@data$W_1,
+                 library_size = colSums(counts_filter) )
+ggplot(dd, aes(weight, library_size)) + 
+    geom_point()
+```
+
+
+### clustering
+
+```{r mds}
+cpm_ruv = cpm_ruv[type=="miR",]
+mds(cpm_ruv, condition = metadata$Expcode,xi = 1, yi = 2,d = "cor") +
+    scale_color_brewer(palette = "Set1")
+mds(cpm_ruv, condition = metadata$pato,xi = 1, yi = 2,d = "cor") +
+    scale_color_brewer(palette = "Set1")
+```
+
+### heatmap with highest variable miRNAS
+
+```{r lower}
+cv <- apply(cpm_ruv,1,function(x){
+    sd(x)/mean(x)
+})
+
+max.cv <- names(head(sort(cv,decreasing = T),20))
+max.exp = names(head( sort(rowMeans(cpm_ruv), decreasing = T),50))
+```
+
+Heatmap using the most variable miRNAs
+
+
+```{r heatmap}
+cols1 = brewer.pal(9,"Set1")
+cols2 = brewer.pal(9,"Set3")
+aheatmap( cpm_ruv[max.cv,], annCol = metadata[,c(2,4)], annLegend = TRUE,labCol="",hclustfun="ward",annColors = list(Expcode=cols1,pato=cols2), labRow  = row.names(cpm_ruv[max.cv,]) )
+```
+
+
+## DEG
+
+```{r, eval=FALSE}
+d.sva <- model.matrix(~set_norm@phenoData@data$W_1 + metadata[,2])
+colnames(d.sva)<- gsub("d.ma\\$","",colnames(d.sva))
+v.sva <- voom(dge,d.sva,plot = TRUE)
+fit.sva<-lmFit(v.sva)
+fit.sva<-eBayes(fit.sva)
+whole_table <- topTable(fit.sva,coef = "gest_cat267-287", number = nrow(v.sva$E))
+idx<-match(row.names(whole_table),x$Accession)
+whole_table$name <- gsub("[::|::].*$","",x[idx,"Name"])
+whole_table$adj.P.Val<-p.adjust(whole_table$P.Value)
+```
+
