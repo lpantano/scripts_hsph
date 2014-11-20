@@ -43,7 +43,7 @@ dn <- "fichorova_mirna"
 opts_chunk$set(tidy=TRUE, highlight=T, figalign="center",cache=F,
                fig.height=6, fig.width=9, message=F, error=F, warning=F, bootstrap.show.code=FALSE)
 source("~/repos/myRfunctions/transactions.R")
-render_2_drop("~/repos/pipelines/fichorova_mirna/reports/mirna.rmd",dn)
+#render_2_drop("~/repos/pipelines/fichorova_mirna/reports/mirna.rmd",dn)
 ```
 
 
@@ -235,7 +235,7 @@ samples equal. At least, to remove noise coming from technical problems.
 
 controls = row.names(counts_filter)[type=="POS"]
 set = newSeqExpressionSet(as.matrix(counts_filter), phenoData = metadata[,c(1,2)])
-set_norm = RUVg(set, controls, k=2)
+set_norm = RUVg(set, controls, k=1)
 
 ```
 
@@ -289,7 +289,7 @@ cv <- apply(cpm_ruv,1,function(x){
     sd(x)/mean(x)
 })
 
-max.cv <- names(head(sort(cv,decreasing = T),25))
+max.cv <- names(head(sort(cv,decreasing = T),30))
 max.exp = names(head( sort(rowMeans(cpm_ruv), decreasing = T),50))
 ```
 
@@ -299,7 +299,7 @@ Heatmap using the most variable miRNAs
 ```{r heatmap}
 cols1 = brewer.pal(9,"Set1")
 cols2 = brewer.pal(9,"Set3")
-aheatmap( cpm_ruv[max.cv,], annCol = metadata[,c(2,4)], annLegend = TRUE,hclustfun="ward",annColors = list(Expcode=cols1,pato=cols2), labRow  = row.names(cpm_ruv[max.cv,]) )
+aheatmap( cpm_ruv[max.cv,], annCol = metadata[,c(2,4)], annLegend = TRUE,distfun = function(x){dist(x)^2},hclustfun="ward",annColors = list(Expcode=cols1,pato=cols2), labRow  = row.names(cpm_ruv[max.cv,]) )
 ```
 
 
@@ -422,4 +422,30 @@ void = copy_batch_2_drop("txt",dn)
 knitr::kable(do.call(rbind, f))
 ```
 
+### figures
+
+```{r heatmap-for-grant}
+cv <- apply(cpm_ruv,1,function(x){
+    sd(x)/mean(x)
+})
+max.cv <- names(head(sort(cv,decreasing = T),25))
+aheatmap( cpm_ruv[max.cv,-10], annCol = metadata[-10,c(4),drop=FALSE], annLegend = TRUE,hclustfun="ward",annColors = list(Group=cols1),labCol="", labRow  = row.names(cpm_ruv[max.cv,]),fontsize = 11, cexRow = 2 )
+
+new_count = cpm_ruv[max.cv,c("X5","X7","X11","X15","X20")]
+#2 19 10
+new_count=cbind(new_count,data.frame(nomedium=rowMeans(cpm_ruv[max.cv,c("X2","X19","X10")])))
+#4 18 
+new_count=cbind(new_count,data.frame(lc=rowMeans(cpm_ruv[max.cv,c("X18","X4")])))
+#3 12
+new_count=cbind(new_count,data.frame(pb=rowMeans(cpm_ruv[max.cv,c("X3","X12")])))
+
+meta = metadata[c("X5","X7","X11","X15","X20","X2","X4","X3"),]
+
+meta[,4] = factor(meta[,4],levels=c("A. vaginae","P. bivia", "P. bivia with poly(I:C)","poly(I:C)","L. crispatus", "L. gasseri",
+                                     "No bacteria", "MALP-2"))
+aheatmap( new_count, annCol = meta[,c(4),drop=FALSE], annLegend = TRUE, distfun = function(x){dist(x)^2}, hclustfun="ward",annColors = list(Group=cols1),labCol= NA, labRow  = row.names(cpm_ruv[max.cv,]),fontsize = 11, cexRow = 2 )
+
+
+
+```
 
