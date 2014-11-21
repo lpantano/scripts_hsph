@@ -1,5 +1,6 @@
 from utils import file_transaction
 import os
+import pysam
 import gzip
 from collections import defaultdict, Counter
 from tailseq import do
@@ -16,7 +17,7 @@ def counts(data, args):
     out_file = prefix + "counts"
     data['counts'] = _cmd_counts(in_file, out_file, gtf_file, cores)
     data['assign'] = _assign_gene(data['counts'], prefix)
-    _summarize(data['detect'], data['assign'], prefix + "summary.dat")
+    _summarize(data['detect'], data['align_r2'], data['assign'], prefix + "summary.dat")
     return data
 
 
@@ -40,23 +41,34 @@ def _assign_gene(in_file, prefix):
     return out_file
 
 
-def _summarize(in_file, count_file, out_file):
+def _summarize(in_file, align_r2, count_file, out_file):
+    log_file = out_file + ".log"
     logger.my_logger.info("summarize results")
     read_gene, counts_gene = _get_first_read(count_file)
+    logger.my_logger.info("load read 1")
+    read_gene = _get_second_read(align_r2, read_gene)
+    logger.my_logger.info("load read 2")
     stats = defaultdict(Counter)
     if not os.path.exists(out_file):
         with gzip.open(in_file) as handle_polya:
+            log_handle = open(log_file, 'w')
             for line in handle_polya:
                 cols = line.strip().split("\t")
                 read = cols[0].split(" ")[0].replace("@", "")
                 if read in read_gene:
                     find = tune(cols[3], cols[4])
-                #print "%s %s -----> %s " % (cols[3], cols[4], find)
+                    if len(cols[3] + cols[4] + cols[6]) > 135:
+                        continue
                     if find:
-                        gene = read_gene[read]
-                        stats[gene]["polyA"] += 1
-                        if find[0] != "":
-                            stats[gene][find[0]] += 1
+                        log_handle.write("found %s %s %s ---> %s %s\n" % (read, cols[3], cols[4], find, read_gene[read]))
+                        if read_gene[read][1]:
+                            #print "is polya"
+                            gene = read_gene[read][0]
+                            stats[gene]["polyA"] += 1
+                            if find[0] != "":
+                                stats[gene][find[0]] += 1
+                    else:
+                        log_handle.write("corrected %s %s %s ---> %s %s\n" % (read, cols[3], cols[4], find, read_gene[read]))
         with file_transaction(out_file) as tx_out_file:
             with open(tx_out_file, 'w') as out:
                 for gene in counts_gene:
@@ -66,12 +78,47 @@ def _summarize(in_file, count_file, out_file):
                             out.write("%s %s %s\n" % (gene, mod, c))
 
 
+def _get_second_read(sam_file, read1_assing):
+    num_lines = 0
+    with pysam.Samfile(sam_file, 'r') as sam:
+        for read in sam.fetch():
+            num_lines += 1
+            if num_lines % 1000000 == 0:
+                logger.my_logger.info(num_lines)
+            if not read.is_unmapped and read.qname in read1_assing and not read.is_secondary and read.is_read2:
+                nm = int([t[1] for t in read.tags if t[0] == "NM"][0])
+                name = read.qname
+                cigar = read.cigar[::-1] if read.is_reverse else read.cigar
+                read1_assing[name][1] = _is_polyA(cigar, nm, read.is_proper_pair) 
+                #print "%s %s %s %s %s %s %s" % (read.seq, name, nm, cigar, read.is_reverse, read.is_proper_pair, _is_polyA(cigar, nm, read.is_proper_pair))
+    return read1_assing
+
+
+def _is_polyA(cigar, nm, pair):
+    """guess if all nt after 20 adapter are mapped"""
+    if cigar[0][1] == 20 and _get_middle(cigar) > 90 and pair:
+        return False
+    if cigar[0][1] - 20 >= 6:
+        return [cigar, nm]
+    return False
+
+
+def _get_middle(cigar):
+    l = 0
+    for c in cigar:
+        if c[0] != 4:
+            l += c[1]
+        else:
+            break
+    return l
+
+
 def _get_first_read(in_file):
-    gene = {}
+    gene = defaultdict(list)
     stats = Counter()
     with open(in_file) as counts:
         for line in counts:
             cols = line.strip().split("\t")
-            gene[cols[0]] = cols[1]
+            gene[cols[0]] = [cols[1], "None"]
             stats[cols[1]] += 1
     return gene, stats

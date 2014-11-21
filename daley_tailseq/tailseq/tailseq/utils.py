@@ -98,7 +98,7 @@ def safe_makedir(dname):
 def file_exists(fname):
     """Check if a file exists and is non-empty.
     """
-    return fname and os.path.exists(fname) and os.path.getsize(fname) > 0
+    return os.path.exists(fname)
 
 
 def splitext_plus(f):

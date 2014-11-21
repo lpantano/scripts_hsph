@@ -3,11 +3,12 @@ import logger
 from cluster_helper import cluster as ipc
 
 
-resources = {"align": [45, 12],
+resources = {"align_r1": [45, 12],
+             "align_r2": [45, 12],
              "qc": [8, 1],
              "cleaning": [4, 1],
-             "polyA": [8, 1],
-             "counts": [16, 4]}
+             "polyA": [16, 1],
+             "counts": [32, 4]}
 
 
 def get_cluster_view(args):

@@ -117,7 +117,7 @@ def _adapter(seq, qual):
     TAG = "GTCAG"
     tag_pos = seq.find(TAG, 15, 25)
     #print tag_pos
-    if tag_pos:
+    if tag_pos >= 0:
         tag_pos += 5
         return seq[tag_pos:], qual[tag_pos:]
     else:
@@ -201,6 +201,8 @@ def tune(mod, polya):
         return [mod, polya]
     if sum([1 for nt in mod if nt == "T"]) == len(mod):
         return ["", mod+polya]
+    if len(polya) < 7:
+        return False
     seq = mod + polya
     start_limit = len(mod) + 10 if len(polya) > 16 else len(mod) + len(polya) - 7
     end_limit = 50 + len(mod) if len(polya) > 54 else len(seq)-3

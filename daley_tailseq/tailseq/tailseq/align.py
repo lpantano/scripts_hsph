@@ -11,23 +11,35 @@ MAX_EDIT_DISTANCE = 15
 MAX_BEST = 10
 
 
-def star_align(data, args):
-    cores = args.cores_per_job
+def align_read1(data, args):
     fastq_path = data['r1_path']
-    reference_prefix = args.aligner_index
     out_prefix = data['sample_id'] + "_"
+    data["align"], data["clean"] = star_align(data, args, fastq_path, out_prefix)
+    return data
+
+
+def align_read2(data, args):
+    fastq_path = data['r2_path'] + " " + data['r1_path']
+    out_prefix = data['sample_id'] + "_both_"
+    opts = "--clip3pNbases 0 25 --clip5pNbases 0 20 "
+    data["align_r2"], data["clean_r2"] = star_align(data, args, fastq_path, out_prefix, opts)
+    return data
+
+
+def star_align(data, args, fastq_path, out_prefix, opts=""):
+    cores = args.cores_per_job
+    reference_prefix = args.aligner_index
     max_best = MAX_BEST
     out_file = out_prefix + "Aligned.out.sam"
-    if not file_exists(out_file):
+    if not os.path.exists(out_file):
         cmd = ("STAR --genomeDir {reference_prefix} --readFilesIn {fastq_path} --readFilesCommand zcat "
            "--runThreadN {cores} --outFileNamePrefix {out_prefix} "
            "--outFilterMultimapNmax {max_best} "
-           "--outSAMattributes NH HI NM MD AS "
+           "--outSAMattributes NH HI NM MD AS {opts} "
            "--outSAMstrandField intronMotif").format(**locals())
         do.run(cmd)
-    data['align'] = out_file
-    data['clean'] = clean_align(out_file, out_prefix + "cleaned.sam")
-    return data
+    clean_file = clean_align(out_file, out_prefix + "cleaned.sam")
+    return out_file, clean_file
 
 
 def qc(data, args):
