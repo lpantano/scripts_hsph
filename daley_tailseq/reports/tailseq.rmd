@@ -110,9 +110,9 @@ get_set_genes = function(dd){
     return( list(poly, mod, a, aa, c, top10, top5) )
 }
 
-filter_out = function(dd){
-    dd = dd %>% filter(V3 > 2 & !grepl("N", V2) & !is.na(V2))
-    genes = (dd %>% filter( V2=="polyA" & V3>=30 ))[,1]
+filter_out = function(dd, cuta=30, cutmod=2){
+    dd = dd %>% filter(V3 > cutmod & !grepl("N", V2) & !is.na(V2))
+    genes = (dd %>% filter( V2=="polyA" & V3>=cuta ))[,1]
     dd[ dd$V1 %in%  genes, ]
 }
 
@@ -135,6 +135,10 @@ poly_read_summary = function(dd){
 }
 
 
+rm_na = function(x){
+    x[!is.na(x)]
+}
+
 ```
 
 
@@ -146,6 +150,9 @@ These are the stats of read_2 before taking into account the ones where the pair
 read_1 maps onto a gene. In this case half of the reads_1 map on to genes 
 (Only it counts reads that map to only one gene, that reduce the number of reads with assigned genes.)
 
+
+And we applied here another filter to reduce the number of false positive of polyA.
+Normally short polyA with long modifications.
 
 ```{r ploya}
 dd = data.frame()
@@ -165,15 +172,17 @@ ggplot( dd, aes( x=sample, y=V2, fill=V1 ) ) +
 
 After that filter, we reduce the total number of reads, but still have a lot.
 
+### polyA > 200 and size >= 8 nt
+
 ```{r polya-filter}
-s1 = read.table(paste0(root_path,"/work/s1_summary.dat"))
-s1 = filter_out(s1)
-s2 = read.table(paste0(root_path,"/work/s2_summary.dat"))
-s2 = filter_out(s2)
-s3 = read.table(paste0(root_path,"/work/s3_summary.dat"))
-s3 = filter_out(s3)
-s4 = read.table(paste0(root_path,"/work/s4_summary.dat"))
-s4 = filter_out(s4)
+s1 = read.table(paste0(root_path,"/work/filter_polya6/s1_summary.dat"))
+s1 = filter_out(s1,100)
+s2 = read.table(paste0(root_path,"/work/filter_polya6/s2_summary.dat"))
+s2 = filter_out(s2,100)
+s3 = read.table(paste0(root_path,"/work/filter_polya6/s3_summary.dat"))
+s3 = filter_out(s3,100)
+s4 = read.table(paste0(root_path,"/work/filter_polya6/s4_summary.dat"))
+s4 = filter_out(s4,100)
 genes_s1 = get_set_genes(s1)
 genes_s2 = get_set_genes(s2)
 genes_s3 = get_set_genes(s3)
@@ -195,7 +204,7 @@ poly_read_summary(s4)
 It will show comparison among samples
 
 
-```{r go}
+```{r go,eval=FALSE}
 library(org.Hs.eg.db)
 set <- universeGO(org.Hs.egGO,"Homo sapiens")
 get_entrez = function(g){
@@ -235,11 +244,30 @@ run_go_enrichment = function(g, sample){
 sp<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/SPtable.csv",header=T,sep=",")
 library(biomaRt)
 mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
-g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol") , filters=
+g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
 "hgnc_symbol"    , values =as.character(sp$Gene.Name) ,mart=mart)
 idx<-match(sp$Gene.Name,g$hgnc_symbol)
 sp$ens<-g[idx,1]
 sp.f<-sp[,c(24,2,3,11,12,13,14,15,16,17,18,19),]
+
+sp_reworked<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/summary.complete.8As",header=F,sep="\t")
+sp_rw_f = sp_reworked %>% group_by(V1) %>% summarise(polyA=sum(V2)) %>% ungroup()
+
+
+sp_rw_genes = subset(sp_rw_f,polyA>=30)[,1]
+venn(list(public=public,rw=sp_rw_genes))  
+```
+
+
+```{r biotype}
+s1_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"ensembl_gene_id"    , values =as.character(s1[[1]]) ,mart=mart)
+s2_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"ensembl_gene_id"    , values =as.character(s2[[1]]) ,mart=mart)
+s3_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"ensembl_gene_id"    , values =as.character(s3[[1]]) ,mart=mart)
+s4_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"ensembl_gene_id"    , values =as.character(s4[[1]]) ,mart=mart)
 ```
 
 
@@ -259,22 +287,20 @@ all_genes = rbind(data.frame(gene=genes_s1[[1]],sample="s1",is=1),
       data.frame(gene=genes_s2[[1]],sample="s2",is=1),
       data.frame(gene=genes_s3[[1]],sample="s3",is=1),
       data.frame(gene=genes_s4[[1]],sample="s4",is=1),
-      data.frame(gene=sp.f[sp.f[,3]>1,1],sample="public",is=1)
+      data.frame(gene=rm_na(sp.f[sp.f[,3]>1,1]),sample="public",is=1)
       )
 
 total_genes = all_genes %>% group_by(sample) %>% summarise(total = sum(is)) %>% ungroup()
 all_genes = reshape(all_genes, timevar = "sample",idvar = "gene", direction = "wide")
 all_genes[is.na(all_genes)] = 0
 detect = rowSums(all_genes[,2:6])
-table(detect)
-
 all_genes_sum = all_genes %>% group_by(is.s1, is.s2, is.s3, is.s4,is.public) %>% summarise(total = n()) %>% ungroup()
 per = apply( all_genes_sum, 1, function(x){
      unlist((x[6]/as.vector(total_genes[,2])) * x[1:5] *100 )
     })
 per[per==0] = NA
 all_genes_sum = cbind( all_genes_sum, t(per) )
-cols = brewer.pal(5,"")
+#cols = brewer.pal(5,"")
 aheatmap( t(as.matrix(all_genes_sum[,7:11])), annCol = all_genes_sum[,1:5], Colv = NA, Rowv = NA,cellheight = 45,  fontsize=9)
 ```
 
