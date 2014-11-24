@@ -107,7 +107,7 @@ get_set_genes = function(dd){
                          arrange( desc(V3) ))[1:n10,1])
     top5 = unique(( dd %>% filter( V2=="A" |  V2=="AA" | V2=="C"  ) %>%
                          arrange( desc(V3) ))[1:n5,1])
-    return( list(poly, mod, a, aa, c, top10, top5) )
+    return( list("polyA"=poly, "mod"=mod, "a"=a, "aa"=aa, "c"=c, "top10"=top10, "top5"=top5) )
 }
 
 filter_out = function(dd, cuta=30, cutmod=2){
@@ -137,6 +137,75 @@ poly_read_summary = function(dd){
 
 rm_na = function(x){
     x[!is.na(x)]
+}
+
+```
+
+
+```{r go,eval=FALSE}
+library(org.Hs.eg.db)
+set <- universeGO(org.Hs.egGO,"Homo sapiens")
+get_entrez = function(g){
+  require(biomaRt)
+  ensembl = useMart('ensembl', dataset = "hsapiens_gene_ensembl")
+  df = getBM(attributes=c("ensembl_gene_id", "entrezgene"), filters="ensembl_gene_id", values=g,mart=ensembl)
+  return(df[,2])
+}
+
+run_one_go = function(g, name){
+    g = g[!is.na(g)]
+    mf <- runGO(g,set,"MF",as.list(GOMFCHILDREN))
+    #plotGO(mf, name)
+    write.table(mf[[1]], paste0(name, ".txt") )
+    #print(head(mf[[1]]))
+    return(mf[[1]][1:20,])
+}
+
+run_go_enrichment = function(g, sample){
+    table = vector("list")
+    table[[1]] = run_one_go(g[[1]], paste0(sample,"_mf_polyA"))
+    table[[2]] = run_one_go(g[[2]], paste0(sample,'_mf_mod'))
+    table[[3]] = run_one_go(g[[3]], paste0(sample,'_mf_a'))
+    table[[4]] = run_one_go(g[[4]], paste0(sample,'_mf_aa'))
+    table[[5]] = run_one_go(g[[5]], paste0(sample,'_mf_c'))
+    table[[6]] = run_one_go(g[[6]], paste0(sample,'_mf_top10'))
+    table[[7]] = run_one_go(g[[7]], paste0(sample,'_mf_top5'))
+    table
+}
+
+```
+
+```{r venn-function}
+
+do_df = function(sample, groups){
+    data.frame(gene=groups[[sample]],sample=sample,is=1)
+}
+
+do_venn = function(groups)
+{
+    n = length(groups)
+    all_genes = do.call(rbind, lapply(names(groups), do_df, groups) )
+    
+    total_genes = all_genes %>% group_by(sample) %>% summarise(total = sum(is)) %>% ungroup()
+    all_genes = reshape(all_genes, timevar = "sample",idvar = "gene", direction = "wide")
+    all_genes[is.na(all_genes)] = 0
+    
+    all_genes_sum = all_genes %>% group_by_(.dots = (names(all_genes[,1:n+1]))) %>% summarise(total = n()) %>% ungroup()
+    per = apply( all_genes_sum, 1, function(x){
+        unlist((x[n+1]/as.vector(total_genes[,2])) * x[1:n] * 100 )
+        })
+    per[per==0] = NA
+    rownames(per) = names(groups)
+ 
+    num = apply( all_genes_sum, 1, function(x){
+        unlist(x[n+1] * x[1:n]  )
+        })
+    num[num==0] = NA
+    rownames(num) = names(groups)
+ 
+    
+    aheatmap( t(as.matrix(t(per))), annCol = all_genes_sum[,1:n], Colv = NA, Rowv = NA,cellheight = 45, cellwidth = 25, fontsize=9, txt = num )
+    
 }
 
 ```
@@ -174,71 +243,23 @@ After that filter, we reduce the total number of reads, but still have a lot.
 
 ### polyA > 200 and size >= 8 nt
 
-```{r polya-filter}
-s1 = read.table(paste0(root_path,"/work/filter_polya6/s1_summary.dat"))
-s1 = filter_out(s1,100)
-s2 = read.table(paste0(root_path,"/work/filter_polya6/s2_summary.dat"))
-s2 = filter_out(s2,100)
-s3 = read.table(paste0(root_path,"/work/filter_polya6/s3_summary.dat"))
-s3 = filter_out(s3,100)
-s4 = read.table(paste0(root_path,"/work/filter_polya6/s4_summary.dat"))
-s4 = filter_out(s4,100)
+```{r polya-filter-200}
+s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
+s1 = filter_out(s1_raw,200)
+s2_raw = read.table(paste0(root_path,"/work/s2_summary.dat"))
+s2 = filter_out(s2_raw,200)
+s3_raw = read.table(paste0(root_path,"/work/s3_summary.dat"))
+s3 = filter_out(s3_raw,200)
+s4_raw = read.table(paste0(root_path,"/work/s4_summary.dat"))
+s4 = filter_out(s4_raw,200)
 genes_s1 = get_set_genes(s1)
 genes_s2 = get_set_genes(s2)
 genes_s3 = get_set_genes(s3)
 genes_s4 = get_set_genes(s4)
 
-print("s1")
-poly_read_summary(s1)
-print("s2")
-poly_read_summary(s2)
-print("s3")
-poly_read_summary(s3)
-print("s4")
-poly_read_summary(s4)
-```
-
-
-# Comparison
-
-It will show comparison among samples
-
-
-```{r go,eval=FALSE}
-library(org.Hs.eg.db)
-set <- universeGO(org.Hs.egGO,"Homo sapiens")
-get_entrez = function(g){
-  require(biomaRt)
-  ensembl = useMart('ensembl', dataset = "hsapiens_gene_ensembl")
-  df = getBM(attributes=c("ensembl_gene_id", "entrezgene"), filters="ensembl_gene_id", values=g,mart=ensembl)
-  return(df[,2])
-}
-
-run_one_go = function(g, name){
-    g = g[!is.na(g)]
-    mf <- runGO(g,set,"MF",as.list(GOMFCHILDREN))
-    #plotGO(mf, name)
-    write.table(mf[[1]], paste0(name, ".txt") )
-    #print(head(mf[[1]]))
-    return(mf[[1]][1:20,])
-}
-
-run_go_enrichment = function(g, sample){
-    table = vector("list")
-    table[[1]] = run_one_go(g[[1]], paste0(sample,"_mf_polyA"))
-    table[[2]] = run_one_go(g[[2]], paste0(sample,'_mf_mod'))
-    table[[3]] = run_one_go(g[[3]], paste0(sample,'_mf_a'))
-    table[[4]] = run_one_go(g[[4]], paste0(sample,'_mf_aa'))
-    table[[5]] = run_one_go(g[[5]], paste0(sample,'_mf_c'))
-    table[[6]] = run_one_go(g[[6]], paste0(sample,'_mf_top10'))
-    table[[7]] = run_one_go(g[[7]], paste0(sample,'_mf_top5'))
-    table
-}
 
 ```
 
-
-## Common genes
 
 ```{r public-data}
 sp<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/SPtable.csv",header=T,sep=",")
@@ -250,12 +271,33 @@ idx<-match(sp$Gene.Name,g$hgnc_symbol)
 sp$ens<-g[idx,1]
 sp.f<-sp[,c(24,2,3,11,12,13,14,15,16,17,18,19),]
 
+public = vector("list")
+
+sp.f = sp.f[!is.na(sp.f$ens),]
+public[["polyA"]] = data.frame(V1=sp.f$ens, V2="polyA", V3=sp.f$Total.poly.A...tags)
+
+p = sp.f[sp.f[,5]>1,1]
+public[["a"]] = data.frame(V1=p, V2="A", V3=sp.f[sp.f$ens %in% p ,5])
+
+p = sp.f[sp.f[,8]>1,1]
+public[["aa"]] = data.frame(V1=p, V2="AA", V3=sp.f[sp.f$ens %in% p ,8])
+
+p = sp.f[sp.f[,6]>1,1]
+public[["c"]] = data.frame(V1=p, V2="C", V3=sp.f[sp.f$ens %in% p ,6])
+
+public_raw = do.call(rbind, public)
+
 sp_reworked<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/summary.complete.8As",header=F,sep="\t")
-sp_rw_f = sp_reworked %>% group_by(V1) %>% summarise(polyA=sum(V2)) %>% ungroup()
+rw_raw = sp_reworked[,c(1,3,4)]
+names(rw_raw) = c("V1","V2","V3")
+rw_raw$V2 = as.character(rw_raw$V2)
+rw_raw$V2[rw_raw$V2=="None"] = "polyA"
 
+public = filter_out(public_raw,200)
+genes_public = get_set_genes(public)
+rw = filter_out(rw_raw,200)
+genes_rw = get_set_genes(rw)
 
-sp_rw_genes = subset(sp_rw_f,polyA>=30)[,1]
-venn(list(public=public,rw=sp_rw_genes))  
 ```
 
 
@@ -271,71 +313,128 @@ s4_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , f
 ```
 
 
+### Common genes among 4 samples
+
+
 ```{r common}
 
 type = c("polyA","Modification","add-U","add-UU","add-G","top 10%","top 5%")
 type_name = c("polyA","mod","a","aa","c","top10","top5")
-void = lapply(1:7, function(x){
-    venn(list(s1=genes_s1[[x]],
-              s2=genes_s2[[x]],
-              s3=genes_s3[[x]],
-              s4=genes_s4[[x]]))
-    title(type[x])
-})
+names(type) = type_name
+ void = lapply(type_name, function(x){
+     do_venn(list(s1=genes_s1[[x]],
+               s2=genes_s2[[x]],
+               s3=genes_s3[[x]],
+               s4=genes_s4[[x]]))
+     title(type[x])
+ })
 
-all_genes = rbind(data.frame(gene=genes_s1[[1]],sample="s1",is=1),
-      data.frame(gene=genes_s2[[1]],sample="s2",is=1),
-      data.frame(gene=genes_s3[[1]],sample="s3",is=1),
-      data.frame(gene=genes_s4[[1]],sample="s4",is=1),
-      data.frame(gene=rm_na(sp.f[sp.f[,3]>1,1]),sample="public",is=1)
-      )
-
-total_genes = all_genes %>% group_by(sample) %>% summarise(total = sum(is)) %>% ungroup()
-all_genes = reshape(all_genes, timevar = "sample",idvar = "gene", direction = "wide")
-all_genes[is.na(all_genes)] = 0
-detect = rowSums(all_genes[,2:6])
-all_genes_sum = all_genes %>% group_by(is.s1, is.s2, is.s3, is.s4,is.public) %>% summarise(total = n()) %>% ungroup()
-per = apply( all_genes_sum, 1, function(x){
-     unlist((x[6]/as.vector(total_genes[,2])) * x[1:5] *100 )
-    })
-per[per==0] = NA
-all_genes_sum = cbind( all_genes_sum, t(per) )
-#cols = brewer.pal(5,"")
-aheatmap( t(as.matrix(all_genes_sum[,7:11])), annCol = all_genes_sum[,1:5], Colv = NA, Rowv = NA,cellheight = 45,  fontsize=9)
 ```
+
 
 ### s1/s2 with public data
 
 ```{r common-public}
-public=sp.f[sp.f[,3]>1,1]
-public = public[!is.na(public)]
-venn(list(s1=genes_s1[[1]],
-              s2=genes_s2[[1]],
-              public=public))
-    title("with polyA and public data")
+ void = lapply(type_name[c(1,3,4,5)], function(x){
+     do_venn(list(s1=genes_s1[[x]],
+               s2=genes_s2[[x]],
+               public=genes_public[[x]],
+               rw=genes_rw[[x]]))
+     title(type[x])
+ })
+```
 
-public=sp.f[sp.f[,5]>1,1]
-public = public[!is.na(public)]
-venn(list(s1=genes_s1[[3]],
-              s2=genes_s2[[3]],
-              public=public))
-    title("with polyA + U and public data")
+### polyA > 100 and size >= 8 nt
+
+```{r poya-filter-30}
+s1 = filter_out(s1_raw,30)
+s2 = filter_out(s2_raw,30)
+s3 = filter_out(s3_raw,30)
+s4 = filter_out(s4_raw,30)
+genes_s1 = get_set_genes(s1)
+genes_s2 = get_set_genes(s2)
+genes_s3 = get_set_genes(s3)
+genes_s4 = get_set_genes(s4)
+rw = filter_out(rw_raw,30)
+genes_rw = get_set_genes(rw)
+public = filter_out(public_raw,30)
+genes_public = get_set_genes(public)
+
+```
+
+### Common genes among 4 samples
+
+```{r common-30}
+
+type = c("polyA","Modification","add-U","add-UU","add-G","top 10%","top 5%")
+type_name = c("polyA","mod","a","aa","c","top10","top5")
+ void = lapply(type_name, function(x){
+     do_venn(list(s1=genes_s1[[x]],
+               s2=genes_s2[[x]],
+               s3=genes_s3[[x]],
+               s4=genes_s4[[x]]))
+     title(x)
+ })
+
+```
+
+### s1/s2 with public data
+
+```{r common-public-30}
+ void = lapply(type_name[c(1,3,4,5)], function(x){
+     do_venn(list(s1=genes_s1[[x]],
+               s2=genes_s2[[x]],
+               public=genes_public[[x]],
+               rw=genes_rw[[x]]))
+     title(type[x])
+ })
+```
+
+### genes in s1/s2 but not in public data
+
+```{r filter-30-not_in_public}
+genes_notin_public =   setdiff( intersect(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])) , genes_public[["polyA"]])
+head(genes_notin_public)
+genes_notin_public_type = getBM( attributes=c("ensembl_gene_id", "refseq_mrna","gene_biotype") , filters=
+"ensembl_gene_id"    , values =genes_notin_public ,mart=mart)
+
+```
+
+They are not in the table, but if I look at least at one of this genes, is full of polyA sequences, 
+so, it should be something relating to the method, or maybe they filter something else??
+
+This is what raw data is for this gene
+
+found HISEQ:272:HAVVLADXX:1:1103:13345:22631    TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT      
+found HISEQ:272:HAVVLADXX:1:1103:16584:26706    TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTGT                  
+found HISEQ:272:HAVVLADXX:1:1103:2751:31339     TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAATTTTTTTTTTTTTTTTGTCCACCA 
+found HISEQ:272:HAVVLADXX:1:1103:17487:65762 AA-TTTTTTTTATTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAATTTTTTTTTT 
 
 
-public = sp.f[sp.f[,8]>1,1]
-public = public[!is.na(public)]
-venn(list(s1=genes_s1[[4]],
-              s2=genes_s2[[4]],
-              public=public))
-    title("with polyA + UU and public data")
+### genes in public not in s1/s2
 
-public = sp.f[sp.f[,6]>1,1]
-public = public[!is.na(public)]
-venn(list(s1=genes_s1[[5]],
-              s2=genes_s2[[5]],
-              public=public))
-    title("with polyA + G and public data")
+All polyA counts for the genes not in public data set are low. 
 
+```{r filter-30-not_in_s1s2}
+genes_notin_s1s2 =   setdiff( as.character(genes_public[["polyA"]]), unlist(unique(c(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])))) )
+s1_removed = s1_raw[ s1_raw$V1 %in% genes_notin_s1s2, ]
+ggplot( (s1_removed %>% filter(V2=="polyA" | V2=="counts")) , aes(x=V2,y=V3) ) +
+    geom_jitter() +
+    labs(list(x="",y='counts'))
+```
+
+
+## Summary of samples with polyA>30
+
+```{r polya-summary}
+print("s1")
+poly_read_summary(s1)
+print("s2")
+poly_read_summary(s2)
+print("s3")
+poly_read_summary(s3)
+print("s4")
+poly_read_summary(s4)
 ```
 
 
