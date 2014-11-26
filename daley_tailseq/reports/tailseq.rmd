@@ -54,6 +54,7 @@ library(GGally)
 source("~/repos/myRfunctions/transactions.R")
 dn <- "daley_tailseq"
 root_path<-"~/ody/projects/daley_mRNA_mod/tailseq-112014"
+path_files = "~/repos/pipelines/daley_tailseq/reports/"
 ```
 
 ```{r render,eval=FALSE}
@@ -144,13 +145,7 @@ rm_na = function(x){
 
 ```{r go,eval=FALSE}
 library(org.Hs.eg.db)
-set <- universeGO(org.Hs.egGO,"Homo sapiens")
-get_entrez = function(g){
-  require(biomaRt)
-  ensembl = useMart('ensembl', dataset = "hsapiens_gene_ensembl")
-  df = getBM(attributes=c("ensembl_gene_id", "entrezgene"), filters="ensembl_gene_id", values=g,mart=ensembl)
-  return(df[,2])
-}
+#set <- universeGO(org.Hs.egGO,"Homo sapiens")
 
 run_one_go = function(g, name){
     g = g[!is.na(g)]
@@ -176,6 +171,13 @@ run_go_enrichment = function(g, sample){
 ```
 
 ```{r venn-function}
+get_entrez = function(g){
+  require(biomaRt)
+  ensembl = useMart('ensembl', dataset = "hsapiens_gene_ensembl")
+  df = getBM(attributes=c("ensembl_gene_id", "entrezgene"), filters="ensembl_gene_id", values=g,mart=ensembl)
+  return(df[,2])
+}
+
 
 do_df = function(sample, groups){
     data.frame(gene=groups[[sample]],sample=sample,is=1)
@@ -240,6 +242,11 @@ ggplot( dd, aes( x=sample, y=V2, fill=V1 ) ) +
 ## After filtering
 
 After that filter, we reduce the total number of reads, but still have a lot.
+Showing sample 1 only. 
+
+```{r after-filtering}
+poly_read_summary(s1)
+```
 
 ### polyA > 200 and size >= 8 nt
 
@@ -301,7 +308,7 @@ genes_rw = get_set_genes(rw)
 ```
 
 
-```{r biotype}
+```{r biotype, eval=FALSE}
 s1_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
 "ensembl_gene_id"    , values =as.character(s1[[1]]) ,mart=mart)
 s2_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
@@ -313,8 +320,13 @@ s4_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , f
 ```
 
 
-### Common genes among 4 samples
+#### Common genes among 4 samples
 
+I changed venn diagrams by heatmaps. Each top bar is a sample, when two bars
+overlaps, the cells below are the number of genes in common. The color mean the
+percentage of common genes for that sample. 
+
+For instance, the first right column shows the common genes in the four samples: 1788 in common. Being the 60% for the first two samples, and the 90% for the two last samples.
 
 ```{r common}
 
@@ -332,7 +344,9 @@ names(type) = type_name
 ```
 
 
-### s1/s2 with public data
+#### s1/s2 with public data
+
+I added here public data using the supplementary table (as PUBLIC in figures), and the re-analyzed data we did with the public data (as RW figures)
 
 ```{r common-public}
  void = lapply(type_name[c(1,3,4,5)], function(x){
@@ -344,7 +358,7 @@ names(type) = type_name
  })
 ```
 
-### polyA > 100 and size >= 8 nt
+### polyA > 30 and size >= 8 nt
 
 ```{r poya-filter-30}
 s1 = filter_out(s1_raw,30)
@@ -362,7 +376,7 @@ genes_public = get_set_genes(public)
 
 ```
 
-### Common genes among 4 samples
+#### Common genes among 4 samples
 
 ```{r common-30}
 
@@ -378,7 +392,7 @@ type_name = c("polyA","mod","a","aa","c","top10","top5")
 
 ```
 
-### s1/s2 with public data
+#### s1/s2 with public data
 
 ```{r common-public-30}
  void = lapply(type_name[c(1,3,4,5)], function(x){
@@ -412,9 +426,42 @@ found HISEQ:272:HAVVLADXX:1:1103:2751:31339     TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
 found HISEQ:272:HAVVLADXX:1:1103:17487:65762 AA-TTTTTTTTATTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAATTTTTTTTTT 
 
 
-### genes in public not in s1/s2
+I have taken all genes like this, and plot the T percentage average and 
+the base-quality average per gene at the first 50 positions.
 
-All polyA counts for the genes not in public data set are low. 
+I plot the % of T at the first 50 nucleotides after PRIMER+TAG and MODIFICATIONS removal.
+Each row is a gene not seen in the public data. 
+
+```{r T-mean}
+unseen = read.table( paste0(root_path,"/work/genes_notin_public.dat"),sep=" ")
+pheatmap( (unseen %>% filter(V1=="seq"))[,3:50],  cluster_rows = F, cluster_cols = F, )
+```
+
+Also I plot the base-quality of these same bases, just to make sure they are good
+
+```{r qual-mean}
+pheatmap( (unseen %>% filter(V1=="qual"))[,3:50],  cluster_rows = F, cluster_cols = F, )
+```
+
+If we plot the number of time the same position is tagged by a read (something
+proportional to PCR artifacts), we don't see a difference in the distribution
+among the common or non-common genes.
+
+```{r pcr}
+unseen_pcr = read.table( paste0(root_path,"/work/s1_quality_check.dat.pcr"),sep=" ")
+unseen_pcr$seen = 1
+unseen_pcr$seen[unseen_pcr$V1 %in% genes_notin_public] = 0
+table(unseen_pcr$seen)
+ggplot(unseen_pcr, aes(x=factor(seen),y=V3) ) +
+    geom_boxplot(alpha=0.3)+
+    scale_y_log10() +
+    labs(list(y="log10(counts)",x="common"))
+```
+
+
+### genes in public but not in s1/s2
+
+All polyA counts for the genes in the public set but not in the new data are low. 
 
 ```{r filter-30-not_in_s1s2}
 genes_notin_s1s2 =   setdiff( as.character(genes_public[["polyA"]]), unlist(unique(c(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])))) )
@@ -534,60 +581,105 @@ ggheatmap.show(ggheatmap(cor(counts)))
 
 It included stats for each sample and GO enrichment analysis
 
+```{r make-table-function}
+make_table = function(data, prefix){
+    raw = paste0(path_files,prefix,"_raw.txt")
+    wide = paste0(path_files,prefix,"_wide.txt")
+    write.table(data, raw,row.names=F, col.names=F)
+    len = sapply(as.character(data$V2), nchar)
+    data$type = "other"
+    data$type[ data$V2=="counts" & data$type=="other"] = "counts"
+    data$type[ data$V2=="polyA" & data$type=="other"] = "polyA"
+    data$type[ data$V2=="A" & data$type=="other"] = "U"
+    data$type[ data$V2=="AA" & data$type=="other"] = "UU"
+    data$type[ data$V2=="C" & data$type=="other"] = "G"
+    data$type[ data$V2=="CC" & data$type=="other"] = "GG"
+    data$type[ len=1 & data$type=="other"] = "N"
+    data$type[ len==2 & data$type=="other"] = "NN"
+    data$type[ len==3 & data$type=="other"] = "NNN"
+    data$type[ len==4 & data$type=="other"] = "NNNN"
+    data$type[ len>4 & data$type=="other"] = "N>4"
+    data = data %>% group_by(V1, type) %>% summarise(reads=sum(V3)) %>% ungroup()
+    data$type = factor(data$type, levels=c("counts","polyA","U","UU","G","GG","N","NN","NNN","NNNN","N>4"))
+    data = reshape(as.data.frame(data),  timevar = "type", idvar = "V1", direction = "wide")
+    names(data) = sub("reads.","",names(data))
+    data[is.na(data)] = 0
+    write.table(data, wide,row.names=F, col.names=F)
+    c(raw,wide)
+}
+
+```
+
+
 ### Sample 1
 
 ```{r do_go-s1, results='asis',cache=TRUE}
+files = make_table(s1, "s1")
+files = get_report_links(files)
 read_summary(s1)
 g_ezid = lapply(genes_s1, get_entrez)
-res_go = run_go_enrichment(g_ezid, "s1")
+#res_go = run_go_enrichment(g_ezid, "s1")
 ```
-```{r table-s1, results='asis'}
+```{r table-s1, results='asis',eval=FALSE}
 lapply(1:7, function(x){
     knitr::kable(res_go[[x]], caption=type[x])
 })
 ```
 
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
 
 ### Sample 2
 
 ```{r do_go-s2, results='asis',cache=TRUE}
 read_summary(s2)
+files = make_table(s1, "s2")
+files = get_report_links(files)
 g_ezid = lapply(genes_s2, get_entrez)
-res_go = run_go_enrichment(g_ezid, "s2")
+#res_go = run_go_enrichment(g_ezid, "s2")
 ```
-```{r table-s2, results='asis'}
+```{r table-s2, results='asis',eval=FALSE}
 lapply(1:7, function(x){
     knitr::kable(res_go[[x]], caption=type[x])
 })
 ```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
 
 
 ### Sample 3
 
 ```{r do_go-s3, results='asis',cache=TRUE}
 read_summary(s3)
+files = make_table(s1, "s3")
+files = get_report_links(files)
 g_ezid = lapply(genes_s3, get_entrez)
-res_go = run_go_enrichment(g_ezid, "s3")
+#res_go = run_go_enrichment(g_ezid, "s3")
 ```
-```{r table-s3, results='asis'}
+```{r table-s3, results='asis',eval=FALSE}
 lapply(1:7, function(x){
     knitr::kable(res_go[[x]], caption=type[x])
 })
 ```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
 
 
 ### Sample 4
 
 ```{r do_go-s4, results='asis',cache=TRUE}
 read_summary(s4)
+files = make_table(s1, "s4")
+files = get_report_links(files)
 g_ezid = lapply(genes_s4, get_entrez)
-res_go = run_go_enrichment(g_ezid, "s4")
+#res_go = run_go_enrichment(g_ezid, "s4")
 ```
-```{r table-s4, results='asis'}
+```{r table-s4, results='asis',eval=FALSE}
 lapply(1:7, function(x){
     knitr::kable(res_go[[x]], caption=type[x])
 })
 ```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
 
 
 ### Files
