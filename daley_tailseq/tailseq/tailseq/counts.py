@@ -45,9 +45,9 @@ def _summarize(in_file, align_r2, count_file, out_file):
     log_file = out_file + ".log"
     logger.my_logger.info("summarize results")
     read_gene, counts_gene = _get_first_read(count_file)
-    logger.my_logger.info("load read 1")
+    logger.my_logger.info("load read 1 done")
     read_gene = _get_second_read(align_r2, read_gene)
-    logger.my_logger.info("load read 2")
+    logger.my_logger.info("load read 2 done")
     stats = defaultdict(Counter)
     if not os.path.exists(out_file):
         with gzip.open(in_file) as handle_polya:
@@ -114,11 +114,22 @@ def _get_middle(cigar):
 
 
 def _get_first_read(in_file):
-    gene = defaultdict(list)
+    genes = defaultdict(list)
     stats = Counter()
     with open(in_file) as counts:
         for line in counts:
             cols = line.strip().split("\t")
-            gene[cols[0]] = [cols[1], "None"]
+            genes[cols[0]] = [cols[1], "None"]
             stats[cols[1]] += 1
-    return gene, stats
+    return genes, stats
+
+
+def _get_position(sam_file, genes):
+    """get all positions from SAM file and sync with _get_first_read"""
+    pos = defaultdict(Counter)
+    with pysam.Samfile(sam_file, 'r') as sam:
+        for read in sam.fetch():
+            if not read.is_unmapped and read.qname in genes and not read.is_secondary:
+                name = read.qname
+                pos[genes[name][0]][int(read.pos)] += 1
+    return pos

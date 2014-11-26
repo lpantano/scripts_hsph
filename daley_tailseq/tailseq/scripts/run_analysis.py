@@ -63,8 +63,10 @@ if __name__ == "__main__":
 
     data = get_samples_to_process(args.sample_map)
 
-    data = cluster.send_job(align.star_align, data, args, "align")
-    print data
+    data = cluster.send_job(align.align_read1, data, args, "align_r1")
+
+    data = cluster.send_job(align.align_read2, data, args, "align_r2")
+
     cluster.send_job(align.qc, data, args, "qc")
 
     data = cluster.send_job(detect.detect, data, args, "polyA")
