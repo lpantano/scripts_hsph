@@ -394,10 +394,11 @@ type_name = c("polyA","mod","a","aa","c","top10","top5")
 
 ```{r filter-30-not_in_public}
 genes_notin_public =   setdiff( intersect(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])) , genes_public[["polyA"]])
-head(genes_notin_public)
-genes_notin_public_type = getBM( attributes=c("ensembl_gene_id", "refseq_mrna","gene_biotype") , filters=
-"ensembl_gene_id"    , values =genes_notin_public ,mart=mart)
 
+#genes_notin_public_type = getBM( attributes=c("ensembl_gene_id", "refseq_mrna","gene_biotype") , filters=
+#"ensembl_gene_id"    , values =genes_notin_public ,mart=mart)
+
+intersect(genes_notin_public,public_raw$V1)
 ```
 
 They are not in the table, but if I look at least at one of this genes, is full of polyA sequences, 
