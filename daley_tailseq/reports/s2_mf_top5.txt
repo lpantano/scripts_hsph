@@ -1,0 +1,50 @@
+"go" "term" "OddsRatio" "FDR"
+"1" "GO:0003735" "structural constituent of ribosome" 54.7736965561361 1.04113504370111e-74
+"2" "GO:0044822" "poly(A) RNA binding" 11.280651619949 5.31190176068252e-68
+"3" "GO:0005198" "structural molecule activity" 10.4483348690272 9.5689911254446e-44
+"4" "GO:0003676" "nucleic acid binding" 3.83994243357169 2.25664039238217e-27
+"5" "GO:0097159" "organic cyclic compound binding" 2.75903860151093 4.07878740676284e-16
+"6" "GO:1901363" "heterocyclic compound binding" 2.7321906693712 6.68053030206128e-16
+"7" "GO:0015078" "hydrogen ion transmembrane transporter activity" 10.4765048720517 4.94703258799964e-09
+"8" "GO:0003729" "mRNA binding" 8.00881123058542 3.31936236001667e-07
+"9" "GO:0019843" "rRNA binding" 18.0046783625731 1.71555182064663e-06
+"10" "GO:0009055" "electron carrier activity" 7.52534053258068 5.1049707951481e-06
+"11" "GO:0051082" "unfolded protein binding" 6.64334121355398 4.01154261412575e-05
+"12" "GO:0015002" "heme-copper terminal oxidase activity" 16.9437007152026 5.80606169961328e-05
+"13" "GO:0016676" "oxidoreductase activity, acting on a heme group of donors, oxygen as acceptor" 16.9437007152026 5.80606169961328e-05
+"14" "GO:0004129" "cytochrome-c oxidase activity" 16.9437007152026 5.80606169961328e-05
+"15" "GO:0016675" "oxidoreductase activity, acting on a heme group of donors" 16.0954703832753 7.03922546104976e-05
+"16" "GO:0003697" "single-stranded DNA binding" 7.60266285211268 8.19600567910618e-05
+"17" "GO:0031492" "nucleosomal DNA binding" 14.6303452644916 0.000100996682190487
+"18" "GO:0008135" "translation factor activity, nucleic acid binding" 6.66144125024117 0.000185829298160958
+"19" "GO:0016655" "oxidoreductase activity, acting on NAD(P)H, quinone or similar compound as acceptor" 8.17908178777744 0.000413335854008732
+"20" "GO:0031491" "nucleosome binding" 9.74659486854609 0.000572613828137173
+"21" "GO:0019901" "protein kinase binding" 2.70881827532074 0.00108147603624331
+"22" "GO:0019900" "kinase binding" 2.54473309147448 0.00147967670435444
+"23" "GO:0003743" "translation initiation factor activity" 7.14192799070848 0.00208137261197089
+"24" "GO:0016651" "oxidoreductase activity, acting on NAD(P)H" 5.00432476540188 0.00210090376398108
+"25" "GO:0048306" "calcium-dependent protein binding" 6.83712654755727 0.00242899054014129
+"26" "GO:0008565" "protein transporter activity" 5.21668609168609 0.00318664710634291
+"27" "GO:0015077" "monovalent inorganic cation transmembrane transporter activity" 2.59542684323878 0.00537392426246186
+"28" "GO:0042802" "identical protein binding" 1.83949953570207 0.00550661311791783
+"29" "GO:0016209" "antioxidant activity" 5.2631518821043 0.00588170104069841
+"30" "GO:0031490" "chromatin DNA binding" 5.17792514330673 0.00623191816958806
+"31" "GO:0019207" "kinase regulator activity" 3.32685978512172 0.0134160220838691
+"32" "GO:0019887" "protein kinase regulator activity" 3.37519687519688 0.0174560892720335
+"33" "GO:0032403" "protein complex binding" 1.79417871273553 0.0174560892720335
+"34" "GO:0004857" "enzyme inhibitor activity" 2.20462713387242 0.0218977673817033
+"35" "GO:0008134" "transcription factor binding" 1.98015679600823 0.0252956311533441
+"36" "GO:0015399" "primary active transmembrane transporter activity" 3.10848753425121 0.0281153139182544
+"37" "GO:0015405" "P-P-bond-hydrolysis-driven transmembrane transporter activity" 3.10848753425121 0.0281153139182544
+"38" "GO:0042803" "protein homodimerization activity" 1.74269460443094 0.0281153139182544
+"39" "GO:0022890" "inorganic cation transmembrane transporter activity" 1.86571644665539 0.0281153139182544
+"40" "GO:0016616" "oxidoreductase activity, acting on the CH-OH group of donors, NAD or NADP as acceptor" 2.96360820751065 0.0289506369102017
+"41" "GO:0017016" "Ras GTPase binding" 2.4170482703935 0.0323308897409467
+"42" "GO:0022891" "substrate-specific transmembrane transporter activity" 1.60276547003388 0.0334549693399515
+"43" "GO:0003779" "actin binding" 1.92557064147973 0.0334549693399515
+"44" "GO:0016887" "ATPase activity" 1.92557064147973 0.0334549693399515
+"45" "GO:0042623" "ATPase activity, coupled" 2.12659150821695 0.0341266146301696
+"46" "GO:0031267" "small GTPase binding" 2.24975069252078 0.039964471846187
+"47" "GO:0016614" "oxidoreductase activity, acting on CH-OH group of donors" 2.59964306960143 0.039964471846187
+"48" "GO:0022857" "transmembrane transporter activity" 1.51729454630543 0.0399993286705451
+"49" "GO:0051020" "GTPase binding" 2.11443460135487 0.0445072647352229

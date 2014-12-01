@@ -1,0 +1,192 @@
+"go" "term" "OddsRatio" "FDR"
+"1" "GO:0044822" "poly(A) RNA binding" 5.32054655067559 5.11428642082651e-144
+"2" "GO:0003735" "structural constituent of ribosome" 12.9736870837428 2.37894548792874e-47
+"3" "GO:0003676" "nucleic acid binding" 1.63656945454594 3.73604641618609e-27
+"4" "GO:1901265" "nucleoside phosphate binding" 1.72062716351049 2.03461812332327e-23
+"5" "GO:0050136" "NADH dehydrogenase (quinone) activity" 13.3195197109765 8.37536617488296e-13
+"6" "GO:0003954" "NADH dehydrogenase activity" 13.3195197109765 8.37536617488296e-13
+"7" "GO:0008137" "NADH dehydrogenase (ubiquinone) activity" 13.3195197109765 8.37536617488296e-13
+"8" "GO:0016655" "oxidoreductase activity, acting on NAD(P)H, quinone or similar compound as acceptor" 8.4726172807034 1.28722332189598e-12
+"9" "GO:0009055" "electron carrier activity" 4.62423557007623 3.21697070118706e-12
+"10" "GO:0016462" "pyrophosphatase activity" 1.84256830817585 6.74587870806522e-12
+"11" "GO:0016818" "hydrolase activity, acting on acid anhydrides, in phosphorus-containing anhydrides" 1.83514894792578 8.78630876195228e-12
+"12" "GO:0016817" "hydrolase activity, acting on acid anhydrides" 1.82895083928156 9.80265357232804e-12
+"13" "GO:0003743" "translation initiation factor activity" 7.32748351414593 7.1717276063875e-11
+"14" "GO:0051082" "unfolded protein binding" 3.77527507771254 1.51376787822997e-09
+"15" "GO:0016887" "ATPase activity" 2.06281045233566 2.68640571384797e-09
+"16" "GO:0019843" "rRNA binding" 8.76782193958665 3.22144549633128e-08
+"17" "GO:0042802" "identical protein binding" 1.50751150474186 1.60873855936398e-07
+"18" "GO:0048037" "cofactor binding" 2.15469613259669 1.60873855936398e-07
+"19" "GO:0003697" "single-stranded DNA binding" 3.8866090619524 1.86261456339474e-07
+"20" "GO:0019900" "kinase binding" 1.75759459451356 4.70143466892154e-07
+"21" "GO:0051287" "NAD binding" 4.89423856398379 5.02507265095697e-07
+"22" "GO:0016879" "ligase activity, forming carbon-nitrogen bonds" 2.9375 5.78602123229556e-07
+"23" "GO:0016881" "acid-amino acid ligase activity" 3.50630594137305 9.37869394811904e-07
+"24" "GO:0004812" "aminoacyl-tRNA ligase activity" 5.3138190688302 9.70374632477227e-07
+"25" "GO:0016875" "ligase activity, forming carbon-oxygen bonds" 5.3138190688302 9.70374632477227e-07
+"26" "GO:0016876" "ligase activity, forming aminoacyl-tRNA and related compounds" 5.3138190688302 9.70374632477227e-07
+"27" "GO:0019901" "protein kinase binding" 1.77121804056279 1.19827484321583e-06
+"28" "GO:0016616" "oxidoreductase activity, acting on the CH-OH group of donors, NAD or NADP as acceptor" 2.80529563719862 1.36656459372984e-06
+"29" "GO:0015002" "heme-copper terminal oxidase activity" 8.4568253968254 1.80342045815905e-06
+"30" "GO:0016676" "oxidoreductase activity, acting on a heme group of donors, oxygen as acceptor" 8.4568253968254 1.80342045815905e-06
+"31" "GO:0004129" "cytochrome-c oxidase activity" 8.4568253968254 1.80342045815905e-06
+"32" "GO:0016614" "oxidoreductase activity, acting on CH-OH group of donors" 2.61580428557322 1.92278891303119e-06
+"33" "GO:0003729" "mRNA binding" 2.76723500714532 2.95349947993735e-06
+"34" "GO:0051087" "chaperone binding" 3.8549606968345 3.43321040013134e-06
+"35" "GO:0016675" "oxidoreductase activity, acting on a heme group of donors" 7.51657848324515 3.92307374477887e-06
+"36" "GO:0003678" "DNA helicase activity" 4.34628178058022 7.66459758779955e-06
+"37" "GO:0042803" "protein homodimerization activity" 1.5377300679685 1.37422719275222e-05
+"38" "GO:0003924" "GTPase activity" 2.0032310177706 1.82959591758902e-05
+"39" "GO:0070035" "purine NTP-dependent helicase activity" 2.87310124560843 1.85277073382853e-05
+"40" "GO:0019904" "protein domain specific binding" 1.55401437962535 2.5710925316095e-05
+"41" "GO:0016667" "oxidoreductase activity, acting on a sulfur group of donors" 3.98250636132316 2.96304304769913e-05
+"42" "GO:0008022" "protein C-terminus binding" 2.15315382142769 3.85340951739096e-05
+"43" "GO:0044389" "small conjugating protein ligase binding" 2.05058520510587 4.87367656845782e-05
+"44" "GO:0031625" "ubiquitin protein ligase binding" 2.05058520510587 4.87367656845782e-05
+"45" "GO:0015036" "disulfide oxidoreductase activity" 5.3028668147678 8.28128594296251e-05
+"46" "GO:0043022" "ribosome binding" 4.83015873015873 9.3499216129089e-05
+"47" "GO:0003725" "double-stranded RNA binding" 3.41329939548202 9.4682644412852e-05
+"48" "GO:0016504" "peptidase activator activity" 4.20009176902443 0.000102810737338702
+"49" "GO:0003724" "RNA helicase activity" 4.89456338647072 0.00014165733297272
+"50" "GO:0005525" "GTP binding" 1.61379385421594 0.000212537538746727
+"51" "GO:0016627" "oxidoreductase activity, acting on the CH-CH group of donors" 3.08224112980202 0.000273666371547456
+"52" "GO:0008143" "poly(A) binding" 11.9135528815706 0.000273666371547456
+"53" "GO:0046961" "proton-transporting ATPase activity, rotational mechanism" 7.2833755809041 0.000331615162816065
+"54" "GO:0004579" "dolichyl-diphosphooligosaccharide-protein glycotransferase activity" 27.7851265822785 0.000360349907952311
+"55" "GO:0036442" "hydrogen-exporting ATPase activity" 5.96006339144216 0.0004335609472391
+"56" "GO:0019001" "guanyl nucleotide binding" 1.55776679734996 0.000467634231954084
+"57" "GO:0070717" "poly-purine tract binding" 7.9436173582515 0.000469221915748382
+"58" "GO:0015035" "protein disulfide oxidoreductase activity" 5.16620164870006 0.000504336336167464
+"59" "GO:0008536" "Ran GTPase binding" 4.63706522888255 0.00055493734819212
+"60" "GO:0019003" "GDP binding" 3.09454686727414 0.00066716339785319
+"61" "GO:0004003" "ATP-dependent DNA helicase activity" 3.74170664774955 0.000920225328934578
+"62" "GO:0004576" "oligosaccharyl transferase activity" 13.8914556962025 0.00120542806637497
+"63" "GO:0016835" "carbon-oxygen lyase activity" 2.65309152614275 0.00120542806637497
+"64" "GO:0050699" "WW domain binding" 4.76729001584786 0.00133211877474569
+"65" "GO:0008121" "ubiquinol-cytochrome-c reductase activity" 23.8082885162923 0.00134446064916508
+"66" "GO:0051920" "peroxiredoxin activity" 23.8082885162923 0.00134446064916508
+"67" "GO:0016681" "oxidoreductase activity, acting on diphenols and related substances as donors, cytochrome as acceptor" 23.8082885162923 0.00134446064916508
+"68" "GO:0051059" "NF-kappaB binding" 4.30448108222363 0.00136121425396781
+"69" "GO:0031492" "nucleosomal DNA binding" 3.97399302251824 0.00136771455719616
+"70" "GO:0016765" "transferase activity, transferring alkyl or aryl (other than methyl) groups" 2.78442466624285 0.00163610844933876
+"71" "GO:0047485" "protein N-terminus binding" 2.20440051020408 0.00185241980238553
+"72" "GO:0031369" "translation initiation factor binding" 4.33355424290448 0.00208173483860311
+"73" "GO:0008186" "RNA-dependent ATPase activity" 4.33355424290448 0.00208173483860311
+"74" "GO:0004722" "protein serine/threonine phosphatase activity" 2.69438918852409 0.00213423491310968
+"75" "GO:0031491" "nucleosome binding" 3.07177489177489 0.00242755560188529
+"76" "GO:0005178" "integrin binding" 2.0517269728888 0.00261002767866694
+"77" "GO:0043024" "ribosomal small subunit binding" 9.26023206751055 0.00285679274425091
+"78" "GO:0070003" "threonine-type peptidase activity" 4.36863117870722 0.00320037303182761
+"79" "GO:0004298" "threonine-type endopeptidase activity" 4.36863117870722 0.00320037303182761
+"80" "GO:0008565" "protein transporter activity" 2.18505956061941 0.00342041694724431
+"81" "GO:0000049" "tRNA binding" 3.0280334285412 0.00364408047748295
+"82" "GO:0008094" "DNA-dependent ATPase activity" 2.24899298201902 0.00364717710330931
+"83" "GO:0016679" "oxidoreductase activity, acting on diphenols and related substances as donors" 11.9031951913951 0.00385782686291403
+"84" "GO:0008187" "poly-pyrimidine tract binding" 6.35087052864831 0.00388605084696935
+"85" "GO:0016779" "nucleotidyltransferase activity" 1.85302801555841 0.00407310056629467
+"86" "GO:0035173" "histone kinase activity" 5.10417986067131 0.00439765350610111
+"87" "GO:0003755" "peptidyl-prolyl cis-trans isomerase activity" 2.89016473846686 0.00442184971661571
+"88" "GO:0003684" "damaged DNA binding" 2.48490625993009 0.00468824026574129
+"89" "GO:0051540" "metal cluster binding" 2.2868320610687 0.00492474431314961
+"90" "GO:0051536" "iron-sulfur cluster binding" 2.2868320610687 0.00492474431314961
+"91" "GO:0000287" "magnesium ion binding" 1.64369070359953 0.0051642302348212
+"92" "GO:0017166" "vinculin binding" 6.94462025316456 0.0051642302348212
+"93" "GO:0046933" "proton-transporting ATP synthase activity, rotational mechanism" 6.94462025316456 0.0051642302348212
+"94" "GO:0019787" "small conjugating protein ligase activity" 3.4041204437401 0.00618095222878019
+"95" "GO:0001968" "fibronectin binding" 3.4041204437401 0.00618095222878019
+"96" "GO:0019210" "kinase inhibitor activity" 2.31924136469591 0.00635893019726159
+"97" "GO:0031490" "chromatin DNA binding" 2.16932288201776 0.00635893019726159
+"98" "GO:0060590" "ATPase regulator activity" 3.97022489705417 0.00651535189664556
+"99" "GO:0030544" "Hsp70 protein binding" 3.97022489705417 0.00651535189664556
+"100" "GO:0003899" "DNA-directed RNA polymerase activity" 2.59836385836386 0.00651535189664556
+"101" "GO:0016836" "hydro-lyase activity" 2.59836385836386 0.00651535189664556
+"102" "GO:0034062" "RNA polymerase activity" 2.59836385836386 0.00651535189664556
+"103" "GO:0004860" "protein kinase inhibitor activity" 2.33836146470027 0.00712930589441561
+"104" "GO:0004601" "peroxidase activity" 2.64889453083677 0.00729624446992035
+"105" "GO:0016859" "cis-trans isomerase activity" 2.64889453083677 0.00729624446992035
+"106" "GO:0017056" "structural constituent of nuclear pore" 7.93483074976273 0.00729624446992035
+"107" "GO:0016846" "carbon-sulfur lyase activity" 7.93483074976273 0.00729624446992035
+"108" "GO:0042393" "histone binding" 1.73134411368029 0.00810582626445467
+"109" "GO:0050839" "cell adhesion molecule binding" 1.63458044573787 0.00847239361858948
+"110" "GO:0048029" "monosaccharide binding" 2.12677525297355 0.00847239361858948
+"111" "GO:0050660" "flavin adenine dinucleotide binding" 2.07467249512374 0.00887646901206869
+"112" "GO:0005200" "structural constituent of cytoskeleton" 1.86890267470625 0.00889648086329946
+"113" "GO:0008106" "alcohol dehydrogenase (NADP+) activity" 5.55525316455696 0.00889648086329946
+"114" "GO:0008266" "poly(U) RNA binding" 5.55525316455696 0.00889648086329946
+"115" "GO:0004004" "ATP-dependent RNA helicase activity" 3.60900740058168 0.00927477633362299
+"116" "GO:0008320" "protein transmembrane transporter activity" 4.53561253561254 0.00947562663066681
+"117" "GO:0042162" "telomeric DNA binding" 4.53561253561254 0.00947562663066681
+"118" "GO:0004033" "aldo-keto reductase (NADP) activity" 3.96928435718809 0.00947562663066681
+"119" "GO:0002039" "p53 binding" 2.20809942449599 0.0101337765840786
+"120" "GO:0016866" "intramolecular transferase activity" 3.11945500633714 0.011936312099557
+"121" "GO:0070063" "RNA polymerase binding" 3.30799282018794 0.0130813176692284
+"122" "GO:0019903" "protein phosphatase binding" 1.83085475532894 0.013164969703699
+"123" "GO:0004526" "ribonuclease P activity" 5.95064852894654 0.013164969703699
+"124" "GO:0004029" "aldehyde dehydrogenase (NAD) activity" 5.95064852894654 0.013164969703699
+"125" "GO:0030332" "cyclin binding" 3.57207093096897 0.0133569007030135
+"126" "GO:0070064" "proline-rich region binding" 3.57207093096897 0.0133569007030135
+"127" "GO:0004549" "tRNA-specific ribonuclease activity" 4.62900843881857 0.0137266247177028
+"128" "GO:0023023" "MHC protein complex binding" 3.96834441278886 0.0137266247177028
+"129" "GO:0023026" "MHC class II protein complex binding" 3.96834441278886 0.0137266247177028
+"130" "GO:0016597" "amino acid binding" 1.74377662712198 0.014342042469592
+"131" "GO:0017016" "Ras GTPase binding" 1.51579234763282 0.015853416531864
+"132" "GO:0016796" "exonuclease activity, active with either ribo- or deoxyribonucleic acids and producing 5'-phosphomonoesters" 2.41721479888029 0.017033307175448
+"133" "GO:0043177" "organic acid binding" 1.50071416940005 0.017033307175448
+"134" "GO:0016860" "intramolecular oxidoreductase activity" 2.1784024577573 0.0170934484945585
+"135" "GO:0051537" "2 iron, 2 sulfur cluster binding" 3.24707812769877 0.0177783477421208
+"136" "GO:0003746" "translation elongation factor activity" 3.52713587281489 0.0190667145886585
+"137" "GO:0004602" "glutathione peroxidase activity" 3.52713587281489 0.0190667145886585
+"138" "GO:0022884" "macromolecule transmembrane transporter activity" 3.52713587281489 0.0190667145886585
+"139" "GO:0030291" "protein serine/threonine kinase inhibitor activity" 2.72908745247148 0.0191411457333445
+"140" "GO:0016891" "endoribonuclease activity, producing 5'-phosphomonoesters" 2.72908745247148 0.0191411457333445
+"141" "GO:0005080" "protein kinase C binding" 2.1913131025728 0.019346559791422
+"142" "GO:0019206" "nucleoside kinase activity" 4.76013919645682 0.0194076097243666
+"143" "GO:1900750" "oligopeptide binding" 4.76013919645682 0.0194076097243666
+"144" "GO:0043295" "glutathione binding" 4.76013919645682 0.0194076097243666
+"145" "GO:0005487" "nucleocytoplasmic transporter activity" 3.96740506329114 0.0194076097243666
+"146" "GO:0004659" "prenyltransferase activity" 3.96740506329114 0.0194076097243666
+"147" "GO:0008430" "selenium binding" 3.96740506329114 0.0194076097243666
+"148" "GO:0005544" "calcium-dependent phospholipid binding" 2.50729835682709 0.0213091497762706
+"149" "GO:0019902" "phosphatase binding" 1.57473101097262 0.0222066628571031
+"150" "GO:0003756" "protein disulfide isomerase activity" 2.97625079164028 0.023451210834031
+"151" "GO:0016864" "intramolecular oxidoreductase activity, transposing S-S bonds" 2.97625079164028 0.023451210834031
+"152" "GO:0016538" "cyclin-dependent protein serine/threonine kinase regulator activity" 2.97625079164028 0.023451210834031
+"153" "GO:0016505" "peptidase activator activity involved in apoptotic process" 2.97625079164028 0.023451210834031
+"154" "GO:0008656" "cysteine-type endopeptidase activator activity involved in apoptotic process" 3.17416904083571 0.0260527081335456
+"155" "GO:0042826" "histone deacetylase binding" 1.79201591578107 0.0260527081335456
+"156" "GO:0004197" "cysteine-type endopeptidase activity" 1.79201591578107 0.0260527081335456
+"157" "GO:0016896" "exoribonuclease activity, producing 5'-phosphomonoesters" 2.64576074332172 0.0271571547333426
+"158" "GO:0010485" "H4 histone acetyltransferase activity" 3.47120253164557 0.0279201008996592
+"159" "GO:0072341" "modified amino acid binding" 1.98571428571429 0.0279898121615372
+"160" "GO:0070491" "repressing transcription factor binding" 1.93219640726786 0.0286213465917767
+"161" "GO:0004861" "cyclin-dependent protein serine/threonine kinase inhibitor activity" 3.96646630813034 0.0291311813387499
+"162" "GO:0003690" "double-stranded DNA binding" 1.58992668154288 0.0347112674736649
+"163" "GO:0004532" "exoribonuclease activity" 2.48020272410516 0.0347112674736649
+"164" "GO:0016903" "oxidoreductase activity, acting on the aldehyde or oxo group of donors" 2.05845109302134 0.0359896481295317
+"165" "GO:0031072" "heat shock protein binding" 1.79659042778484 0.0361214790299754
+"166" "GO:0000175" "3'-5'-exoribonuclease activity" 2.55066497783407 0.0366302536916718
+"167" "GO:0016628" "oxidoreductase activity, acting on the CH-CH group of donors, NAD or NADP as acceptor" 2.55066497783407 0.0366302536916718
+"168" "GO:0008757" "S-adenosylmethionine-dependent methyltransferase activity" 1.54011479591837 0.0386918544278155
+"169" "GO:0016893" "endonuclease activity, active with either ribo- or deoxyribonucleic acids and producing 5'-phosphomonoesters" 2.06400760938491 0.0386918544278155
+"170" "GO:0050750" "low-density lipoprotein particle receptor binding" 3.39955710218285 0.0393154184837226
+"171" "GO:0036002" "pre-mRNA binding" 3.39955710218285 0.0393154184837226
+"172" "GO:0019905" "syntaxin binding" 1.98477640342531 0.0396729358976709
+"173" "GO:0050840" "extracellular matrix binding" 1.86831444732765 0.0410884237629981
+"174" "GO:1901677" "phosphate transmembrane transporter activity" 2.64471879286694 0.0417685576468551
+"175" "GO:0008601" "protein phosphatase type 2A regulator activity" 2.64471879286694 0.0417685576468551
+"176" "GO:0017022" "myosin binding" 2.07058499276511 0.0419411755635975
+"177" "GO:0015175" "neutral amino acid transmembrane transporter activity" 2.38043065231159 0.0419411755635975
+"178" "GO:0030742" "GTP-dependent protein binding" 2.77651898734177 0.0419411755635975
+"179" "GO:0015399" "primary active transmembrane transporter activity" 1.50893984819811 0.0419411755635975
+"180" "GO:0015405" "P-P-bond-hydrolysis-driven transmembrane transporter activity" 1.50893984819811 0.0419411755635975
+"181" "GO:0043531" "ADP binding" 2.20427269207757 0.0420853921735425
+"182" "GO:0016407" "acetyltransferase activity" 1.54149025645412 0.0450724101714464
+"183" "GO:0019201" "nucleotide kinase activity" 2.44108408210972 0.0456323276136316
+"184" "GO:0031418" "L-ascorbic acid binding" 2.44108408210972 0.0456323276136316
+"185" "GO:0019888" "protein phosphatase regulator activity" 1.67641536072286 0.0456323276136316
+"186" "GO:0001671" "ATPase activator activity" 2.97437519772224 0.0459255711746629
+"187" "GO:0005095" "GTPase inhibitor activity" 2.97437519772224 0.0459255711746629
+"188" "GO:0008408" "3'-5' exonuclease activity" 1.85216196215245 0.046531559277997
+"189" "GO:0016830" "carbon-carbon lyase activity" 1.80419358560222 0.0465914150044084
+"190" "GO:0003777" "microtubule motor activity" 1.58842607313196 0.0486783382555594
+"191" "GO:0005520" "insulin-like growth factor binding" 2.23147561747942 0.0487611739111886
