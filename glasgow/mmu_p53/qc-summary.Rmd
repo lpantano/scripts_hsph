@@ -32,7 +32,8 @@ render_2_drop("~/repos/pipelines/glasgow/mmu_p53/qc-summary.Rmd",dn)
 
 ```{r qc-setup}
 library(ggplot2)
-
+library(grid)
+library(gridExtra)
 library(reshape)
 library(gplots)
 library(edgeR)
@@ -261,8 +262,7 @@ for(i in seq(length(all_results))) {
 ## Volcano-plot
 
 ```{r volcano, fig.height=8, fig.width=9}
-library(grid)
-library(gridExtra)
+
 # used for formatting labels on ggplots
 fmt <- function(){ 
   function(x) format(x,nsmall = 1,scientific = FALSE)
