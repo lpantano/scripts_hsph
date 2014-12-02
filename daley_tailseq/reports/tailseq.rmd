@@ -34,7 +34,7 @@ that ended up with long modifications, and mapped perfectly to the genome.
 
 ### Setup: loading packages and data
     
-```{r setup}
+```{r setup,cache=FALSE}
 library(knitr)
 library(rmarkdown)
 library(knitrBootstrap)
@@ -218,12 +218,10 @@ do_venn = function(groups)
 purple (reads with polyA), blue (reads without polyA) and orange (reads with polyA < 6 nt) are the total amount of reads. red (modifications) are reads with modifications after polyA. And green are the ones without the 5 nt TAG along the read.
 
 These are the stats of read_2 before taking into account the ones where the paired
-read_1 maps onto a gene. In this case half of the reads_1 map on to genes 
-(Only it counts reads that map to only one gene, that reduce the number of reads with assigned genes.)
-
+read_1 maps onto a gene. 
 
 And we applied here another filter to reduce the number of false positive of polyA.
-Normally short polyA with long modifications.
+Normally short polyA with long modifications are removed here. We just don't count when read2 maps perfectly to the genome and is at the expected distance from the read1.
 
 ```{r ploya}
 dd = data.frame()
@@ -242,6 +240,7 @@ ggplot( dd, aes( x=sample, y=V2, fill=V1 ) ) +
 ## After filtering
 
 After that filter, we reduce the total number of reads, but still have a lot.
+Similar number than public database.
 Showing sample 1 only. 
 
 ```{r after-filtering}
@@ -346,7 +345,7 @@ names(type) = type_name
 
 #### s1/s2 with public data
 
-I added here public data using the supplementary table (as PUBLIC in figures), and the re-analyzed data we did with the public data (as RW figures)
+I added here public data using the supplementary table (as PUBLIC in figures), and the re-analyzed data we did with the public data (as RW in figures - last row)
 
 ```{r common-public}
  void = lapply(type_name[c(1,3,4,5)], function(x){
@@ -408,10 +407,11 @@ type_name = c("polyA","mod","a","aa","c","top10","top5")
 
 ```{r filter-30-not_in_public}
 genes_notin_public =   setdiff( intersect(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])) , genes_public[["polyA"]])
+genes_in_public =   intersect( intersect(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])) , genes_public[["polyA"]])
 
 #genes_notin_public_type = getBM( attributes=c("ensembl_gene_id", "refseq_mrna","gene_biotype") , filters=
 #"ensembl_gene_id"    , values =genes_notin_public ,mart=mart)
-
+write.table(genes_in_public,paste0(root_path,"/work/genes_in_public"),row.names=F,col.names=F,quote=F)
 intersect(genes_notin_public,public_raw$V1)
 ```
 
@@ -434,13 +434,16 @@ Each row is a gene not seen in the public data.
 
 ```{r T-mean}
 unseen = read.table( paste0(root_path,"/work/genes_notin_public.dat"),sep=" ")
-pheatmap( (unseen %>% filter(V1=="seq"))[,3:50],  cluster_rows = F, cluster_cols = F, )
+seen = read.table( paste0(root_path,"/work/genes_in_public.dat"),sep=" ")
+pheatmap( (unseen %>% filter(V1=="seq"))[,3:50],  cluster_rows = T, cluster_cols = F, main = "Not in commont")
+pheatmap( (seen %>% filter(V1=="seq"))[,3:50],  cluster_rows = T, cluster_cols = F,main = "In common")
 ```
 
 Also I plot the base-quality of these same bases, just to make sure they are good
 
 ```{r qual-mean}
-pheatmap( (unseen %>% filter(V1=="qual"))[,3:50],  cluster_rows = F, cluster_cols = F, )
+pheatmap( (unseen %>% filter(V1=="qual"))[,3:50],  cluster_rows = F, cluster_cols = F,main="Not in common" )
+pheatmap( (seen %>% filter(V1=="qual"))[,3:50],  cluster_rows = F, cluster_cols = F,main="In common" )
 ```
 
 If we plot the number of time the same position is tagged by a read (something
@@ -470,6 +473,7 @@ ggplot( (s1_removed %>% filter(V2=="polyA" | V2=="counts")) , aes(x=V2,y=V3) ) +
     geom_jitter() +
     labs(list(x="",y='counts'))
 ```
+
 
 
 ## Summary of samples with polyA>30
@@ -604,7 +608,7 @@ make_table = function(data, prefix){
     data = reshape(as.data.frame(data),  timevar = "type", idvar = "V1", direction = "wide")
     names(data) = sub("reads.","",names(data))
     data[is.na(data)] = 0
-    write.table(data, wide,row.names=F, col.names=F)
+    write.table(data, wide,row.names=F, col.names=T)
     c(raw,wide)
 }
 
