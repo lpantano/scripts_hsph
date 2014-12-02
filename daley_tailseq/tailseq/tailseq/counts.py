@@ -119,7 +119,7 @@ def _get_first_read(in_file):
     with open(in_file) as counts:
         for line in counts:
             cols = line.strip().split("\t")
-            genes[cols[0]] = [cols[1], "None"]
+            genes[cols[0]] = [cols[1], "Added"]
             stats[cols[1]] += 1
     return genes, stats
 

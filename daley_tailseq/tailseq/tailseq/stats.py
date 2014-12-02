@@ -15,7 +15,7 @@ def stats_from_read2(summary_log_file):
     read2 = defaultdict()
     with open(summary_log_file) as in_handle:
         for line in in_handle:
-            if line.startswith("found"):
+            if line.find("False") == -1:
                 name = line.split(" ")[1]
                 new = eval(line.split("--->")[1].split("]")[0]+"]")
                 read2[name] = new

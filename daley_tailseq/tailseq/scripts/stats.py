@@ -4,9 +4,9 @@ from argparse import ArgumentParser
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Run a single cell analysis.")
-    parser.add_argument("--count-file", required=True, help="Sample map file.")
-    parser.add_argument("--summary-log-file", required=True, help="Sample map file.")
-    parser.add_argument("--polya-log-file", required=True, help="Sample map file.")
+    parser.add_argument("--count-file", required=True, help="assig.dat")
+    parser.add_argument("--summary-log-file", required=True, help="summary.dat.log")
+    parser.add_argument("--polya-log-file", required=True, help="polya.dat.gz")
     parser.add_argument("--out-file", required=True, help="Sample map file.")
 
     args = parser.parse_args()
