@@ -1,0 +1,173 @@
+"query.number" "significant" "p.value" "term.size" "query.size" "overlap.size" "precision" "recall" "term.id" "domain" "subgraph.number" "term.name" "relative.depth"
+"1" 1 TRUE 0.00269 716 734 45 0.061 0.063 "GO:0009611" "BP" 11 "response to wounding" 1
+"2" 1 TRUE 0.0469 81 734 11 0.015 0.136 "GO:0014065" "BP" 18 "phosphatidylinositol 3-kinase signaling" 1
+"3" 1 TRUE 3.61e-16 12812 734 487 0.663 0.038 "GO:0044699" "BP" 3 "single-organism process" 1
+"4" 1 TRUE 0.0123 1631 734 79 0.108 0.048 "GO:0016265" "BP" 3 "death" 2
+"5" 1 TRUE 2.01e-07 4539 734 201 0.274 0.044 "GO:0051179" "BP" 3 "localization" 1
+"6" 1 TRUE 5.56e-06 1017 734 65 0.089 0.064 "GO:0051674" "BP" 3 "localization of cell" 2
+"7" 1 TRUE 1.38e-09 4650 734 213 0.29 0.046 "GO:0032502" "BP" 3 "developmental process" 1
+"8" 1 TRUE 3.09e-09 4629 734 211 0.287 0.046 "GO:0044767" "BP" 3 "single-organism developmental process" 2
+"9" 1 TRUE 1.18e-09 4154 734 196 0.267 0.047 "GO:0048856" "BP" 3 "anatomical structure development" 2
+"10" 1 TRUE 2.2e-05 2114 734 107 0.146 0.051 "GO:0009653" "BP" 3 "anatomical structure morphogenesis" 2
+"11" 1 TRUE 0.0032 911 734 53 0.072 0.058 "GO:0048646" "BP" 3 "anatomical structure formation involved in morphogenesis" 2
+"12" 1 TRUE 0.00829 10263 734 357 0.486 0.035 "GO:0065007" "BP" 3 "biological regulation" 1
+"13" 1 TRUE 9.43e-06 2564 734 125 0.17 0.049 "GO:0065008" "BP" 3 "regulation of biological quality" 2
+"14" 1 TRUE 0.00377 1190 734 64 0.087 0.054 "GO:0042592" "BP" 3 "homeostatic process" 3
+"15" 1 TRUE 0.000494 2002 734 98 0.134 0.049 "GO:0065009" "BP" 3 "regulation of molecular function" 2
+"16" 1 TRUE 0.029 9843 734 341 0.465 0.035 "GO:0050789" "BP" 3 "regulation of biological process" 2
+"17" 1 TRUE 1.05e-07 2100 734 114 0.155 0.054 "GO:0051239" "BP" 3 "regulation of multicellular organismal process" 3
+"18" 1 TRUE 6.83e-06 1757 734 95 0.129 0.054 "GO:0032879" "BP" 3 "regulation of localization" 3
+"19" 1 TRUE 4.73e-08 1771 734 102 0.139 0.058 "GO:0050793" "BP" 3 "regulation of developmental process" 3
+"20" 1 TRUE 4.35e-05 1643 734 88 0.12 0.054 "GO:0002376" "BP" 3 "immune system process" 1
+"21" 1 TRUE 0.000872 849 734 52 0.071 0.061 "GO:0002682" "BP" 3 "regulation of immune system process" 2
+"22" 1 TRUE 0.00351 5779 734 222 0.302 0.038 "GO:0023052" "BP" 3 "signaling" 1
+"23" 1 TRUE 0.00351 5779 734 222 0.302 0.038 "GO:0044700" "BP" 3 "single organism signaling" 2
+"24" 1 TRUE 0.0037 2344 734 107 0.146 0.046 "GO:0023051" "BP" 3 "regulation of signaling" 3
+"25" 1 TRUE 0.0083 6448 734 241 0.328 0.037 "GO:0032501" "BP" 3 "multicellular organismal process" 1
+"26" 1 TRUE 0.00508 6281 734 237 0.323 0.038 "GO:0044707" "BP" 3 "single-multicellular organism process" 2
+"27" 1 TRUE 4.57e-09 4071 734 191 0.26 0.047 "GO:0007275" "BP" 3 "multicellular organismal development" 3
+"28" 1 TRUE 1.82e-10 3518 734 176 0.24 0.05 "GO:0048731" "BP" 3 "system development" 4
+"29" 1 TRUE 6e-04 2589 734 119 0.162 0.046 "GO:0048513" "BP" 3 "organ development" 5
+"30" 1 TRUE 1.04e-05 1644 734 90 0.123 0.055 "GO:0007399" "BP" 3 "nervous system development" 5
+"31" 1 TRUE 2.36e-08 1388 734 87 0.119 0.063 "GO:2000026" "BP" 3 "regulation of multicellular organismal development" 4
+"32" 1 TRUE 0.00149 610 734 41 0.056 0.067 "GO:0051960" "BP" 3 "regulation of nervous system development" 5
+"33" 1 TRUE 0.00839 9758 734 342 0.466 0.035 "GO:0008152" "BP" 3 "metabolic process" 1
+"34" 1 TRUE 0.0346 8923 734 313 0.426 0.035 "GO:0071704" "BP" 3 "organic substance metabolic process" 2
+"35" 1 TRUE 1.2e-05 1423 734 81 0.11 0.057 "GO:1901135" "BP" 3 "carbohydrate derivative metabolic process" 3
+"36" 1 TRUE 2.56e-07 1724 734 98 0.134 0.057 "GO:1901564" "BP" 3 "organonitrogen compound metabolic process" 3
+"37" 1 TRUE 0.000469 998 734 59 0.08 0.059 "GO:0072521" "BP" 3 "purine-containing compound metabolic process" 4
+"38" 1 TRUE 7.07e-06 4432 734 191 0.26 0.043 "GO:0044710" "BP" 3 "single-organism metabolic process" 2
+"39" 1 TRUE 2.09e-06 2129 734 111 0.151 0.052 "GO:0044281" "BP" 3 "small molecule metabolic process" 3
+"40" 1 TRUE 0.0176 2088 734 95 0.129 0.045 "GO:0009056" "BP" 3 "catabolic process" 2
+"41" 1 TRUE 0.0113 1927 734 90 0.123 0.047 "GO:1901575" "BP" 3 "organic substance catabolic process" 3
+"42" 1 TRUE 0.0132 785 734 46 0.063 0.059 "GO:1901136" "BP" 3 "carbohydrate derivative catabolic process" 4
+"43" 1 TRUE 0.00221 924 734 54 0.074 0.058 "GO:1901565" "BP" 3 "organonitrogen compound catabolic process" 4
+"44" 1 TRUE 0.00411 1825 734 88 0.12 0.048 "GO:0044248" "BP" 3 "cellular catabolic process" 3
+"45" 1 TRUE 0.000236 1321 734 73 0.099 0.055 "GO:0044712" "BP" 3 "single-organism catabolic process" 3
+"46" 1 TRUE 0.0315 715 734 42 0.057 0.059 "GO:1901658" "BP" 3 "glycosyl compound catabolic process" 4
+"47" 1 TRUE 6.36e-05 3041 734 139 0.189 0.046 "GO:0006793" "BP" 3 "phosphorus metabolic process" 1
+"48" 1 TRUE 8.04e-05 2996 734 137 0.187 0.046 "GO:0006796" "BP" 3 "phosphate-containing compound metabolic process" 2
+"49" 1 TRUE 1.43e-05 1379 734 79 0.108 0.057 "GO:0019637" "BP" 3 "organophosphate metabolic process" 2
+"50" 1 TRUE 0.00287 932 734 54 0.074 0.058 "GO:0019693" "BP" 3 "ribose phosphate metabolic process" 3
+"51" 1 TRUE 0.000311 821 734 52 0.071 0.063 "GO:0046434" "BP" 3 "organophosphate catabolic process" 3
+"52" 1 TRUE 0.0164 1536 734 75 0.102 0.049 "GO:0051174" "BP" 3 "regulation of phosphorus metabolic process" 2
+"53" 1 TRUE 0.0146 1531 734 75 0.102 0.049 "GO:0019220" "BP" 3 "regulation of phosphate metabolic process" 3
+"54" 1 TRUE 1.11e-07 13969 734 488 0.665 0.035 "GO:0009987" "BP" 3 "cellular process" 1
+"55" 1 TRUE 2.54e-12 11451 734 436 0.594 0.038 "GO:0044763" "BP" 3 "single-organism cellular process" 2
+"56" 1 TRUE 1.77e-06 3237 734 152 0.207 0.047 "GO:0048869" "BP" 3 "cellular developmental process" 3
+"57" 1 TRUE 2.69e-07 3043 734 148 0.202 0.049 "GO:0030154" "BP" 3 "cell differentiation" 4
+"58" 1 TRUE 6.7e-07 1289 734 79 0.108 0.061 "GO:0045595" "BP" 3 "regulation of cell differentiation" 5
+"59" 1 TRUE 7.08e-06 1212 734 73 0.099 0.06 "GO:0022008" "BP" 3 "neurogenesis" 5
+"60" 1 TRUE 3.39e-06 1144 734 71 0.097 0.062 "GO:0048699" "BP" 3 "generation of neurons" 6
+"61" 1 TRUE 4.81e-05 1028 734 63 0.086 0.061 "GO:0030182" "BP" 3 "neuron differentiation" 5
+"62" 1 TRUE 7.13e-06 1682 734 92 0.125 0.055 "GO:0048468" "BP" 3 "cell development" 4
+"63" 1 TRUE 0.000134 687 734 47 0.064 0.068 "GO:0060284" "BP" 3 "regulation of cell development" 5
+"64" 1 TRUE 0.000267 550 734 40 0.054 0.073 "GO:0050767" "BP" 3 "regulation of neurogenesis" 6
+"65" 1 TRUE 0.00676 447 734 32 0.044 0.072 "GO:0045664" "BP" 3 "regulation of neuron differentiation" 7
+"66" 1 TRUE 0.000247 792 734 51 0.069 0.064 "GO:0048666" "BP" 3 "neuron development" 5
+"67" 1 TRUE 3.48e-05 1138 734 68 0.093 0.06 "GO:0055086" "BP" 3 "nucleobase-containing small molecule metabolic process" 3
+"68" 1 TRUE 0.000101 1097 734 65 0.089 0.059 "GO:0006753" "BP" 3 "nucleoside phosphate metabolic process" 4
+"69" 1 TRUE 0.00144 769 734 48 0.065 0.062 "GO:1901292" "BP" 3 "nucleoside phosphate catabolic process" 5
+"70" 1 TRUE 0.0412 699 734 41 0.056 0.059 "GO:0009143" "BP" 3 "nucleoside triphosphate catabolic process" 6
+"71" 1 TRUE 0.000384 1089 734 63 0.086 0.058 "GO:0009117" "BP" 3 "nucleotide metabolic process" 5
+"72" 1 TRUE 0.00275 955 734 55 0.075 0.058 "GO:0006163" "BP" 3 "purine nucleotide metabolic process" 6
+"73" 1 TRUE 0.00244 927 734 54 0.074 0.058 "GO:0009259" "BP" 3 "ribonucleotide metabolic process" 6
+"74" 1 TRUE 0.00188 919 734 54 0.074 0.059 "GO:0009150" "BP" 3 "purine ribonucleotide metabolic process" 7
+"75" 1 TRUE 0.00565 760 734 46 0.063 0.061 "GO:0009166" "BP" 3 "nucleotide catabolic process" 6
+"76" 1 TRUE 0.014 715 734 43 0.059 0.06 "GO:0009261" "BP" 3 "ribonucleotide catabolic process" 7
+"77" 1 TRUE 0.0018 5854 734 226 0.308 0.039 "GO:0007154" "BP" 3 "cell communication" 3
+"78" 1 TRUE 0.00392 2347 734 107 0.146 0.046 "GO:0010646" "BP" 3 "regulation of cell communication" 4
+"79" 1 TRUE 0.0306 5354 734 203 0.277 0.038 "GO:0007165" "BP" 3 "signal transduction" 4
+"80" 1 TRUE 0.00428 2018 734 95 0.129 0.047 "GO:0035556" "BP" 3 "intracellular signal transduction" 5
+"81" 1 TRUE 1.18e-05 1324 734 77 0.105 0.058 "GO:0006928" "BP" 3 "cellular component movement" 3
+"82" 1 TRUE 1.49e-06 595 734 47 0.064 0.079 "GO:0051270" "BP" 3 "regulation of cellular component movement" 4
+"83" 1 TRUE 0.00309 309 734 26 0.035 0.084 "GO:0051272" "BP" 3 "positive regulation of cellular component movement" 4
+"84" 1 TRUE 0.011 1626 734 79 0.108 0.049 "GO:0008219" "BP" 3 "cell death" 3
+"85" 1 TRUE 0.0371 1546 734 74 0.101 0.048 "GO:0012501" "BP" 3 "programmed cell death" 4
+"86" 1 TRUE 0.00332 4326 734 175 0.238 0.04 "GO:0071840" "BP" 3 "cellular component organization or biogenesis" 1
+"87" 1 TRUE 0.00057 4212 734 175 0.238 0.042 "GO:0016043" "BP" 3 "cellular component organization" 2
+"88" 1 TRUE 0.00481 1537 734 77 0.105 0.05 "GO:0051128" "BP" 3 "regulation of cellular component organization" 3
+"89" 1 TRUE 0.0281 983 734 53 0.072 0.054 "GO:0030030" "BP" 3 "cell projection organization" 3
+"90" 1 TRUE 0.0489 382 734 27 0.037 0.071 "GO:0031344" "BP" 3 "regulation of cell projection organization" 4
+"91" 1 TRUE 0.000146 667 734 46 0.063 0.069 "GO:0031175" "BP" 3 "neuron projection development" 4
+"92" 1 TRUE 0.0229 304 734 24 0.033 0.079 "GO:0010975" "BP" 3 "regulation of neuron projection development" 5
+"93" 1 TRUE 2.37e-07 1214 734 77 0.105 0.063 "GO:0040011" "BP" 3 "locomotion" 1
+"94" 1 TRUE 2.5e-06 584 734 46 0.063 0.079 "GO:0040012" "BP" 3 "regulation of locomotion" 2
+"95" 1 TRUE 5.56e-06 1017 734 65 0.089 0.064 "GO:0048870" "BP" 3 "cell motility" 2
+"96" 1 TRUE 1.44e-06 938 734 63 0.086 0.067 "GO:0016477" "BP" 3 "cell migration" 3
+"97" 1 TRUE 0.0371 214 734 19 0.026 0.089 "GO:0050900" "BP" 3 "leukocyte migration" 4
+"98" 1 TRUE 1.25e-05 532 734 42 0.057 0.079 "GO:2000145" "BP" 3 "regulation of cell motility" 3
+"99" 1 TRUE 3.66e-05 511 734 40 0.054 0.078 "GO:0030334" "BP" 3 "regulation of cell migration" 4
+"100" 1 TRUE 6.21e-11 882 734 70 0.095 0.079 "GO:0022610" "BP" 3 "biological adhesion" 1
+"101" 1 TRUE 3.54e-11 872 734 70 0.095 0.08 "GO:0007155" "BP" 3 "cell adhesion" 2
+"102" 1 TRUE 0.00862 347 734 27 0.037 0.078 "GO:0016337" "BP" 3 "cell-cell adhesion" 3
+"103" 1 TRUE 3.96e-06 7707 734 298 0.406 0.039 "GO:0050896" "BP" 3 "response to stimulus" 1
+"104" 1 TRUE 0.0112 1493 734 74 0.101 0.05 "GO:0009605" "BP" 3 "response to external stimulus" 2
+"105" 1 TRUE 0.00873 431 734 31 0.042 0.072 "GO:0042330" "BP" 3 "taxis" 3
+"106" 1 TRUE 4.04e-06 2637 734 129 0.176 0.049 "GO:0048583" "BP" 3 "regulation of response to stimulus" 2
+"107" 1 TRUE 0.0145 2078 734 95 0.129 0.046 "GO:0009966" "BP" 3 "regulation of signal transduction" 3
+"108" 1 TRUE 0.0157 839 734 48 0.065 0.057 "GO:0006955" "BP" 3 "immune response" 2
+"109" 1 TRUE 0.0454 975 734 52 0.071 0.053 "GO:0044270" "BP" 3 "cellular nitrogen compound catabolic process" 1
+"110" 1 TRUE 0.00113 3660 734 155 0.211 0.042 "GO:0051234" "BP" 3 "establishment of localization" 1
+"111" 1 TRUE 0.00216 3581 734 151 0.206 0.042 "GO:0006810" "BP" 3 "transport" 2
+"112" 1 TRUE 0.00175 2814 734 125 0.17 0.044 "GO:0044765" "BP" 3 "single-organism transport" 3
+"113" 1 TRUE 0.00927 1249 734 65 0.089 0.052 "GO:0006811" "BP" 3 "ion transport" 4
+"114" 1 TRUE 0.000123 936 734 58 0.079 0.062 "GO:0055085" "BP" 3 "transmembrane transport" 4
+"115" 1 TRUE 0.0156 718 734 43 0.059 0.06 "GO:0034220" "BP" 3 "ion transmembrane transport" 5
+"116" 1 TRUE 0.000211 3856 734 165 0.225 0.043 "GO:0048518" "BP" 3 "positive regulation of biological process" 1
+"117" 1 TRUE 0.00964 848 734 49 0.067 0.058 "GO:0051094" "BP" 3 "positive regulation of developmental process" 2
+"118" 1 TRUE 0.0205 608 734 38 0.052 0.062 "GO:0045597" "BP" 3 "positive regulation of cell differentiation" 3
+"119" 1 TRUE 0.0246 521 734 34 0.046 0.065 "GO:0002684" "BP" 3 "positive regulation of immune system process" 2
+"120" 1 TRUE 0.00558 319 734 26 0.035 0.082 "GO:0040017" "BP" 3 "positive regulation of locomotion" 2
+"121" 1 TRUE 0.00189 301 734 26 0.035 0.086 "GO:2000147" "BP" 3 "positive regulation of cell motility" 3
+"122" 1 TRUE 0.00431 295 734 25 0.034 0.085 "GO:0030335" "BP" 3 "positive regulation of cell migration" 4
+"123" 1 TRUE 0.00086 3497 734 150 0.204 0.043 "GO:0048519" "BP" 3 "negative regulation of biological process" 1
+"124" 1 TRUE 0.047 655 734 39 0.053 0.06 "GO:0051093" "BP" 3 "negative regulation of developmental process" 2
+"125" 1 TRUE 0.000257 507 734 38 0.052 0.075 "GO:0006140" "BP" 3 "regulation of nucleotide metabolic process" 1
+"126" 1 TRUE 2e-04 502 734 38 0.052 0.076 "GO:1900542" "BP" 3 "regulation of purine nucleotide metabolic process" 2
+"127" 1 TRUE 0.00976 752 734 45 0.061 0.06 "GO:0072523" "BP" 3 "purine-containing compound catabolic process" 1
+"128" 1 TRUE 0.047 703 734 41 0.056 0.058 "GO:0006152" "BP" 3 "purine nucleoside catabolic process" 2
+"129" 1 TRUE 0.047 703 734 41 0.056 0.058 "GO:0046130" "BP" 3 "purine ribonucleoside catabolic process" 3
+"130" 1 TRUE 0.0167 744 734 44 0.06 0.059 "GO:0006195" "BP" 3 "purine nucleotide catabolic process" 2
+"131" 1 TRUE 0.014 715 734 43 0.059 0.06 "GO:0009154" "BP" 3 "purine ribonucleotide catabolic process" 3
+"132" 1 TRUE 0.00832 430 734 31 0.042 0.072 "GO:0006935" "BP" 3 "chemotaxis" 1
+"133" 1 TRUE 0.0273 501 734 33 0.045 0.066 "GO:0043269" "BP" 3 "regulation of ion transport" 1
+"134" 1 TRUE 0.0261 390 734 28 0.038 0.072 "GO:0009118" "BP" 4 "regulation of nucleoside metabolic process" 1
+"135" 1 TRUE 0.031 911 734 50 0.068 0.055 "GO:0051336" "BP" 5 "regulation of hydrolase activity" 1
+"136" 1 TRUE 1.33e-05 856 734 57 0.078 0.067 "GO:0030054" "CC" 14 "cell junction" 1
+"137" 1 TRUE 0.0131 355 734 27 0.037 0.076 "GO:0005911" "CC" 14 "cell-cell junction" 2
+"138" 1 TRUE 3.24e-09 3329 734 165 0.225 0.05 "GO:0005576" "CC" 15 "extracellular region" 1
+"139" 1 TRUE 1.79e-06 2603 734 129 0.176 0.05 "GO:0044421" "CC" 15 "extracellular region part" 2
+"140" 1 TRUE 0.00781 1064 734 58 0.079 0.055 "GO:0005615" "CC" 15 "extracellular space" 3
+"141" 1 TRUE 5.1e-09 8453 734 334 0.455 0.04 "GO:0016020" "CC" 8 "membrane" 1
+"142" 1 TRUE 2.97e-05 14959 734 504 0.687 0.034 "GO:0005623" "CC" 8 "cell" 1
+"143" 1 TRUE 3.89e-05 14943 734 503 0.685 0.034 "GO:0044464" "CC" 8 "cell part" 2
+"144" 1 TRUE 0.0375 1019 734 54 0.074 0.053 "GO:0097458" "CC" 8 "neuron part" 3
+"145" 1 TRUE 0.016 864 734 49 0.067 0.057 "GO:0043005" "CC" 8 "neuron projection" 4
+"146" 1 TRUE 5.35e-06 619 734 47 0.064 0.076 "GO:0009986" "CC" 8 "cell surface" 3
+"147" 1 TRUE 4.82e-08 4998 734 219 0.298 0.044 "GO:0071944" "CC" 8 "cell periphery" 3
+"148" 1 TRUE 6.95e-08 4898 734 215 0.293 0.044 "GO:0005886" "CC" 8 "plasma membrane" 3
+"149" 1 TRUE 8.9e-09 6734 734 279 0.38 0.041 "GO:0044425" "CC" 8 "membrane part" 1
+"150" 1 TRUE 2.23e-08 5982 734 253 0.345 0.042 "GO:0031224" "CC" 8 "intrinsic component of membrane" 2
+"151" 1 TRUE 4.49e-07 5843 734 243 0.331 0.042 "GO:0016021" "CC" 8 "integral component of membrane" 2
+"152" 1 TRUE 1.02e-07 1770 734 101 0.138 0.057 "GO:0044459" "CC" 8 "plasma membrane part" 2
+"153" 1 TRUE 0.000143 801 734 52 0.071 0.065 "GO:0031226" "CC" 8 "intrinsic component of plasma membrane" 3
+"154" 1 TRUE 0.00356 747 734 46 0.063 0.062 "GO:0005887" "CC" 8 "integral component of plasma membrane" 3
+"155" 1 TRUE 0.00486 2358 734 107 0.146 0.045 "GO:0031982" "CC" 19 "vesicle" 1
+"156" 1 TRUE 3.86e-08 11751 734 428 0.583 0.036 "GO:0005488" "MF" 1 "binding" 1
+"157" 1 TRUE 9.84e-09 7084 734 290 0.395 0.041 "GO:0005515" "MF" 1 "protein binding" 2
+"158" 1 TRUE 0.0111 113 734 14 0.019 0.124 "GO:0019838" "MF" 1 "growth factor binding" 3
+"159" 1 TRUE 0.00568 1053 734 58 0.079 0.055 "GO:0005215" "MF" 10 "transporter activity" 1
+"160" 1 TRUE 0.0192 870 734 49 0.067 0.056 "GO:0022892" "MF" 10 "substrate-specific transporter activity" 2
+"161" 1 TRUE 0.00631 835 734 49 0.067 0.059 "GO:0022857" "MF" 10 "transmembrane transporter activity" 2
+"162" 1 TRUE 0.0241 755 734 44 0.06 0.058 "GO:0022891" "MF" 10 "substrate-specific transmembrane transporter activity" 3
+"163" 1 TRUE 0.0496 2 666 2 0.003 1 "CORUM:5330" "co" 13 "Lef1-Tle1 complex" 1
+"164" 1 TRUE 0.0235 198 734 21 0.029 0.106 "HP:0010985" "hp" 6 "Gonosomal inheritance" 1
+"165" 1 TRUE 0.0185 195 734 21 0.029 0.108 "HP:0001417" "hp" 6 "X-linked inheritance" 2
+"166" 1 TRUE 0.0499 129 734 13 0.018 0.101 "KEGG:04360" "ke" 17 "Axon guidance" 1
+"167" 1 TRUE 0.00517 234 733 21 0.029 0.09 "REAC:109582" "re" 2 "Hemostasis" 1
+"168" 1 TRUE 0.00816 300 733 24 0.033 0.08 "REAC:420362" "re" 12 "Hemostasis" 1
+"169" 1 TRUE 0.00045 6821 734 316 0.431 0.046 "TF:M00378_4" "tf" 7 "Factor: Pax-4; motif: NNNNNYCACCCB; match class: 4" 1
+"170" 1 TRUE 0.00695 6275 734 288 0.392 0.046 "TF:M00378_3" "tf" 7 "Factor: Pax-4; motif: NNNNNYCACCCB; match class: 3" 2
+"171" 1 TRUE 0.0178 4130 734 200 0.272 0.048 "TF:M00378_2" "tf" 7 "Factor: Pax-4; motif: NNNNNYCACCCB; match class: 2" 3
+"172" 1 TRUE 0.018 10046 734 426 0.58 0.042 "TF:M00444_4" "tf" 9 "Factor: VDR; motif: GGGKNARNRRGGWSA; match class: 4" 1
