@@ -64,18 +64,37 @@ def _summarize(in_file, align_r2, count_file, out_file):
                         if read_gene[read][1]:
                             #print "is polya"
                             gene = read_gene[read][0]
-                            stats[gene]["polyA"] += 1
+                            polya_size = _get_bin(len(find[1]))
+                            stats[gene][polya_size] += 1
                             if find[0] != "":
-                                stats[gene][find[0]] += 1
+                                stats[gene][(polya_size, find[0])] += 1
                     else:
                         log_handle.write("corrected %s %s %s ---> %s %s\n" % (read, cols[3], cols[4], find, read_gene[read]))
         with file_transaction(out_file) as tx_out_file:
             with open(tx_out_file, 'w') as out:
                 for gene in counts_gene:
-                    out.write("%s counts %s\n" % (gene, counts_gene[gene]))
+                    out.write("%s total counts %s 0\n" % (gene, counts_gene[gene]))
                     if gene in stats:
                         for mod, c in stats[gene].iteritems():
-                            out.write("%s %s %s\n" % (gene, mod, c))
+                            if isinstance(mod, tuple):
+                                u_times = _get_u_times(mod[1])
+                                out.write("%s %s %s %s %s\n" % (gene, mod[0], mod[1], c, u_times))
+                            else:
+                                out.write("%s polyA %s %s 0\n" % (gene, mod, c))
+
+def _get_u_times(m):
+    us = sum([1 for nt in m if nt == "A"])
+    ratio = 1.0 * us / len(m)
+    return ratio
+
+
+def _get_bin(size):
+    if size < 15:
+        return "<15"
+    elif size < 25:
+        return "<25"
+    else:
+        return ">25"
 
 
 def _get_second_read(sam_file, read1_assing):
