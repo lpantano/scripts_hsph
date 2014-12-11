@@ -71,7 +71,7 @@ setwd(root_path)
 ```
 
 ```{r read-summary}
-read_summary = function(dd){
+read_summary_d = function(dd){
     dd = dd %>% filter(V3 > 1 & !grepl("N", V2) & !is.na(V2))
     dd$type = as.character(dd$V2)
     dd$type[ dd$type!="counts" & dd$type!="polyA" ] = "Mod"
@@ -96,43 +96,164 @@ read_summary = function(dd){
     print(p)
 }
 
+dd_list =list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
+summary_all = function(dd_list){
+    all = lapply(dd_list, get_mod_table)
+    names(all) = names(dd_list)
+    tab = data.frame()
+    for (e in names(all)) {
+        tab = rbind( tab, cbind( all[[e]], samples=rep(e,nrow(all[[e]])) ) )
+    }
+    dd_melt = tab %>% group_by(type,samples) %>% summarise(total=sum(counts)) %>% ungroup()
+    dd_melt$type = factor(dd_melt$type, levels=rev(c("U>3","UU","U","polyA","exp")))
+    p = ggplot(dd_melt, aes(y=total, x=samples, fill=type, order=type )) + 
+        geom_bar( stat = 'identity') +
+        scale_y_log10()+
+        scale_fill_brewer(palette = "Set1")
+        ggtitle("Number of reads")
+    print(p)
+
+}
+
+
+frequency_u = function(dd_list){
+    all = lapply(names(dd_list) , function (name){
+        x = normalization(dd_list[[name]])
+        rbind(get_size(x,"<15") %>% mutate(sample=name),
+        get_size(x,"<25") %>% mutate(sample=name),
+        get_size(x,">25") %>% mutate(sample=name) )
+        
+        })
+    tab = do.call(rbind,all)
+    tab$type = factor(tab$type, levels=rev(c("U>3","UU","U","polyA","polyA-NoU","exp")))
+    ggplot(tab %>% filter(type!="exp" & type!="polyA" & type!="polyA-NoU"), aes(x=size, y=freq, fill = type, order=type )) +
+        geom_bar(stat = 'identity')+
+        scale_fill_brewer(palette = "Blues")+
+        facet_wrap(~sample) +
+        theme_bw()
+        
+   ggplot(tab %>% filter(type!="exp" & type!="polyA"), aes(x=size, y=freq, fill = type, order=type )) +
+        geom_bar(stat = 'identity')+
+        scale_fill_brewer(palette = "Blues")+
+        facet_wrap(~sample) +
+        theme_bw()
+
+}
+
+get_size = function(x, size){
+    t = get_mod_table(x %>% filter(V2==size | V3==size | V2=="total")) %>% mutate(size=size)    
+    total = t %>% group_by(type,size) %>% summarize(total=sum(counts))
+    total$freq = total$total / total$total[total$type=="polyA"] * 100
+    total
+}
+
+get_size_gene = function(x, size){
+    t = get_u_table(x %>% filter(V2==size | V3==size | V2=="total")) %>% mutate(size=size)    
+    t
+}
+
+
+normalization = function(x){
+    t = x %>% filter(V2=="total")
+    th = quantile(t$V4,c(.25,.75))
+    ls = sum((t %>% filter(V4>th[1] & V4<th[2]))[,4])
+    x$V4=x$V4/ls * 1000000
+    x
+}
+
 get_set_genes = function(dd){
     poly = unique((dd %>% filter(V2=="polyA"))[,1])
-    aa = unique((dd %>% filter(V2=="AA"))[,1])
-    a = unique((dd %>% filter(V2=="A"))[,1])
-    c = unique((dd %>% filter(V2=="C"))[,1])
-    mod = unique((dd %>% filter(V2!="counts" & V2!="polyA"))[,1])
-    n10 = length( c(aa,a,c) ) * 0.1
-    n5 = length( c(aa,a,c) ) * 0.05
-    top10 = unique(( dd %>% filter( V2=="A" |  V2=="AA" | V2=="C"  ) %>%
-                         arrange( desc(V3) ))[1:n10,1])
-    top5 = unique(( dd %>% filter( V2=="A" |  V2=="AA" | V2=="C"  ) %>%
+    aa = as.character(unique((dd %>% filter(V3=="AA"))[,1]))
+    a = as.character(unique((dd %>% filter(V3=="A"))[,1]))
+    a3 = as.character(unique((dd %>% filter(V5 > 0.8 & nchar(as.character(V3))>3 & V2!="total" & V2!="polyA"))[,1]))
+    genes = unique(c(a,aa,a3))
+    #c = unique((dd %>% filter(V2=="C"))[,1])
+    #mod = unique((dd %>% filter(V2!="counts" & V2!="polyA"))[,1])
+    n10 = round(length( c(aa,a,a3) ) * 0.1)
+    n5 = round(length( c(aa,a,a3) ) * 0.05)
+    top10 = unique(( dd[ dd$V1 %in% as.character(genes), ] %>%
+                         arrange( desc(V4) ))[1:n10,1])
+    top5 = unique(( dd[ dd$V1 %in% as.character(genes), ] %>%
                          arrange( desc(V3) ))[1:n5,1])
     return( list("polyA"=poly, "mod"=mod, "a"=a, "aa"=aa, "c"=c, "top10"=top10, "top5"=top5) )
 }
 
+
 filter_out = function(dd, cuta=30, cutmod=2){
-    dd = dd %>% filter(V3 > cutmod & !grepl("N", V2) & !is.na(V2))
-    genes = (dd %>% filter( V2=="polyA" & V3>=cuta ))[,1]
-    dd[ dd$V1 %in%  genes, ]
+    dd = dd %>% filter(V4 > cutmod & !grepl("N", V3) & !is.na(V3))
+    genes = (dd %>% filter(V2=="polyA") %>% group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% filter(counts>=cuta))
+    dd[ dd$V1 %in%  as.character(genes$V1), ]
 }
 
-poly_read_summary = function(dd){
-    dd = dd %>% filter(V3 > 1 & !grepl("N", V2) & !is.na(V2))
+
+get_u_table = function(dd,by_size=NULL){
     dd$type = as.character(dd$V2)
-    dd$type[ dd$type!="counts" & dd$type!="polyA" ] = "Mod"
-    dd_melt = dd %>% group_by(type) %>% summarise( total=sum(V3) )
+    uf = get_mod_table(dd)
+    total = uf %>% filter(type!="polyA" & type!="exp" & type!="polyA-NoU") %>% group_by(V1) %>% summarize(total=sum(counts))
+    poly = uf %>% filter(type=="polyA")
+    t = merge(total,poly, by=1)
+    t$ufreq = t$total/t$counts * 100
+    t[,c(1,5)]
+}
+
+
+get_mod_table = function(dd,by_size=NULL){
+    dd$type = as.character(dd$V2)
+    exp = dd %>% filter(V2=="total") %>% 
+                group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% mutate(type="exp")
+    poly = dd %>% filter(V2=="polyA") %>% 
+                group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% mutate(type="polyA")
+#    t = merge(exp,poly, by=1,all.x=TRUE)
+#    t[is.na(t)] = 0
+#    t$counts = t[,2] - t[,4]
+#    exp = t[,c("V1","counts","type.x")]
+#    names(exp)[3] = "type"
+    
+#    mod = dd %>% filter(V2!="polyA" & V2!="total") %>% 
+#                group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% mutate(type="mod")
+#    t = merge(poly,mod,by=1,all.x=TRUE)
+#    t[is.na(t)] = 0
+#    t$counts = t[,2] - t[,4]
+#    poly = t[,c("V1","counts","type.x")]
+#    names(poly)[3] = "type"
+    
+    aa = dd %>% filter(V3=="AA") %>% 
+                group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% mutate(type="U")
+    a = dd %>% filter(V3=="A") %>% 
+                group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% mutate(type="UU")
+    a3 = dd %>% filter(V5 > 0.8 & nchar(as.character(V3))>3 & V2!="total" & V2!="polyA") %>% 
+                group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% mutate(type="U>3")
+    nou = dd %>% filter(V5 < 0.11 & V2!="total" & V2!="polyA") %>% 
+                group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% mutate(type="polyA-NoU")
+
+    
+    dd = rbind(exp,poly,a,aa,a3,nou)
+    dd[dd$counts>0,]
+}
+
+
+poly_read_summary = function(dd){
+    dd = filter_out(dd)
+    dd_melt = get_mod_table(dd)
+    p = ggplot(dd_melt, aes(y=counts, x=type)) + 
+    geom_boxplot() +
+    scale_y_log10()+
+    ggtitle("Number of reads")
+    print(p)
+    
+    dd_melt = dd_melt %>% group_by(type) %>% summarise(total=sum(counts)) %>% ungroup()
     p = ggplot(dd_melt, aes(y=total, x=type)) + 
         geom_bar( stat = 'identity') +
+        scale_y_log10()+
         ggtitle("Number of reads")
     print(p)
-    dd_melt = dd %>% filter(V2=="AA" | V2=="A" | V2=="C") %>% 
-              dplyr::select(mod=V2, V3) %>% group_by(mod) %>%
-              summarise( total=sum(V3) )
-    p = ggplot(dd_melt, aes(y=total, x=mod)) + 
-        geom_bar(stat="identity", position = "dodge") +
-        ggtitle("Number of reads")
-    print(p)
+    #dd_melt = dd %>% filter(V2=="AA" | V2=="A" | V2=="C") %>% 
+    #          dplyr::select(mod=V2, V3) %>% group_by(mod) %>%
+    #          summarise( total=sum(V3) )
+    #p = ggplot(dd_melt, aes(y=total, x=mod)) + 
+    #    geom_bar(stat="identity", position = "dodge") +
+    #    ggtitle("Number of reads")
+    #print(p)
 }
 
 
@@ -244,12 +365,14 @@ Similar number than public database.
 Showing sample 1 only. 
 
 ```{r after-filtering}
-poly_read_summary(s1)
+s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
+poly_read_summary(s1_raw)
 ```
 
 ### polyA > 200 and size >= 8 nt
 
 ```{r polya-filter-200}
+s1 = filter_out(s1_raw,200)
 s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
 s1 = filter_out(s1_raw,200)
 s2_raw = read.table(paste0(root_path,"/work/s2_summary.dat"))
@@ -283,26 +406,26 @@ sp.f = sp.f[!is.na(sp.f$ens),]
 public[["polyA"]] = data.frame(V1=sp.f$ens, V2="polyA", V3=sp.f$Total.poly.A...tags)
 
 p = sp.f[sp.f[,5]>1,1]
-public[["a"]] = data.frame(V1=p, V2="A", V3=sp.f[sp.f$ens %in% p ,5])
+public[["a"]] = data.frame(V1=p, V2="U", V3=sp.f[sp.f$ens %in% p ,5])
 
 p = sp.f[sp.f[,8]>1,1]
-public[["aa"]] = data.frame(V1=p, V2="AA", V3=sp.f[sp.f$ens %in% p ,8])
+public[["aa"]] = data.frame(V1=p, V2="UU", V3=sp.f[sp.f$ens %in% p ,8])
 
-p = sp.f[sp.f[,6]>1,1]
-public[["c"]] = data.frame(V1=p, V2="C", V3=sp.f[sp.f$ens %in% p ,6])
+p = sp.f[sp.f[,11]>1,1]
+public[["a3"]] = data.frame(V1=p, V2="U3", V3=sp.f[sp.f$ens %in% p ,11])
 
 public_raw = do.call(rbind, public)
 
-sp_reworked<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/summary.complete.8As",header=F,sep="\t")
-rw_raw = sp_reworked[,c(1,3,4)]
-names(rw_raw) = c("V1","V2","V3")
-rw_raw$V2 = as.character(rw_raw$V2)
-rw_raw$V2[rw_raw$V2=="None"] = "polyA"
+#sp_reworked<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/summary.complete.8As",header=F,sep="\t")
+#rw_raw = sp_reworked[,c(1,3,4)]
+#names(rw_raw) = c("V1","V2","V3")
+#rw_raw$V2 = as.character(rw_raw$V2)
+#rw_raw$V2[rw_raw$V2=="None"] = "polyA"
 
 public = filter_out(public_raw,200)
 genes_public = get_set_genes(public)
-rw = filter_out(rw_raw,200)
-genes_rw = get_set_genes(rw)
+#rw = filter_out(rw_raw,200)
+#genes_rw = get_set_genes(rw)
 
 ```
 
@@ -684,6 +807,39 @@ lapply(1:7, function(x){
 ```
 
 [raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+
+## half-life
+```{r hl}
+hl = read.table("~/ody/projects/daley_mRNA_mod/tani.csv",header=T,sep="\t")
+mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+g <- getBM( attributes=c("ensembl_gene_id","refseq_mrna") , filters=
+"refseq_mrna"    , values =as.character(hl$RepName) ,mart=mart)
+idx<-match(hl$RepName,g$refseq_mrna)
+hl$ens<-g[idx,1]
+half_life = hl[!is.na(hl$ens),c("ens","t1.2..h.")]
+value = half_life[,2]
+value = as.character(value)
+value_num = as.numeric(value)
+value_num[which(value==">24")] = NA
+value_num[which(value=="N.D.")] = NA
+half_life$pi=value_num
+half_life = half_life[!is.na(value_num),]
+
+all = lapply(names(dd_list) , function (name){
+        x = normalization(dd_list[[name]])
+        rbind(get_size_gene(x,"<15") %>% mutate(sample=name),
+        get_size_gene(x,"<25") %>% mutate(sample=name),
+        get_size_gene(x,">25") %>% mutate(sample=name) )
+        
+        })
+tab = do.call(rbind,all)
+tab_hl = merge(tab, half_life, by=1)
+head(tab_hl)
+ggplot(tab_hl %>% filter(sample=="s1"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    facet_wrap(~size)
+```
 
 
 ### Files
