@@ -774,14 +774,16 @@ ggplot(tab_hl %>% filter(sample=="s1"), aes(y=ufreq,x=pi)) +
     geom_point()+
     facet_wrap(~size)
 
+```
 
+
+```{r hl-sp}
 head(sp.f)
 sp_hl = merge(sp.f[,c(1,3,13)],half_life)
 names(sp_hl)[2:3]=c("polya","ufreq")
 ggplot(sp_hl %>% filter(polya>200), aes(y=ufreq,x=pi)) +
     geom_point()+
     theme_bw()
-
 ```
 
 ## Non common genes
