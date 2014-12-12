@@ -70,7 +70,7 @@ render_2_drop("~/repos/pipelines/daley_tailseq/reports/tailseq.rmd",dn)
 setwd(root_path)
 ```
 
-```{r read-summary}
+```{r functions}
 read_summary_d = function(dd){
     dd = dd %>% filter(V3 > 1 & !grepl("N", V2) & !is.na(V2))
     dd$type = as.character(dd$V2)
@@ -96,7 +96,7 @@ read_summary_d = function(dd){
     print(p)
 }
 
-dd_list =list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
+
 summary_all = function(dd_list){
     all = lapply(dd_list, get_mod_table)
     names(all) = names(dd_list)
@@ -148,10 +148,9 @@ get_size = function(x, size){
 }
 
 get_size_gene = function(x, size){
-    t = get_u_table(x %>% filter(V2==size | V3==size | V2=="total")) %>% mutate(size=size)    
+    t = get_u_table(x %>% filter(V2==size | V3==size | V2=="total" )) %>% mutate(size=size)    
     t
 }
-
 
 normalization = function(x){
     t = x %>% filter(V2=="total")
@@ -174,28 +173,50 @@ get_set_genes = function(dd){
     top10 = unique(( dd[ dd$V1 %in% as.character(genes), ] %>%
                          arrange( desc(V4) ))[1:n10,1])
     top5 = unique(( dd[ dd$V1 %in% as.character(genes), ] %>%
-                         arrange( desc(V3) ))[1:n5,1])
-    return( list("polyA"=poly, "mod"=mod, "a"=a, "aa"=aa, "c"=c, "top10"=top10, "top5"=top5) )
+                         arrange( desc(V4) ))[1:n5,1])
+    return( list("polyA"=poly, "a"=a, "aa"=aa, "a3"=a3, "top10"=top10, "top5"=top5) )
 }
 
+get_set_genes_public = function(dd){
+    poly = unique((dd %>% filter(V2=="polyA"))[,1])
+    aa = as.character(unique((dd %>% filter(V2=="UU"))[,1]))
+    a = as.character(unique((dd %>% filter(V2=="U"))[,1]))
+    a3 = as.character(unique((dd %>% filter(V2=="U3"))[,1]))
+    genes = unique(c(a,aa,a3))
+    #c = unique((dd %>% filter(V2=="C"))[,1])
+    #mod = unique((dd %>% filter(V2!="counts" & V2!="polyA"))[,1])
+    n10 = round(length( c(aa,a,a3) ) * 0.1)
+    n5 = round(length( c(aa,a,a3) ) * 0.05)
+    top10 = unique(( dd[ dd$V1 %in% as.character(genes), ] %>%
+                         arrange( desc(V3) ))[1:n10,1])
+    top5 = unique(( dd[ dd$V1 %in% as.character(genes), ] %>%
+                         arrange( desc(V3) ))[1:n5,1])
+    return( list("polyA"=poly, "a"=a, "aa"=aa, "a3"=a3, "top10"=top10, "top5"=top5) )
+  
+}
 
-filter_out = function(dd, cuta=30, cutmod=2){
+filter_out = function(dd, cuta=30, cutmod=1){
     dd = dd %>% filter(V4 > cutmod & !grepl("N", V3) & !is.na(V3))
     genes = (dd %>% filter(V2=="polyA") %>% group_by(V1) %>% summarise(counts=sum(V4)) %>% ungroup() %>% filter(counts>=cuta))
     dd[ dd$V1 %in%  as.character(genes$V1), ]
 }
 
+filter_out_public = function(dd, cuta=30, cutmod=1){
+    dd = dd %>% filter(V3 > cutmod & !grepl("N", V3) & !is.na(V3))
+    genes = (dd %>% filter(V2=="polyA") %>% group_by(V1) %>% summarise(counts=sum(V3)) %>% ungroup() %>% filter(counts>=cuta))
+    dd[ dd$V1 %in%  as.character(genes$V1), ]
+}
 
 get_u_table = function(dd,by_size=NULL){
     dd$type = as.character(dd$V2)
     uf = get_mod_table(dd)
-    total = uf %>% filter(type!="polyA" & type!="exp" & type!="polyA-NoU") %>% group_by(V1) %>% summarize(total=sum(counts))
+    total = uf %>% filter(type!="polyA" & type!="exp" & type!="polyA-NoU" & type!="U>3") %>% group_by(V1) %>% summarize(total=sum(counts))
     poly = uf %>% filter(type=="polyA")
     t = merge(total,poly, by=1)
+    t = t %>% filter(total > 10)
     t$ufreq = t$total/t$counts * 100
     t[,c(1,5)]
 }
-
 
 get_mod_table = function(dd,by_size=NULL){
     dd$type = as.character(dd$V2)
@@ -230,7 +251,6 @@ get_mod_table = function(dd,by_size=NULL){
     dd = rbind(exp,poly,a,aa,a3,nou)
     dd[dd$counts>0,]
 }
-
 
 poly_read_summary = function(dd){
     dd = filter_out(dd)
@@ -304,7 +324,7 @@ do_df = function(sample, groups){
     data.frame(gene=groups[[sample]],sample=sample,is=1)
 }
 
-do_venn = function(groups)
+do_venn_d = function(groups)
 {
     n = length(groups)
     all_genes = do.call(rbind, lapply(names(groups), do_df, groups) )
@@ -422,8 +442,8 @@ public_raw = do.call(rbind, public)
 #rw_raw$V2 = as.character(rw_raw$V2)
 #rw_raw$V2[rw_raw$V2=="None"] = "polyA"
 
-public = filter_out(public_raw,200)
-genes_public = get_set_genes(public)
+public = filter_out_public(public_raw,200)
+genes_public = get_set_genes_public(public)
 #rw = filter_out(rw_raw,200)
 #genes_rw = get_set_genes(rw)
 
@@ -452,11 +472,11 @@ For instance, the first right column shows the common genes in the four samples:
 
 ```{r common}
 
-type = c("polyA","Modification","add-U","add-UU","add-G","top 10%","top 5%")
-type_name = c("polyA","mod","a","aa","c","top10","top5")
+type = c("polyA","add-U","add-UU","add-U>3","top 10%","top 5%")
+type_name = c("polyA","a","aa","a3","top10","top5")
 names(type) = type_name
  void = lapply(type_name, function(x){
-     do_venn(list(s1=genes_s1[[x]],
+     venn(list(s1=genes_s1[[x]],
                s2=genes_s2[[x]],
                s3=genes_s3[[x]],
                s4=genes_s4[[x]]))
@@ -471,11 +491,10 @@ names(type) = type_name
 I added here public data using the supplementary table (as PUBLIC in figures), and the re-analyzed data we did with the public data (as RW in figures - last row)
 
 ```{r common-public}
- void = lapply(type_name[c(1,3,4,5)], function(x){
-     do_venn(list(s1=genes_s1[[x]],
+ void = lapply(type_name, function(x){
+     venn(list(s1=genes_s1[[x]],
                s2=genes_s2[[x]],
-               public=genes_public[[x]],
-               rw=genes_rw[[x]]))
+               public=genes_public[[x]]))
      title(type[x])
  })
 ```
@@ -491,10 +510,9 @@ genes_s1 = get_set_genes(s1)
 genes_s2 = get_set_genes(s2)
 genes_s3 = get_set_genes(s3)
 genes_s4 = get_set_genes(s4)
-rw = filter_out(rw_raw,30)
-genes_rw = get_set_genes(rw)
-public = filter_out(public_raw,30)
-genes_public = get_set_genes(public)
+#rw = filter_out(rw_raw,30)#genes_rw = get_set_genes(rw)
+public = filter_out_public(public_raw,30)
+genes_public = get_set_genes_public(public)
 
 ```
 
@@ -502,14 +520,12 @@ genes_public = get_set_genes(public)
 
 ```{r common-30}
 
-type = c("polyA","Modification","add-U","add-UU","add-G","top 10%","top 5%")
-type_name = c("polyA","mod","a","aa","c","top10","top5")
  void = lapply(type_name, function(x){
-     do_venn(list(s1=genes_s1[[x]],
+     venn(list(s1=genes_s1[[x]],
                s2=genes_s2[[x]],
                s3=genes_s3[[x]],
                s4=genes_s4[[x]]))
-     title(x)
+     title(type[x])
  })
 
 ```
@@ -518,13 +534,248 @@ type_name = c("polyA","mod","a","aa","c","top10","top5")
 
 ```{r common-public-30}
  void = lapply(type_name[c(1,3,4,5)], function(x){
-     do_venn(list(s1=genes_s1[[x]],
+     venn(list(s1=genes_s1[[x]],
                s2=genes_s2[[x]],
-               public=genes_public[[x]],
-               rw=genes_rw[[x]]))
+               public=genes_public[[x]]))
      title(type[x])
  })
 ```
+
+
+## Summary of samples with polyA>30
+
+```{r polya-summary}
+summary_all(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
+frequency_u(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
+```
+
+
+## Correlation
+
+
+```{r cor-funct}
+get_counts = function(dd_list){
+   all = lapply(names(dd_list) , function (name){
+        x = normalization(dd_list[[name]])
+        t = get_mod_table(x) %>% mutate(sample=name)
+        })
+    tab = do.call(rbind,all)
+    e= reshape(as.data.frame(tab %>% filter(type=="exp") %>% select(V1,counts,sample)), direction = "wide", idvar = c("V1"),  timevar = "sample")
+    e[is.na(e)] = 0
+    u = reshape(as.data.frame(tab %>% filter(type=="U") %>% select(V1,counts,sample)), direction = "wide", idvar = c("V1"),  timevar = "sample")
+    u[is.na(u)] = 0
+    uu= reshape(as.data.frame(tab %>% filter(type=="UU") %>% select(V1,counts,sample)), direction = "wide", idvar = c("V1"),  timevar = "sample")
+    uu[is.na(uu)] = 0
+    u3= reshape(as.data.frame(tab %>% filter(type=="U>3") %>% select(V1,counts,sample)), direction = "wide", idvar = c("V1"),  timevar = "sample")
+    u3[is.na(u3)] = 0
+    p= reshape(as.data.frame(tab %>% filter(type=="polyA") %>% select(V1,counts,sample)), direction = "wide", idvar = c("V1"),  timevar = "sample")
+    p[is.na(p)] = 0
+    list(exp=e,polya=p,u=u,uu=u,u3=u3)
+}
+```
+
+
+### Total gene expression
+
+```{r cor}
+ma = get_counts(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
+m = log2(ma[[1]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+
+```
+
+### Genes expression of polyA-transcripts
+
+```{r cor-polyA}
+m = log2(ma[[2]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+
+```
+
+
+
+###Genes expression of polyA + U modification
+
+```{r cor-a}
+m = log2(ma[[3]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+
+```
+
+
+### Genes expression of polyA + UU modification
+
+```{r cor-aa}
+m = log2(ma[[4]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+```
+
+
+### Genes expression of polyA + U>3 modification
+
+```{r cor-c}
+m = log2(ma[[5]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+```
+
+## By sample analysis
+
+It included stats for each sample and GO enrichment analysis
+
+```{r make-table-function}
+library(org.Hs.eg.db)
+cols <- c("ENSEMBL", "SYMBOL")
+make_table = function(dd, prefix){
+    all = lapply(c("<15","<25",">25"), function(size){
+        get_mod_table(dd %>% filter(V2==size | V3==size | V2=="total")) %>% mutate(size=size)  
+    }) 
+    data = do.call(rbind,all)
+    raw = paste0(path_files,prefix,"_raw.txt")
+    wide = paste0(path_files,prefix,"_wide.txt")
+
+    len = sapply(as.character(data$V2), nchar)
+    #data$type = "other"
+    #data$type[ data$V2=="counts" & data$type=="other"] = "counts"
+    #data$type[ data$V2=="polyA" & data$type=="other"] = "polyA"
+    #data$type[ data$V2=="A" & data$type=="other"] = "U"
+    #data$type[ data$V2=="AA" & data$type=="other"] = "UU"
+    #data$type[ data$V2=="C" & data$type=="other"] = "G"
+    #data$type[ data$V2=="CC" & data$type=="other"] = "GG"
+    #data$type[ len=1 & data$type=="other"] = "N"
+    #data$type[ len==2 & data$type=="other"] = "NN"
+    #data$type[ len==3 & data$type=="other"] = "NNN"
+    #data$type[ len==4 & data$type=="other"] = "NNNN"
+    #data$type[ len>4 & data$type=="other"] = "N>4"
+    #data = data %>% group_by(V1, type) %>% summarise(reads=sum(V3)) %>% ungroup()
+    #data$type = factor(data$type, levels=c("counts","polyA","U","UU","G","GG","N","NN","NNN","NNNN","N>4"))
+    data$type = paste0(data$type,data$size)
+    data = reshape(as.data.frame(data %>% select(V1, counts,type)),  timevar = "type", idvar = "V1", direction = "wide")
+    names(data) = sub("counts.","",names(data))
+    data[is.na(data)] = 0
+    symbol = select(org.Hs.eg.db, as.character(data$V1), cols, keytype="ENSEMBL")
+    symbol = symbol %>% distinct(ENSEMBL)
+    data$symbol = symbol[match(data$V1,symbol$ENSEMBL),2]
+    write.table(data, wide,row.names=F, col.names=T)
+    c(raw,wide)
+}
+
+```
+
+
+### Sample 1
+
+```{r do_go-s1, results='asis',cache=TRUE}
+files = make_table(s1, "s1")
+files = get_report_links(files)
+#read_summary(s1)
+#g_ezid = lapply(genes_s1, get_entrez)
+#res_go = run_go_enrichment(g_ezid, "s1")
+```
+```{r table-s1, results='asis',eval=FALSE}
+lapply(1:7, function(x){
+    knitr::kable(res_go[[x]], caption=type[x])
+})
+```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+### Sample 2
+
+```{r do_go-s2, results='asis',cache=TRUE}
+#read_summary(s2)
+files = make_table(s1, "s2")
+files = get_report_links(files)
+#g_ezid = lapply(genes_s2, get_entrez)
+#res_go = run_go_enrichment(g_ezid, "s2")
+```
+```{r table-s2, results='asis',eval=FALSE}
+lapply(1:7, function(x){
+    knitr::kable(res_go[[x]], caption=type[x])
+})
+```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+
+### Sample 3
+
+```{r do_go-s3, results='asis',cache=TRUE}
+#read_summary(s3)
+files = make_table(s1, "s3")
+files = get_report_links(files)
+#g_ezid = lapply(genes_s3, get_entrez)
+#res_go = run_go_enrichment(g_ezid, "s3")
+```
+```{r table-s3, results='asis',eval=FALSE}
+lapply(1:7, function(x){
+    knitr::kable(res_go[[x]], caption=type[x])
+})
+```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+
+### Sample 4
+
+```{r do_go-s4, results='asis',cache=TRUE}
+#read_summary(s4)
+files = make_table(s1, "s4")
+files = get_report_links(files)
+#g_ezid = lapply(genes_s4, get_entrez)
+#res_go = run_go_enrichment(g_ezid, "s4")
+```
+```{r table-s4, results='asis',eval=FALSE}
+lapply(1:7, function(x){
+    knitr::kable(res_go[[x]], caption=type[x])
+})
+```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+
+## half-life
+```{r hl}
+hl = read.table("~/ody/projects/daley_mRNA_mod/tani.csv",header=T,sep="\t")
+mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+g <- getBM( attributes=c("ensembl_gene_id","refseq_mrna") , filters=
+"refseq_mrna"    , values =as.character(hl$RepName) ,mart=mart)
+idx<-match(hl$RepName,g$refseq_mrna)
+hl$ens<-g[idx,1]
+half_life = hl[!is.na(hl$ens),c("ens","t1.2..h.")]
+value = half_life[,2]
+value = as.character(value)
+value_num = as.numeric(value)
+value_num[which(value==">24")] = NA
+value_num[which(value=="N.D.")] = NA
+half_life$pi=value_num
+half_life = half_life[!is.na(value_num),]
+
+all = lapply(names(dd_list) , function (name){
+        x = normalization(dd_list[[name]])
+        rbind(get_size_gene(x,"<15") %>% mutate(sample=name),
+        get_size_gene(x,"<25") %>% mutate(sample=name),
+        get_size_gene(x,">25") %>% mutate(sample=name) )
+        
+        })
+tab = do.call(rbind,all)
+tab_hl = merge(tab, half_life, by=1)
+head(tab_hl)
+ggplot(tab_hl %>% filter(sample=="s1"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    facet_wrap(~size)
+```
+
+## Non common genes
 
 ### genes in s1/s2 but not in public data
 
@@ -597,249 +848,6 @@ ggplot( (s1_removed %>% filter(V2=="polyA" | V2=="counts")) , aes(x=V2,y=V3) ) +
     labs(list(x="",y='counts'))
 ```
 
-
-
-## Summary of samples with polyA>30
-
-```{r polya-summary}
-print("s1")
-poly_read_summary(s1)
-print("s2")
-poly_read_summary(s2)
-print("s3")
-poly_read_summary(s3)
-print("s4")
-poly_read_summary(s4)
-```
-
-
-## Correlation
-
-
-```{r cor-funct}
-get_counts = function(counts){
-    y = DGEList(counts=counts)
-    y = calcNormFactors(y)
-    cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
-}
-```
-
-
-### Total gene expression
-
-```{r cor}
-all = rbind( s1 %>% mutate( sample="s1"),
-             s2 %>% mutate( sample="s2"),
-             s3 %>% mutate( sample="s3"),
-             s4 %>% mutate( sample="s4") )
-all_melt = reshape(all %>% filter( V2=="counts" ), direction = "wide", idvar = c("V1","V2"),  timevar = "sample")
-all_melt[is.na(all_melt)] = 0
-counts = get_counts(all_melt[,3:6])
-ggpairs(counts, alpha=0.4,
-        diag = list(continuous = "density"))
-ggheatmap.show(ggheatmap(cor(counts)))
-
-```
-
-### Genes expression of polyA-transcripts
-
-```{r cor-polyA}
-all_melt = reshape(all %>% filter( V2=="polyA" ), direction = "wide", idvar = c("V1","V2"),  timevar = "sample")
-all_melt[is.na(all_melt)] = 0
-ggpairs(log2(all_melt[,3:6]+0.1), alpha=0.4,
-        diag = list(continuous = "density"))
-ggheatmap.show(ggheatmap(cor(counts)))
-
-```
-
-
-### Genes expression of polyA + modification
-
-```{r cor-mod}
-all_melt = reshape(as.data.frame(all %>% filter( V2!="counts" & V3!="polya" ) %>% 
-                                group_by(V1,sample) %>% summarise( total=sum(V3)))
-                   , direction = "wide", idvar = c("V1"),  timevar = "sample")
-all_melt[is.na(all_melt)] = 0
-counts = get_counts(all_melt[,2:5])
-ggpairs(counts, alpha=0.4,
-        diag = list(continuous = "density"))
-ggheatmap.show(ggheatmap(cor(counts)))
-
-```
-
-
-###Genes expression of polyA + U modification
-
-```{r cor-a}
-all_melt = reshape(all %>% filter( V2=="A" ), direction = "wide", idvar = c("V1","V2"),  timevar = "sample")
-all_melt[is.na(all_melt)] = 0
-counts = get_counts(all_melt[,3:6])
-ggpairs(counts, alpha=0.4,
-        diag = list(continuous = "density"))
-ggheatmap.show(ggheatmap(cor(counts)))
-```
-
-
-### Genes expression of polyA + UU modification
-
-```{r cor-aa}
-all_melt = reshape(all %>% filter( V2=="AA" ), direction = "wide", idvar = c("V1","V2"),  timevar = "sample")
-all_melt[is.na(all_melt)] = 0
-counts = get_counts(all_melt[,3:6])
-ggpairs(counts, alpha=0.4,
-        diag = list(continuous = "density"))
-ggheatmap.show(ggheatmap(cor(counts)))
-```
-
-
-### Genes expression of polyA + G modification
-
-```{r cor-c}
-all_melt = reshape(all %>% filter( V2=="C" ), direction = "wide", idvar = c("V1","V2"),  timevar = "sample")
-all_melt[is.na(all_melt)] = 0
-counts = get_counts(all_melt[,3:6])
-ggpairs(counts, alpha=0.4,
-        diag = list(continuous = "density"))
-ggheatmap.show(ggheatmap(cor(counts)))
-
-```
-
-## By sample analysis
-
-It included stats for each sample and GO enrichment analysis
-
-```{r make-table-function}
-make_table = function(data, prefix){
-    raw = paste0(path_files,prefix,"_raw.txt")
-    wide = paste0(path_files,prefix,"_wide.txt")
-    write.table(data, raw,row.names=F, col.names=F)
-    len = sapply(as.character(data$V2), nchar)
-    data$type = "other"
-    data$type[ data$V2=="counts" & data$type=="other"] = "counts"
-    data$type[ data$V2=="polyA" & data$type=="other"] = "polyA"
-    data$type[ data$V2=="A" & data$type=="other"] = "U"
-    data$type[ data$V2=="AA" & data$type=="other"] = "UU"
-    data$type[ data$V2=="C" & data$type=="other"] = "G"
-    data$type[ data$V2=="CC" & data$type=="other"] = "GG"
-    data$type[ len=1 & data$type=="other"] = "N"
-    data$type[ len==2 & data$type=="other"] = "NN"
-    data$type[ len==3 & data$type=="other"] = "NNN"
-    data$type[ len==4 & data$type=="other"] = "NNNN"
-    data$type[ len>4 & data$type=="other"] = "N>4"
-    data = data %>% group_by(V1, type) %>% summarise(reads=sum(V3)) %>% ungroup()
-    data$type = factor(data$type, levels=c("counts","polyA","U","UU","G","GG","N","NN","NNN","NNNN","N>4"))
-    data = reshape(as.data.frame(data),  timevar = "type", idvar = "V1", direction = "wide")
-    names(data) = sub("reads.","",names(data))
-    data[is.na(data)] = 0
-    write.table(data, wide,row.names=F, col.names=T)
-    c(raw,wide)
-}
-
-```
-
-
-### Sample 1
-
-```{r do_go-s1, results='asis',cache=TRUE}
-files = make_table(s1, "s1")
-files = get_report_links(files)
-read_summary(s1)
-g_ezid = lapply(genes_s1, get_entrez)
-#res_go = run_go_enrichment(g_ezid, "s1")
-```
-```{r table-s1, results='asis',eval=FALSE}
-lapply(1:7, function(x){
-    knitr::kable(res_go[[x]], caption=type[x])
-})
-```
-
-[raw table](`r files[1]`) and [formatted table](`r files[2]`)
-
-### Sample 2
-
-```{r do_go-s2, results='asis',cache=TRUE}
-read_summary(s2)
-files = make_table(s1, "s2")
-files = get_report_links(files)
-g_ezid = lapply(genes_s2, get_entrez)
-#res_go = run_go_enrichment(g_ezid, "s2")
-```
-```{r table-s2, results='asis',eval=FALSE}
-lapply(1:7, function(x){
-    knitr::kable(res_go[[x]], caption=type[x])
-})
-```
-
-[raw table](`r files[1]`) and [formatted table](`r files[2]`)
-
-
-### Sample 3
-
-```{r do_go-s3, results='asis',cache=TRUE}
-read_summary(s3)
-files = make_table(s1, "s3")
-files = get_report_links(files)
-g_ezid = lapply(genes_s3, get_entrez)
-#res_go = run_go_enrichment(g_ezid, "s3")
-```
-```{r table-s3, results='asis',eval=FALSE}
-lapply(1:7, function(x){
-    knitr::kable(res_go[[x]], caption=type[x])
-})
-```
-
-[raw table](`r files[1]`) and [formatted table](`r files[2]`)
-
-
-### Sample 4
-
-```{r do_go-s4, results='asis',cache=TRUE}
-read_summary(s4)
-files = make_table(s1, "s4")
-files = get_report_links(files)
-g_ezid = lapply(genes_s4, get_entrez)
-#res_go = run_go_enrichment(g_ezid, "s4")
-```
-```{r table-s4, results='asis',eval=FALSE}
-lapply(1:7, function(x){
-    knitr::kable(res_go[[x]], caption=type[x])
-})
-```
-
-[raw table](`r files[1]`) and [formatted table](`r files[2]`)
-
-
-## half-life
-```{r hl}
-hl = read.table("~/ody/projects/daley_mRNA_mod/tani.csv",header=T,sep="\t")
-mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
-g <- getBM( attributes=c("ensembl_gene_id","refseq_mrna") , filters=
-"refseq_mrna"    , values =as.character(hl$RepName) ,mart=mart)
-idx<-match(hl$RepName,g$refseq_mrna)
-hl$ens<-g[idx,1]
-half_life = hl[!is.na(hl$ens),c("ens","t1.2..h.")]
-value = half_life[,2]
-value = as.character(value)
-value_num = as.numeric(value)
-value_num[which(value==">24")] = NA
-value_num[which(value=="N.D.")] = NA
-half_life$pi=value_num
-half_life = half_life[!is.na(value_num),]
-
-all = lapply(names(dd_list) , function (name){
-        x = normalization(dd_list[[name]])
-        rbind(get_size_gene(x,"<15") %>% mutate(sample=name),
-        get_size_gene(x,"<25") %>% mutate(sample=name),
-        get_size_gene(x,">25") %>% mutate(sample=name) )
-        
-        })
-tab = do.call(rbind,all)
-tab_hl = merge(tab, half_life, by=1)
-head(tab_hl)
-ggplot(tab_hl %>% filter(sample=="s1"), aes(y=ufreq,x=pi)) +
-    geom_point()+
-    facet_wrap(~size)
-```
 
 
 ### Files
