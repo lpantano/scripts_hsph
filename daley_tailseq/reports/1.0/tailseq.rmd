@@ -1,0 +1,635 @@
+---
+output:
+    knitrBootstrap::bootstrap_document:
+        theme: readable
+        highlight: zenburn
+        theme.chooser: TRUE
+        highlight.chooser: TRUE
+    html_document:
+        toc: true
+        highlight: zenburn
+
+---
+    
+# Report
+    
+## Overview
+
+There are 4 samples, `s1` and `s2` get long fragments and `s3` and `s4` get short fragments.
+Among the pairs, there are some difference in protocol, like amplification cycles 
+and different ligation method (i am guessing from the metadata)
+
+## Method
+
+* Map read 1
+* QC for read 1
+* Detect polyA in read 2: remove first 5 nt TAG at position ~17
+* Overlap read 1 with genes and retrieve read-gene information
+* Summarize read 1 and read 2 to get information for each gene (counts, polyA, modifications)
+As well an extra tuner step is applied to get more precisely polyA fragment.
+* Remove false positive polyA. I mapped read 2
+to the genome and remove reads that map entirely since we are trying to detect 
+post-modifications. Make sense? There were a lot of reads with short polyA
+that ended up with long modifications, and mapped perfectly to the genome. 
+
+### Setup: loading packages and data
+    
+```{r setup,cache=FALSE}
+library(knitr)
+library(rmarkdown)
+library(knitrBootstrap)
+library(ggplot2)
+library(gplots)
+library(reshape)
+library(DESeq2)
+library(edgeR)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(rjson)
+library(GGally)
+library(pheatmap)
+source("~/repos/myRfunctions/transactions.R")
+dn <- "daley_tailseq/1.0"
+root_path<-"~/ody/projects/daley_mRNA_mod/tailseq-112014"
+path_files = "~/repos/pipelines/daley_tailseq/reports/1.0/"
+```
+
+```{r render,eval=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+                      cache.path="~/.cache/tailseq-report/html_cached/", eval=TRUE,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+render_2_drop("~/repos/pipelines/daley_tailseq/reports/1.0/tailseq.rmd",dn)
+```
+
+
+```{r load}
+setwd(root_path)
+```
+
+```{r functions,cache=FALSE}
+source("~/repos/pipelines/daley_tailseq/reports/functions.R")
+
+```
+
+
+```{r go,eval=FALSE}
+library(org.Hs.eg.db)
+#set <- universeGO(org.Hs.egGO,"Homo sapiens")
+
+run_one_go = function(g, name){
+    g = g[!is.na(g)]
+    mf <- runGO(g,set,"MF",as.list(GOMFCHILDREN))
+    #plotGO(mf, name)
+    write.table(mf[[1]], paste0(name, ".txt") )
+    #print(head(mf[[1]]))
+    return(mf[[1]][1:20,])
+}
+
+run_go_enrichment = function(g, sample){
+    table = vector("list")
+    table[[1]] = run_one_go(g[[1]], paste0(sample,"_mf_polyA"))
+    table[[2]] = run_one_go(g[[2]], paste0(sample,'_mf_mod'))
+    table[[3]] = run_one_go(g[[3]], paste0(sample,'_mf_a'))
+    table[[4]] = run_one_go(g[[4]], paste0(sample,'_mf_aa'))
+    table[[5]] = run_one_go(g[[5]], paste0(sample,'_mf_c'))
+    table[[6]] = run_one_go(g[[6]], paste0(sample,'_mf_top10'))
+    table[[7]] = run_one_go(g[[7]], paste0(sample,'_mf_top5'))
+    table
+}
+
+```
+
+```{r venn-function}
+get_entrez = function(g){
+  require(biomaRt)
+  ensembl = useMart('ensembl', dataset = "hsapiens_gene_ensembl")
+  df = getBM(attributes=c("ensembl_gene_id", "entrezgene"), filters="ensembl_gene_id", values=g,mart=ensembl)
+  return(df[,2])
+}
+
+
+do_df = function(sample, groups){
+    data.frame(gene=groups[[sample]],sample=sample,is=1)
+}
+
+do_venn_d = function(groups)
+{
+    n = length(groups)
+    all_genes = do.call(rbind, lapply(names(groups), do_df, groups) )
+    
+    total_genes = all_genes %>% group_by(sample) %>% summarise(total = sum(is)) %>% ungroup()
+    all_genes = reshape(all_genes, timevar = "sample",idvar = "gene", direction = "wide")
+    all_genes[is.na(all_genes)] = 0
+    
+    all_genes_sum = all_genes %>% group_by_(.dots = (names(all_genes[,1:n+1]))) %>% summarise(total = n()) %>% ungroup()
+    per = apply( all_genes_sum, 1, function(x){
+        unlist((x[n+1]/as.vector(total_genes[,2])) * x[1:n] * 100 )
+        })
+    per[per==0] = NA
+    rownames(per) = names(groups)
+ 
+    num = apply( all_genes_sum, 1, function(x){
+        unlist(x[n+1] * x[1:n]  )
+        })
+    num[num==0] = NA
+    rownames(num) = names(groups)
+ 
+    
+    aheatmap( t(as.matrix(t(per))), annCol = all_genes_sum[,1:n], Colv = NA, Rowv = NA,cellheight = 45, cellwidth = 25, fontsize=9, txt = num )
+    
+}
+
+```
+
+
+## polyA in read-2
+
+purple (reads with polyA), blue (reads without polyA) and orange (reads with polyA < 6 nt) are the total amount of reads. red (modifications) are reads with modifications after polyA. And green are the ones without the 5 nt TAG along the read.
+
+These are the stats of read_2 before taking into account the ones where the paired
+read_1 maps onto a gene. 
+
+And we applied here another filter to reduce the number of false positive of polyA.
+Normally short polyA with long modifications are removed here. We just don't count when read2 maps perfectly to the genome and is at the expected distance from the read1.
+
+```{r ploya}
+dd = data.frame()
+for (file in list.files(paste0(root_path,"/work"), "stat$") ){
+    data = read.table(paste0(root_path, "/work/", file) )
+    dd = rbind(dd, data)
+}
+dd$sample = c(rep("s1",5), rep("s2",5), rep("s3",5) , rep("s4",5) )
+ggplot( dd, aes( x=sample, y=V2, fill=V1 ) ) +
+    geom_bar( stat = 'identity', position = 'dodge') + 
+    scale_fill_brewer( palette = "Set1" ) +
+    labs( list( y="reads" ) )
+
+```
+
+## After filtering
+
+After that filter, we reduce the total number of reads, but still have a lot.
+Similar number than public database.
+Showing sample 1 only. 
+
+```{r after-filtering}
+s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
+poly_read_summary(s1_raw)
+```
+
+### polyA > 200 and size >= 8 nt
+
+```{r polya-filter-200}
+s1 = filter_out(s1_raw,200)
+s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
+s1 = filter_out(s1_raw,200)
+s2_raw = read.table(paste0(root_path,"/work/s2_summary.dat"))
+s2 = filter_out(s2_raw,200)
+s3_raw = read.table(paste0(root_path,"/work/s3_summary.dat"))
+s3 = filter_out(s3_raw,200)
+s4_raw = read.table(paste0(root_path,"/work/s4_summary.dat"))
+s4 = filter_out(s4_raw,200)
+genes_s1 = get_set_genes(s1)
+genes_s2 = get_set_genes(s2)
+genes_s3 = get_set_genes(s3)
+genes_s4 = get_set_genes(s4)
+
+
+```
+
+
+```{r public-data}
+sp<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/SPtable.csv",header=T,sep=",")
+library(biomaRt)
+mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"hgnc_symbol"    , values =as.character(sp$Gene.Name) ,mart=mart)
+idx<-match(sp$Gene.Name,g$hgnc_symbol)
+sp$ens<-g[idx,1]
+sp.f<-sp[,c(24,2,3,11,12,13,14,15,16,17,18,19,22),]
+
+public = vector("list")
+
+sp.f = sp.f[!is.na(sp.f$ens),]
+public[["polyA"]] = data.frame(V1=sp.f$ens, V2="polyA", V3=sp.f$Total.poly.A...tags)
+
+p = sp.f[sp.f[,5]>1,1]
+public[["a"]] = data.frame(V1=p, V2="U", V3=sp.f[sp.f$ens %in% p ,5])
+
+p = sp.f[sp.f[,8]>1,1]
+public[["aa"]] = data.frame(V1=p, V2="UU", V3=sp.f[sp.f$ens %in% p ,8])
+
+p = sp.f[sp.f[,11]>1,1]
+public[["a3"]] = data.frame(V1=p, V2="U3", V3=sp.f[sp.f$ens %in% p ,11])
+
+public_raw = do.call(rbind, public)
+
+#sp_reworked<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/summary.complete.8As",header=F,sep="\t")
+#rw_raw = sp_reworked[,c(1,3,4)]
+#names(rw_raw) = c("V1","V2","V3")
+#rw_raw$V2 = as.character(rw_raw$V2)
+#rw_raw$V2[rw_raw$V2=="None"] = "polyA"
+
+public = filter_out_public(public_raw,200)
+genes_public = get_set_genes_public(public)
+#rw = filter_out(rw_raw,200)
+#genes_rw = get_set_genes(rw)
+
+```
+
+
+```{r biotype, eval=FALSE}
+s1_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"ensembl_gene_id"    , values =as.character(s1[[1]]) ,mart=mart)
+s2_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"ensembl_gene_id"    , values =as.character(s2[[1]]) ,mart=mart)
+s3_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"ensembl_gene_id"    , values =as.character(s3[[1]]) ,mart=mart)
+s4_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
+"ensembl_gene_id"    , values =as.character(s4[[1]]) ,mart=mart)
+```
+
+
+#### Common genes among 4 samples
+
+I changed venn diagrams by heatmaps. Each top bar is a sample, when two bars
+overlaps, the cells below are the number of genes in common. The color mean the
+percentage of common genes for that sample. 
+
+For instance, the first right column shows the common genes in the four samples: 1788 in common. Being the 60% for the first two samples, and the 90% for the two last samples.
+
+```{r common}
+
+type = c("polyA","add-U","add-UU","add-U>3","top 10%","top 5%")
+type_name = c("polyA","a","aa","a3","top10","top5")
+names(type) = type_name
+ void = lapply(type_name, function(x){
+     venn(list(s1=genes_s1[[x]],
+               s2=genes_s2[[x]],
+               s3=genes_s3[[x]],
+               s4=genes_s4[[x]]))
+     title(type[x])
+ })
+
+```
+
+
+#### s1/s2 with public data
+
+I added here public data using the supplementary table (as PUBLIC in figures)
+
+```{r common-public}
+ void = lapply(type_name, function(x){
+     venn(list(s1=genes_s1[[x]],
+               s2=genes_s2[[x]],
+               public=genes_public[[x]]))
+     title(type[x])
+ })
+```
+
+### polyA > 30 and size >= 8 nt
+
+```{r poya-filter-30}
+s1 = filter_out(s1_raw,30)
+s2 = filter_out(s2_raw,30)
+s3 = filter_out(s3_raw,30)
+s4 = filter_out(s4_raw,30)
+genes_s1 = get_set_genes(s1)
+genes_s2 = get_set_genes(s2)
+genes_s3 = get_set_genes(s3)
+genes_s4 = get_set_genes(s4)
+#rw = filter_out(rw_raw,30)#genes_rw = get_set_genes(rw)
+public = filter_out_public(public_raw,30)
+genes_public = get_set_genes_public(public)
+
+```
+
+#### Common genes among 4 samples
+
+```{r common-30}
+
+ void = lapply(type_name, function(x){
+     venn(list(s1=genes_s1[[x]],
+               s2=genes_s2[[x]],
+               s3=genes_s3[[x]],
+               s4=genes_s4[[x]]))
+     title(type[x])
+ })
+
+```
+
+#### s1/s2 with public data
+
+```{r common-public-30}
+ void = lapply(type_name[c(1,3,4,5)], function(x){
+     venn(list(s1=genes_s1[[x]],
+               s2=genes_s2[[x]],
+               public=genes_public[[x]]))
+     title(type[x])
+ })
+```
+
+
+## Summary of samples with polyA>30
+
+```{r polya-summary}
+summary_all(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
+frequency_u(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
+```
+
+
+## Correlation
+
+
+### Total gene expression
+
+```{r cor}
+ma = get_counts(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
+m = log2(ma[[1]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+
+```
+
+### Genes expression of polyA-transcripts
+
+```{r cor-polyA}
+m = log2(ma[[2]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+
+```
+
+
+
+###Genes expression of polyA + U modification
+
+```{r cor-a}
+m = log2(ma[[3]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+
+```
+
+
+### Genes expression of polyA + UU modification
+
+```{r cor-aa}
+m = log2(ma[[4]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+```
+
+
+### Genes expression of polyA + U>3 modification
+
+```{r cor-c}
+m = log2(ma[[5]][,2:5]+1)
+ggpairs(m, alpha=0.4,
+        diag = list(continuous = "density"))
+ggheatmap.show(ggheatmap(cor(m)))
+```
+
+## By sample analysis
+
+It included stats for each sample and GO enrichment analysis
+
+### Sample 1
+
+```{r do_go-s1, results='asis',cache=TRUE}
+files = make_table(s1,  paste0(path_files, "s1"))
+files = get_report_links(files)
+#read_summary(s1)
+#g_ezid = lapply(genes_s1, get_entrez)
+#res_go = run_go_enrichment(g_ezid, "s1")
+```
+```{r table-s1, results='asis',eval=FALSE}
+lapply(1:7, function(x){
+    knitr::kable(res_go[[x]], caption=type[x])
+})
+```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+### Sample 2
+
+```{r do_go-s2, results='asis',cache=TRUE}
+#read_summary(s2)
+files = make_table(s1,  paste0(path_files, "s2"))
+files = get_report_links(files)
+#g_ezid = lapply(genes_s2, get_entrez)
+#res_go = run_go_enrichment(g_ezid, "s2")
+```
+```{r table-s2, results='asis',eval=FALSE}
+lapply(1:7, function(x){
+    knitr::kable(res_go[[x]], caption=type[x])
+})
+```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+
+### Sample 3
+
+```{r do_go-s3, results='asis',cache=TRUE}
+#read_summary(s3)
+files = make_table(s1,  paste0(path_files, "s3"))
+files = get_report_links(files)
+#g_ezid = lapply(genes_s3, get_entrez)
+#res_go = run_go_enrichment(g_ezid, "s3")
+```
+```{r table-s3, results='asis',eval=FALSE}
+lapply(1:7, function(x){
+    knitr::kable(res_go[[x]], caption=type[x])
+})
+```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+
+### Sample 4
+
+```{r do_go-s4, results='asis',cache=TRUE}
+#read_summary(s4)
+files = make_table(s1,  paste0(path_files, "s4"))
+files = get_report_links(files)
+#g_ezid = lapply(genes_s4, get_entrez)
+#res_go = run_go_enrichment(g_ezid, "s4")
+```
+```{r table-s4, results='asis',eval=FALSE}
+lapply(1:7, function(x){
+    knitr::kable(res_go[[x]], caption=type[x])
+})
+```
+
+[raw table](`r files[1]`) and [formatted table](`r files[2]`)
+
+
+## half-life
+
+Using SP table 1  from Tani et al. 2012 to correlate half_life mRNA with
+Uridylation percentage (% reads with U>1 / % reads with polyA). I count only
+when reads of Uridaylation >= 20.
+
+```{r hl}
+hl = read.table("~/ody/projects/daley_mRNA_mod/tani.csv",header=T,sep="\t")
+mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+g <- getBM( attributes=c("ensembl_gene_id","refseq_mrna") , filters=
+"refseq_mrna"    , values =as.character(hl$RepName) ,mart=mart)
+idx<-match(hl$RepName,g$refseq_mrna)
+hl$ens<-g[idx,1]
+half_life = hl[!is.na(hl$ens),c("ens","t1.2..h.")]
+value = half_life[,2]
+value = as.character(value)
+value_num = as.numeric(value)
+value_num[which(value==">24")] = NA
+value_num[which(value=="N.D.")] = NA
+half_life$pi=value_num
+half_life = half_life[!is.na(value_num),]
+
+all = lapply(names(dd_list) , function (name){
+        x = normalization(dd_list[[name]])
+        rbind(get_size_gene(x,"<15") %>% mutate(sample=name),
+        get_size_gene(x,"<25") %>% mutate(sample=name),
+        get_size_gene(x,">25") %>% mutate(sample=name) )
+        
+        })
+tab = do.call(rbind,all)
+tab_hl = merge(tab, half_life, by=1)
+#head(tab_hl)
+ggplot(tab_hl %>% filter(sample=="s1"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    facet_wrap(~size)+
+    labs(list(title="s1"))
+
+ggplot(tab_hl %>% filter(sample=="s2"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    facet_wrap(~size)+
+    labs(list(title="s2"))
+
+ggplot(tab_hl %>% filter(sample=="s3"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    facet_wrap(~size)+
+    labs(list(title="s3"))
+
+ggplot(tab_hl %>% filter(sample=="s4"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    facet_wrap(~size)+
+    labs(list(title="s4"))
+```
+
+
+```{r hl-sp}
+#head(sp.f)
+sp_hl = merge(sp.f[,c(1,3,13)],half_life)
+names(sp_hl)[2:3]=c("polya","ufreq")
+ggplot(sp_hl %>% filter(polya>200), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    theme_bw()+
+    labs(list(title="Public data"))
+```
+
+## Non common genes
+
+### genes in s1/s2 but not in public data
+
+```{r filter-30-not_in_public}
+genes_notin_public =   setdiff( intersect(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])) , genes_public[["polyA"]])
+genes_in_public =   intersect( intersect(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])) , genes_public[["polyA"]])
+
+#genes_notin_public_type = getBM( attributes=c("ensembl_gene_id", "refseq_mrna","gene_biotype") , filters=
+#"ensembl_gene_id"    , values =genes_notin_public ,mart=mart)
+write.table(genes_in_public,paste0(root_path,"/work/genes_in_public"),row.names=F,col.names=F,quote=F)
+intersect(genes_notin_public,public_raw$V1)
+```
+
+They are not in the table, but if I look at least at one of this genes, is full of polyA sequences, 
+so, it should be something relating to the method, or maybe they filter something else??
+
+This is what raw data is for this gene
+
+found HISEQ:272:HAVVLADXX:1:1103:13345:22631    TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT      
+found HISEQ:272:HAVVLADXX:1:1103:16584:26706    TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTGT                  
+found HISEQ:272:HAVVLADXX:1:1103:2751:31339     TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAATTTTTTTTTTTTTTTTGTCCACCA 
+found HISEQ:272:HAVVLADXX:1:1103:17487:65762 AA-TTTTTTTTATTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAATTTTTTTTTT 
+
+
+I have taken all genes like this, and plot the T percentage average and 
+the base-quality average per gene at the first 50 positions.
+
+I plot the % of T at the first 50 nucleotides after PRIMER+TAG and MODIFICATIONS removal.
+Each row is a gene not seen in the public data. 
+
+```{r T-mean}
+unseen = read.table( paste0(root_path,"/work/genes_notin_public.dat"),sep=" ")
+seen = read.table( paste0(root_path,"/work/genes_in_public.dat"),sep=" ")
+pheatmap( (unseen %>% filter(V1=="seq"))[,3:50],  cluster_rows = T, cluster_cols = F, main = "Not in commont")
+pheatmap( (seen %>% filter(V1=="seq"))[,3:50],  cluster_rows = T, cluster_cols = F,main = "In common")
+```
+
+Also I plot the base-quality of these same bases, just to make sure they are good
+
+```{r qual-mean}
+pheatmap( (unseen %>% filter(V1=="qual"))[,3:50],  cluster_rows = F, cluster_cols = F,main="Not in common" )
+pheatmap( (seen %>% filter(V1=="qual"))[,3:50],  cluster_rows = F, cluster_cols = F,main="In common" )
+```
+
+If we plot the number of time the same position is tagged by a read (something
+proportional to PCR artifacts), we don't see a difference in the distribution
+among the common or non-common genes.
+
+```{r pcr}
+unseen_pcr = read.table( paste0(root_path,"/work/s1_quality_check.dat.pcr"),sep=" ")
+unseen_pcr$seen = 1
+unseen_pcr$seen[unseen_pcr$V1 %in% genes_notin_public] = 0
+table(unseen_pcr$seen)
+ggplot(unseen_pcr, aes(x=factor(seen),y=V3) ) +
+    geom_boxplot(alpha=0.3)+
+    scale_y_log10() +
+    labs(list(y="log10(counts)",x="common"))
+```
+
+
+### genes in public but not in s1/s2
+
+All polyA counts for the genes in the public set but not in the new data are low. 
+
+```{r filter-30-not_in_s1s2}
+genes_notin_s1s2 =   setdiff( as.character(genes_public[["polyA"]]), unlist(unique(c(as.character(genes_s1[["polyA"]]),as.character(genes_s2[["polyA"]])))) )
+s1_removed = s1_raw[ s1_raw$V1 %in% genes_notin_s1s2, ]
+ggplot( (s1_removed %>% filter(V2=="polyA" | V2=="counts")) , aes(x=V2,y=V3) ) +
+    geom_jitter() +
+    labs(list(x="",y='counts'))
+```
+
+
+
+### Files
+
+```{r files_go, results='asis',eval=FALSE}
+go_files = lapply(c("s1","s2","s3","s4"), function(s){
+    files = lapply(1:7, function(x){
+        data.frame(plot=paste0("<a href=",s,"_mf_",type_name[x],".png>","See plot for Molecular function for ",type[x]," in ", s,"<a/>"),
+                   table=paste0("<a href=",s,"_mf_",type_name[x],".txt>"," Get table for Molecular function for ",type[x]," in ", s,"<a/>"))
+        
+    })
+    do.call(rbind, files)
+})
+f = copy_batch_2_drop("txt",dn)
+f = copy_batch_2_drop("png",dn)
+knitr::kable(do.call(rbind, go_files))
+```
