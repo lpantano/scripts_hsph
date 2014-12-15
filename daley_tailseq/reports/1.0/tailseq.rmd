@@ -424,7 +424,7 @@ lapply(1:7, function(x){
 
 ```{r do_go-s2, results='asis',cache=TRUE}
 #read_summary(s2)
-files = make_table(s1,  paste0(path_files, "s2"))
+files = make_table(s2,  paste0(path_files, "s2"))
 files = get_report_links(files)
 #g_ezid = lapply(genes_s2, get_entrez)
 #res_go = run_go_enrichment(g_ezid, "s2")
@@ -442,7 +442,7 @@ lapply(1:7, function(x){
 
 ```{r do_go-s3, results='asis',cache=TRUE}
 #read_summary(s3)
-files = make_table(s1,  paste0(path_files, "s3"))
+files = make_table(s3,  paste0(path_files, "s3"))
 files = get_report_links(files)
 #g_ezid = lapply(genes_s3, get_entrez)
 #res_go = run_go_enrichment(g_ezid, "s3")
@@ -460,7 +460,7 @@ lapply(1:7, function(x){
 
 ```{r do_go-s4, results='asis',cache=TRUE}
 #read_summary(s4)
-files = make_table(s1,  paste0(path_files, "s4"))
+files = make_table(s4,  paste0(path_files, "s4"))
 files = get_report_links(files)
 #g_ezid = lapply(genes_s4, get_entrez)
 #res_go = run_go_enrichment(g_ezid, "s4")
