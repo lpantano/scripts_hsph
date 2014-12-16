@@ -67,7 +67,7 @@ render_2_drop("~/repos/pipelines/daley_tailseq/reports/1.0/tailseq.rmd",dn)
 ```
 
 
-```{r load}
+```{r load,cache=FALSE}
 setwd(root_path)
 ```
 
@@ -177,16 +177,14 @@ After that filter, we reduce the total number of reads, but still have a lot.
 Similar number than public database.
 Showing sample 1 only. 
 
-```{r after-filtering}
+```{r after-filtering,cache=FALSE}
 s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
 poly_read_summary(s1_raw)
 ```
 
-### polyA > 200 and size >= 8 nt
+### polyA > 200 and size >= 6 nt
 
-```{r polya-filter-200}
-s1 = filter_out(s1_raw,200)
-s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
+```{r polya-filter-200,cache=FALSE}
 s1 = filter_out(s1_raw,200)
 s2_raw = read.table(paste0(root_path,"/work/s2_summary.dat"))
 s2 = filter_out(s2_raw,200)
@@ -203,7 +201,7 @@ genes_s4 = get_set_genes(s4)
 ```
 
 
-```{r public-data}
+```{r public-data,cache=FALSE}
 sp<-read.table("~/ody/projects/daley_mRNA_mod/tailseq_GSE51299/SPtable.csv",header=T,sep=",")
 library(biomaRt)
 mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
@@ -243,7 +241,7 @@ genes_public = get_set_genes_public(public)
 ```
 
 
-```{r biotype, eval=FALSE}
+```{r biotype, eval=FALSE,cache=FALSE}
 s1_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
 "ensembl_gene_id"    , values =as.character(s1[[1]]) ,mart=mart)
 s2_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
@@ -263,7 +261,7 @@ percentage of common genes for that sample.
 
 For instance, the first right column shows the common genes in the four samples: 1788 in common. Being the 60% for the first two samples, and the 90% for the two last samples.
 
-```{r common}
+```{r common,cache=FALSE}
 
 type = c("polyA","add-U","add-UU","add-U>3","top 10%","top 5%")
 type_name = c("polyA","a","aa","a3","top10","top5")
@@ -283,7 +281,7 @@ names(type) = type_name
 
 I added here public data using the supplementary table (as PUBLIC in figures)
 
-```{r common-public}
+```{r common-public,cache=FALSE}
  void = lapply(type_name, function(x){
      venn(list(s1=genes_s1[[x]],
                s2=genes_s2[[x]],
@@ -292,9 +290,9 @@ I added here public data using the supplementary table (as PUBLIC in figures)
  })
 ```
 
-### polyA > 30 and size >= 8 nt
+### polyA > 30 and size >= 6 nt
 
-```{r poya-filter-30}
+```{r poya-filter-30,cache=FALSE}
 s1 = filter_out(s1_raw,30)
 s2 = filter_out(s2_raw,30)
 s3 = filter_out(s3_raw,30)
@@ -309,9 +307,19 @@ genes_public = get_set_genes_public(public)
 
 ```
 
+### top family types
+
+```{r top40}
+plot_family(s1)
+plot_family(s2)
+plot_family(s3)
+plot_family(s4)
+```
+
+
 #### Common genes among 4 samples
 
-```{r common-30}
+```{r common-30,cache=FALSE}
 
  void = lapply(type_name, function(x){
      venn(list(s1=genes_s1[[x]],
@@ -325,7 +333,7 @@ genes_public = get_set_genes_public(public)
 
 #### s1/s2 with public data
 
-```{r common-public-30}
+```{r common-public-30,cache=FALSE}
  void = lapply(type_name[c(1,3,4,5)], function(x){
      venn(list(s1=genes_s1[[x]],
                s2=genes_s2[[x]],
@@ -337,7 +345,7 @@ genes_public = get_set_genes_public(public)
 
 ## Summary of samples with polyA>30
 
-```{r polya-summary}
+```{r polya-summary,cache=FALSE}
 summary_all(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
 frequency_u(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
 ```
@@ -480,7 +488,7 @@ Using SP table 1  from Tani et al. 2012 to correlate half_life mRNA with
 Uridylation percentage (% reads with U>1 / % reads with polyA). I count only
 when reads of Uridaylation >= 20.
 
-```{r hl}
+```{r hl,fig.width=9, fig.height=6,cache=FALSE}
 hl = read.table("~/ody/projects/daley_mRNA_mod/tani.csv",header=T,sep="\t")
 mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 g <- getBM( attributes=c("ensembl_gene_id","refseq_mrna") , filters=
@@ -496,8 +504,10 @@ value_num[which(value=="N.D.")] = NA
 half_life$pi=value_num
 half_life = half_life[!is.na(value_num),]
 
+dd_list = list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
 all = lapply(names(dd_list) , function (name){
-        x = normalization(dd_list[[name]])
+        #x = normalization(dd_list[[name]])
+        x=dd_list[[name]]
         rbind(get_size_gene(x,"<15") %>% mutate(sample=name),
         get_size_gene(x,"<25") %>% mutate(sample=name),
         get_size_gene(x,">25") %>% mutate(sample=name) )
@@ -532,7 +542,7 @@ ggplot(tab_hl %>% filter(sample=="s4"), aes(y=ufreq,x=pi)) +
 ```
 
 
-```{r hl-sp}
+```{r hl-sp,cache=FALSE}
 #head(sp.f)
 sp_hl = merge(sp.f[,c(1,3,13)],half_life)
 names(sp_hl)[2:3]=c("polya","ufreq")
