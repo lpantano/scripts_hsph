@@ -58,6 +58,8 @@ if __name__ == "__main__":
                         help="Run in parallel on a local machine.")
     parser.add_argument("--local", action="store_true",
                         default=False, help="Run parallel locally")
+    parser.add_argument("--rmdup", action="store_true",
+                        default=False, help="remove duplicates")
 
     args = parser.parse_args()
 

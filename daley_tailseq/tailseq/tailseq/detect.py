@@ -58,12 +58,15 @@ def polyA(string, maxl=30, endl=50):
     smax = -1
     emax = -1
     scmax = -100
+    step = 5
+    if len(string) < 8:
+        step = 1
     if re.search("TTT", string):
         for s in range(0, maxl):
             sc = 0
             converge = 0
             if string[s:].startswith("TT"):
-                for e in range(s+5, endl-2, 2):
+                for e in range(s+step, endl-2, 2):
                     if converge > 10:
                         break
                     if emax >= e - 3 and scmax < 0:
@@ -71,11 +74,9 @@ def polyA(string, maxl=30, endl=50):
                     sc = numpy.sum(map(getsc, string[s:e]))
                     nT = string[s:e].count("T")
                     nO = len(string[s:e])-nT
-                    if nO > 0:
-                #       print "other N %s" % nO
+                    if nO > 0:  # other nt
                         sc = nT - nO + sc
-                    #print "%s %s %s %s %s %s %s %s" % (sc,scmax,s,e,string[s:e], converge, len(string), endl)
-                    if string[e] == "T" and string[e-1] != "T":
+                    if string[e] == "T" and string[e-1] != "T":  # end on NT
                         sc += 2
                         if sc >= scmax+6:
                             scmax = sc
@@ -85,7 +86,7 @@ def polyA(string, maxl=30, endl=50):
                                 if string[s-1] == "T":
                                     smax = s-1
                                     scmax += 2
-                    if string[e-2] == "T" and string[e-1] != "T":
+                    if string[e-2] == "T" and string[e-1] != "T":  # end on TNN
                         sc += 8
                         if sc >= scmax+6:
                             scmax = sc
@@ -95,7 +96,7 @@ def polyA(string, maxl=30, endl=50):
                                 if string[s-1] == "T":
                                     smax = s-1
                                     scmax += 2
-                    if sc >= scmax + 6 and string[e-1] == "T":
+                    if sc >= scmax + 6 and string[e-1] == "T":  # end on TN
                         scmax = sc
                         smax = s
                         emax = e
@@ -103,7 +104,6 @@ def polyA(string, maxl=30, endl=50):
                             if string[s-1] == "T":
                                 smax = s-1
                                 scmax += 2
-                    #print "# %s %s %s" % (scmax,smax,emax)
         if scmax > 0:
             return([smax, emax])
     else:
@@ -197,18 +197,18 @@ def detect(data, args):
 
 def tune(mod, polya):
     """correct mod"""
-    if mod == "":
-        return [mod, polya]
     if sum([1 for nt in mod if nt == "T"]) == len(mod):
         return ["", mod+polya]
-    if len(polya) < 7:
+    if len(polya) < 5:
         return False
     seq = mod + polya
-    start_limit = len(mod) + 10 if len(polya) > 16 else len(mod) + len(polya) - 7
-    end_limit = 50 + len(mod) if len(polya) > 54 else len(seq)-3
+    start_limit = len(mod) + 15 if len(polya) > 25 else len(mod) + len(polya) - 4
+    end_limit = 50 + len(mod) if len(polya) > 54 else len(seq)
     find = polyA(seq, start_limit, end_limit)
     if find:
-        mod = seq[:find[0]]
-        polya = seq[find[0]:]
-        return [mod, polya]
+        if len(polya) > 4:
+            mod = seq[:find[0]]
+            polya = seq[find[0]:find[1]]
+            return [mod, polya]
+        return False
     return False

@@ -56,20 +56,21 @@ def _summarize(in_file, align_r2, count_file, out_file):
                 cols = line.strip().split("\t")
                 read = cols[0].split(" ")[0].replace("@", "")
                 if read in read_gene:
-                    find = tune(cols[3], cols[4])
-                    if len(cols[3] + cols[4] + cols[6]) > 135:
-                        continue
-                    if find:
-                        log_handle.write("found %s %s %s ---> %s %s\n" % (read, cols[3], cols[4], find, read_gene[read]))
-                        if read_gene[read][1]:
+                    log_handle.write("found %s %s %s ---> %s\n" % (read, cols[3], cols[4], read_gene[read]))
+                    if read_gene[read][1]:
+                        if len(cols[3] + cols[4] + cols[6]) > 135:
+                            continue
+                        find = tune(cols[3], cols[4])
+                        if find:
+                            log_handle.write("corrected %s %s %s --->%s %s\n" % (read, cols[3], cols[4], find, read_gene[read]))
                             #print "is polya"
                             gene = read_gene[read][0]
                             polya_size = _get_bin(len(find[1]))
                             stats[gene][polya_size] += 1
                             if find[0] != "":
                                 stats[gene][(polya_size, find[0])] += 1
-                    else:
-                        log_handle.write("corrected %s %s %s ---> %s %s\n" % (read, cols[3], cols[4], find, read_gene[read]))
+                        else:
+                            log_handle.write("removed %s %s %s ---> %s %s\n" % (read, cols[3], cols[4], find, read_gene[read]))
         with file_transaction(out_file) as tx_out_file:
             with open(tx_out_file, 'w') as out:
                 for gene in counts_gene:
@@ -81,6 +82,7 @@ def _summarize(in_file, align_r2, count_file, out_file):
                                 out.write("%s %s %s %s %s\n" % (gene, mod[0], mod[1], c, u_times))
                             else:
                                 out.write("%s polyA %s %s 0\n" % (gene, mod, c))
+
 
 def _get_u_times(m):
     us = sum([1 for nt in m if nt == "A"])
@@ -102,13 +104,15 @@ def _get_second_read(sam_file, read1_assing):
     with pysam.Samfile(sam_file, 'r') as sam:
         for read in sam.fetch():
             num_lines += 1
-            if num_lines % 1000000 == 0:
+            if num_lines % 10000000 == 0:
                 logger.my_logger.info(num_lines)
-            if not read.is_unmapped and read.qname in read1_assing and not read.is_secondary and read.is_read2:
+            if not read.is_unmapped and read.qname in read1_assing and not read.is_secondary:
+                if not read.is_read2:
+                    continue
                 nm = int([t[1] for t in read.tags if t[0] == "NM"][0])
                 name = read.qname
                 cigar = read.cigar[::-1] if read.is_reverse else read.cigar
-                read1_assing[name][1] = _is_polyA(cigar, nm, read.is_proper_pair) 
+                read1_assing[name][1] = _is_polyA(cigar, nm, read.is_proper_pair)
                 #print "%s %s %s %s %s %s %s" % (read.seq, name, nm, cigar, read.is_reverse, read.is_proper_pair, _is_polyA(cigar, nm, read.is_proper_pair))
     return read1_assing
 
@@ -127,8 +131,8 @@ def _get_middle(cigar):
     for c in cigar:
         if c[0] != 4:
             l += c[1]
-        else:
-            break
+        # else:
+        #    break
     return l
 
 
