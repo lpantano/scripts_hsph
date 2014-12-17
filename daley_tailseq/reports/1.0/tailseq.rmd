@@ -19,6 +19,12 @@ There are 4 samples, `s1` and `s2` get long fragments and `s3` and `s4` get shor
 Among the pairs, there are some difference in protocol, like amplification cycles 
 and different ligation method (i am guessing from the metadata)
 
+[s1](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/1.0/s1_Aligned.out_fastqc.html")`)
+[s2](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/1.0/s2_Aligned.out_fastqc.html")`)
+[s3](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/1.0/s3_Aligned.out_fastqc.html")`)
+[s4](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/1.0/s4_Aligned.out_fastqc.html")`)
+
+
 ## Method
 
 * Map read 1
@@ -413,7 +419,7 @@ It included stats for each sample and GO enrichment analysis
 
 ### Sample 1
 
-```{r do_go-s1, results='asis',cache=TRUE}
+```{r do_go-s1, results='asis',cache=FALSE}
 files = make_table(s1,  paste0(path_files, "s1"))
 files = get_report_links(files)
 #read_summary(s1)
@@ -430,7 +436,7 @@ lapply(1:7, function(x){
 
 ### Sample 2
 
-```{r do_go-s2, results='asis',cache=TRUE}
+```{r do_go-s2, results='asis',cache=FALSE}
 #read_summary(s2)
 files = make_table(s2,  paste0(path_files, "s2"))
 files = get_report_links(files)
@@ -448,7 +454,7 @@ lapply(1:7, function(x){
 
 ### Sample 3
 
-```{r do_go-s3, results='asis',cache=TRUE}
+```{r do_go-s3, results='asis',cache=FALSE}
 #read_summary(s3)
 files = make_table(s3,  paste0(path_files, "s3"))
 files = get_report_links(files)
@@ -466,7 +472,7 @@ lapply(1:7, function(x){
 
 ### Sample 4
 
-```{r do_go-s4, results='asis',cache=TRUE}
+```{r do_go-s4, results='asis',cache=FALSE}
 #read_summary(s4)
 files = make_table(s4,  paste0(path_files, "s4"))
 files = get_report_links(files)
@@ -484,11 +490,13 @@ lapply(1:7, function(x){
 
 ## half-life
 
-Using SP table 1  from Tani et al. 2012 to correlate half_life mRNA with
-Uridylation percentage (% reads with U>1 / % reads with polyA). I count only
-when reads of Uridaylation >= 20.
 
-```{r hl,fig.width=9, fig.height=6,cache=FALSE}
+### Correlation of half_life with Public data. Chang et al. 2014
+
+Using SP table 1  from Tani et al. 2012 to correlate half_life mRNA with
+Uridylation percentage (% reads with U>1 / % reads with polyA). 
+```{r hl-sp,cache=FALSE}
+#head(sp.f)
 hl = read.table("~/ody/projects/daley_mRNA_mod/tani.csv",header=T,sep="\t")
 mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 g <- getBM( attributes=c("ensembl_gene_id","refseq_mrna") , filters=
@@ -504,13 +512,67 @@ value_num[which(value=="N.D.")] = NA
 half_life$pi=value_num
 half_life = half_life[!is.na(value_num),]
 
+
+sp_hl = merge(sp.f[,c(1,3,13)],half_life)
+names(sp_hl)[2:3]=c("polya","ufreq")
+ggplot(sp_hl %>% filter(polya>200), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    theme_bw()+
+    labs(list(title="Public data"))
+```
+
+
+### Corralation with tailseq 1.0
+I count only when reads of Uridaylation >= 50.
+
+```{r hl, fig.width=9, fig.height=6,cache=FALSE}
+
+dd_list = list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
+all = lapply(names(dd_list) , function (name){
+        #x = normalization(dd_list[[name]])
+        x=dd_list[[name]]    
+        get_size_gene(x,limit=50) %>% mutate(sample=name)
+        })
+tab = do.call(rbind,all)
+tab_hl = merge(tab, half_life, by=1)
+#head(tab_hl)
+ggplot(tab_hl %>% filter(sample=="s1"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    labs(list(title="s1"))
+
+ggplot(tab_hl %>% filter(sample=="s2"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    labs(list(title="s2"))
+
+ggplot(tab_hl %>% filter(sample=="s3"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    labs(list(title="s3"))
+
+ggplot(tab_hl %>% filter(sample=="s4"), aes(y=ufreq,x=pi)) +
+    geom_point()+
+    geom_smooth(method = "lm")+
+    labs(list(title="s4"))
+
+```
+
+
+### Correlation considering polyA size
+
+I did as well taking into account polyA size.
+
+```{r hl_by_size, fig.width=9, fig.height=6,cache=FALSE}
+
 dd_list = list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
 all = lapply(names(dd_list) , function (name){
         #x = normalization(dd_list[[name]])
         x=dd_list[[name]]
-        rbind(get_size_gene(x,"<15") %>% mutate(sample=name),
-        get_size_gene(x,"<25") %>% mutate(sample=name),
-        get_size_gene(x,">25") %>% mutate(sample=name) )
+        rbind(get_size_gene(x,"<15",50) %>% mutate(sample=name),
+        get_size_gene(x,"<25",50) %>% mutate(sample=name),
+        get_size_gene(x,">25",50) %>% mutate(sample=name) )
         
         })
 tab = do.call(rbind,all)
@@ -539,19 +601,10 @@ ggplot(tab_hl %>% filter(sample=="s4"), aes(y=ufreq,x=pi)) +
     geom_smooth(method = "lm")+
     facet_wrap(~size)+
     labs(list(title="s4"))
+
 ```
 
 
-```{r hl-sp,cache=FALSE}
-#head(sp.f)
-sp_hl = merge(sp.f[,c(1,3,13)],half_life)
-names(sp_hl)[2:3]=c("polya","ufreq")
-ggplot(sp_hl %>% filter(polya>200), aes(y=ufreq,x=pi)) +
-    geom_point()+
-    geom_smooth(method = "lm")+
-    theme_bw()+
-    labs(list(title="Public data"))
-```
 
 ## Non common genes
 
