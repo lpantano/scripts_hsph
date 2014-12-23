@@ -75,6 +75,10 @@ render_2_drop("~/repos/pipelines/daley_tailseq/reports/1.0/tailseq.rmd",dn)
 
 ```{r load,cache=FALSE}
 setwd(root_path)
+s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
+s2_raw = read.table(paste0(root_path,"/work/s2_summary.dat"))
+s3_raw = read.table(paste0(root_path,"/work/s3_summary.dat"))
+s4_raw = read.table(paste0(root_path,"/work/s4_summary.dat"))
 ```
 
 ```{r functions,cache=FALSE}
@@ -184,7 +188,6 @@ Similar number than public database.
 Showing sample 1 only. 
 
 ```{r after-filtering,cache=FALSE}
-s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
 poly_read_summary(s1_raw)
 ```
 
@@ -192,11 +195,8 @@ poly_read_summary(s1_raw)
 
 ```{r polya-filter-200,cache=FALSE}
 s1 = filter_out(s1_raw,200)
-s2_raw = read.table(paste0(root_path,"/work/s2_summary.dat"))
 s2 = filter_out(s2_raw,200)
-s3_raw = read.table(paste0(root_path,"/work/s3_summary.dat"))
 s3 = filter_out(s3_raw,200)
-s4_raw = read.table(paste0(root_path,"/work/s4_summary.dat"))
 s4 = filter_out(s4_raw,200)
 genes_s1 = get_set_genes(s1)
 genes_s2 = get_set_genes(s2)
@@ -524,7 +524,7 @@ ggplot(sp_hl %>% filter(polya>200), aes(y=ufreq,x=pi)) +
 
 
 ### Corralation with tailseq 1.0
-I count only when reads of Uridaylation >= 50.
+I count only when reads of Uridaylation >= 200.
 
 ```{r hl, fig.width=9, fig.height=6,cache=FALSE}
 
@@ -532,7 +532,7 @@ dd_list = list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
 all = lapply(names(dd_list) , function (name){
         #x = normalization(dd_list[[name]])
         x=dd_list[[name]]    
-        get_size_gene(x,limit=50) %>% mutate(sample=name)
+        get_size_gene(x,limit=200) %>% mutate(sample=name)
         })
 tab = do.call(rbind,all)
 tab_hl = merge(tab, half_life, by=1)
@@ -562,7 +562,7 @@ ggplot(tab_hl %>% filter(sample=="s4"), aes(y=ufreq,x=pi)) +
 
 ### Correlation considering polyA size
 
-I did as well taking into account polyA size.
+I did as well taking into account polyA size. Genes with >100 reads supporting Urydilation
 
 ```{r hl_by_size, fig.width=9, fig.height=6,cache=FALSE}
 
@@ -570,9 +570,9 @@ dd_list = list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
 all = lapply(names(dd_list) , function (name){
         #x = normalization(dd_list[[name]])
         x=dd_list[[name]]
-        rbind(get_size_gene(x,"<15",50) %>% mutate(sample=name),
-        get_size_gene(x,"<25",50) %>% mutate(sample=name),
-        get_size_gene(x,">25",50) %>% mutate(sample=name) )
+        rbind(get_size_gene(x,"<15",100) %>% mutate(sample=name),
+        get_size_gene(x,"<25",100) %>% mutate(sample=name),
+        get_size_gene(x,">25",100) %>% mutate(sample=name) )
         
         })
 tab = do.call(rbind,all)
@@ -604,6 +604,25 @@ ggplot(tab_hl %>% filter(sample=="s4"), aes(y=ufreq,x=pi)) +
 
 ```
 
+## Duplicated reads
+
+There is a kind of correlation between 
+distinct number of reads and total/average/maximum/average_trimmed reads. 
+
+```{r pcr-artifact}
+s1_pcr = read.table(paste0(root_path,"/work/s1_final_stats.pcr"))
+s1_pcr_dd = s1_pcr %>% group_by(V1) %>% summarise(distinct=n(),reads=sum(V3),ave=mean(V3),ave_trim=mean(V3,trim=0.2),max=max(V3),med=median(V3)) %>% ungroup()
+ggplot(s1_pcr_dd,aes(x=distinct,y=reads,color="total")) +
+    geom_point(alpha=0.3) +
+    geom_point(aes(x=distinct,y=ave,color="average"),alpha=0.3) +
+    geom_point(aes(x=distinct,y=ave_trim,color="average_trim"),alpha=0.3) +
+    geom_point(aes(x=distinct,y=max,color="maximum"),alpha=0.3) +
+    scale_y_log10() +
+    scale_color_brewer(palette = "Set1")+
+    ggtitle("s1: duplicated reads")
+
+
+```
 
 
 ## Non common genes

@@ -60,9 +60,9 @@ library(dplyr)
 library(rjson)
 library(GGally)
 source("~/repos/myRfunctions/transactions.R")
-dn <- "daley_tailseq/2.0"
+dn <- "daley_tailseq/2.0_rmdup_read2"
 root_path<-"~/ody/projects/daley_mRNA_mod/tailseq-2.0"
-path_files = "~/repos/pipelines/daley_tailseq/reports/2.0/"
+path_files = "~/repos/pipelines/daley_tailseq/reports/2.0_rmdup_read2/"
 ```
 
 ```{r render,eval=FALSE,cache=FALSE}
@@ -70,7 +70,7 @@ knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                       cache.path="~/.cache/tailseq-report/html_cached_2.0/", eval=TRUE,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
-render_2_drop("~/repos/pipelines/daley_tailseq/reports/2.0/tailseq_2.0.rmd",dn)
+render_2_drop("~/repos/pipelines/daley_tailseq/reports/2.0_rmdup_read2/tailseq_2.0_rmdup_read2.rmd",dn)
 ```
 
 
@@ -80,34 +80,6 @@ setwd(root_path)
 
 ```{r functions,cache=F}
 source("~/repos/pipelines/daley_tailseq/reports/functions.R")
-```
-
-
-```{r go,eval=FALSE}
-library(org.Hs.eg.db)
-#set <- universeGO(org.Hs.egGO,"Homo sapiens")
-
-run_one_go = function(g, name){
-    g = g[!is.na(g)]
-    mf <- runGO(g,set,"MF",as.list(GOMFCHILDREN))
-    #plotGO(mf, name)
-    write.table(mf[[1]], paste0(name, ".txt") )
-    #print(head(mf[[1]]))
-    return(mf[[1]][1:20,])
-}
-
-run_go_enrichment = function(g, sample){
-    table = vector("list")
-    table[[1]] = run_one_go(g[[1]], paste0(sample,"_mf_polyA"))
-    table[[2]] = run_one_go(g[[2]], paste0(sample,'_mf_mod'))
-    table[[3]] = run_one_go(g[[3]], paste0(sample,'_mf_a'))
-    table[[4]] = run_one_go(g[[4]], paste0(sample,'_mf_aa'))
-    table[[5]] = run_one_go(g[[5]], paste0(sample,'_mf_c'))
-    table[[6]] = run_one_go(g[[6]], paste0(sample,'_mf_top10'))
-    table[[7]] = run_one_go(g[[7]], paste0(sample,'_mf_top5'))
-    table
-}
-
 ```
 
 ```{r venn-function,cache=FALSE}
@@ -165,8 +137,8 @@ Normally short polyA with long modifications are removed here. We just don't cou
 
 ```{r ploya,cache=FALSE}
 dd = data.frame()
-for (file in list.files(paste0(root_path,"/work"), "stat$") ){
-    data = read.table(paste0(root_path, "/work/", file) )
+for (file in list.files(paste0(root_path,"/work_rmdup_read2/"), "stat$") ){
+    data = read.table(paste0(root_path, "/work_rmdup_read2/", file) )
     dd = rbind(dd, data)
 }
 dd$sample = c(rep("s1",5), rep("s2",5), rep("s3",5) , rep("s4",5) )
@@ -184,7 +156,7 @@ Similar number than public database.
 Showing sample 1 only. 
 
 ```{r after-filtering,cache=FALSE}
-s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
+s1_raw = read.table(paste0(root_path,"/work_rmdup_read2/s1_summary.dat"))
 poly_read_summary(s1_raw)
 ```
 
@@ -192,11 +164,11 @@ poly_read_summary(s1_raw)
 
 ```{r polya-filter-200,cache=FALSE}
 s1 = filter_out(s1_raw,200)
-s2_raw = read.table(paste0(root_path,"/work/s2_summary.dat"))
+s2_raw = read.table(paste0(root_path,"/work_rmdup_read2/s2_summary.dat"))
 s2 = filter_out(s2_raw,200)
-s3_raw = read.table(paste0(root_path,"/work/s3_summary.dat"))
+s3_raw = read.table(paste0(root_path,"/work_rmdup_read2/s3_summary.dat"))
 s3 = filter_out(s3_raw,200)
-s4_raw = read.table(paste0(root_path,"/work/s4_summary.dat"))
+s4_raw = read.table(paste0(root_path,"/work_rmdup_read2/s4_summary.dat"))
 s4 = filter_out(s4_raw,200)
 genes_s1 = get_set_genes(s1)
 genes_s2 = get_set_genes(s2)
@@ -612,7 +584,7 @@ There is a kind of correlation between
 distinct number of reads and total/average/maximum/average_trimmed reads. 
 
 ```{r pcr-artifact}
-s1_pcr = read.table(paste0(root_path,"/work/s1_final_stats.pcr"))
+s1_pcr = read.table(paste0(root_path,"/work_rmdup_read2/s1_final_stats.pcr"))
 s1_pcr_dd = s1_pcr %>% group_by(V1) %>% summarise(distinct=n(),reads=sum(V3),ave=mean(V3),ave_trim=mean(V3,trim=0.2),max=max(V3),med=median(V3)) %>% ungroup()
 ggplot(s1_pcr_dd,aes(x=distinct,y=reads,color="total")) +
     geom_point(alpha=0.3) +

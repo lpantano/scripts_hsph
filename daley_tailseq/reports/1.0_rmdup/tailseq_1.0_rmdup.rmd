@@ -19,12 +19,10 @@ There are 4 samples, `s1` and `s2` get long fragments and `s3` and `s4` get shor
 Among the pairs, there are some difference in protocol, like amplification cycles 
 and different ligation method (i am guessing from the metadata)
 
-[s1](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/2.0/s1_Aligned.out_fastqc.html")`)
-[s2](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/2.0/s2_Aligned.out_fastqc.html")`)
-[s3](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/2.0/s3_Aligned.out_fastqc.html")`)
-[s4](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/2.0/s4_Aligned.out_fastqc.html")`)
-
-
+[s1](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/1.0/s1_Aligned.out_fastqc.html")`)
+[s2](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/1.0/s2_Aligned.out_fastqc.html")`)
+[s3](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/1.0/s3_Aligned.out_fastqc.html")`)
+[s4](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/1.0/s4_Aligned.out_fastqc.html")`)
 
 
 ## Method
@@ -59,27 +57,33 @@ library(devtools)
 library(dplyr)
 library(rjson)
 library(GGally)
+library(pheatmap)
 source("~/repos/myRfunctions/transactions.R")
-dn <- "daley_tailseq/2.0"
-root_path<-"~/ody/projects/daley_mRNA_mod/tailseq-2.0"
-path_files = "~/repos/pipelines/daley_tailseq/reports/2.0/"
+dn <- "daley_tailseq/1.0_rmdup"
+root_path<-"~/ody/projects/daley_mRNA_mod/tailseq-112014"
+path_files = "~/repos/pipelines/daley_tailseq/reports/1.0_rmdup/"
 ```
 
-```{r render,eval=FALSE,cache=FALSE}
+```{r render,eval=FALSE}
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
-                      cache.path="~/.cache/tailseq-report/html_cached_2.0/", eval=TRUE,
+                      cache.path="~/.cache/tailseq-report/html_rmdup_cached/", eval=TRUE,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
-render_2_drop("~/repos/pipelines/daley_tailseq/reports/2.0/tailseq_2.0.rmd",dn)
+render_2_drop("~/repos/pipelines/daley_tailseq/reports/1.0_rmdup/tailseq_1.0_rmdup.rmd",dn)
 ```
 
 
 ```{r load,cache=FALSE}
 setwd(root_path)
+s1_raw = read.table(paste0(root_path,"/work_rmdup/s1_summary.dat"))
+s2_raw = read.table(paste0(root_path,"/work_rmdup/s2_summary.dat"))
+s3_raw = read.table(paste0(root_path,"/work_rmdup/s3_summary.dat"))
+s4_raw = read.table(paste0(root_path,"/work_rmdup/s4_summary.dat"))
 ```
 
-```{r functions,cache=F}
+```{r functions,cache=FALSE}
 source("~/repos/pipelines/daley_tailseq/reports/functions.R")
+
 ```
 
 
@@ -110,7 +114,7 @@ run_go_enrichment = function(g, sample){
 
 ```
 
-```{r venn-function,cache=FALSE}
+```{r venn-function}
 get_entrez = function(g){
   require(biomaRt)
   ensembl = useMart('ensembl', dataset = "hsapiens_gene_ensembl")
@@ -163,7 +167,7 @@ read_1 maps onto a gene.
 And we applied here another filter to reduce the number of false positive of polyA.
 Normally short polyA with long modifications are removed here. We just don't count when read2 maps perfectly to the genome and is at the expected distance from the read1.
 
-```{r ploya,cache=FALSE}
+```{r ploya}
 dd = data.frame()
 for (file in list.files(paste0(root_path,"/work"), "stat$") ){
     data = read.table(paste0(root_path, "/work/", file) )
@@ -184,7 +188,6 @@ Similar number than public database.
 Showing sample 1 only. 
 
 ```{r after-filtering,cache=FALSE}
-s1_raw = read.table(paste0(root_path,"/work/s1_summary.dat"))
 poly_read_summary(s1_raw)
 ```
 
@@ -192,11 +195,8 @@ poly_read_summary(s1_raw)
 
 ```{r polya-filter-200,cache=FALSE}
 s1 = filter_out(s1_raw,200)
-s2_raw = read.table(paste0(root_path,"/work/s2_summary.dat"))
 s2 = filter_out(s2_raw,200)
-s3_raw = read.table(paste0(root_path,"/work/s3_summary.dat"))
 s3 = filter_out(s3_raw,200)
-s4_raw = read.table(paste0(root_path,"/work/s4_summary.dat"))
 s4 = filter_out(s4_raw,200)
 genes_s1 = get_set_genes(s1)
 genes_s2 = get_set_genes(s2)
@@ -247,7 +247,7 @@ genes_public = get_set_genes_public(public)
 ```
 
 
-```{r biotype, eval=FALSE}
+```{r biotype, eval=FALSE,cache=FALSE}
 s1_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
 "ensembl_gene_id"    , values =as.character(s1[[1]]) ,mart=mart)
 s2_g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype") , filters=
@@ -315,15 +315,13 @@ genes_public = get_set_genes_public(public)
 
 ### top family types
 
-Only using the top 1000 expressed genes. There is 25% of ribosomal and histone
-genes. 
-
 ```{r top40}
 plot_family(s1)
 plot_family(s2)
 plot_family(s3)
 plot_family(s4)
 ```
+
 
 #### Common genes among 4 samples
 
@@ -342,7 +340,7 @@ plot_family(s4)
 #### s1/s2 with public data
 
 ```{r common-public-30,cache=FALSE}
- void = lapply(type_name, function(x){
+ void = lapply(type_name[c(1,3,4,5)], function(x){
      venn(list(s1=genes_s1[[x]],
                s2=genes_s2[[x]],
                public=genes_public[[x]]))
@@ -364,7 +362,7 @@ frequency_u(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
 
 ### Total gene expression
 
-```{r cor,cache=FALSE}
+```{r cor}
 ma = get_counts(list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4))
 m = log2(ma[[1]][,2:5]+1)
 ggpairs(m, alpha=0.4,
@@ -375,7 +373,7 @@ ggheatmap.show(ggheatmap(cor(m)))
 
 ### Genes expression of polyA-transcripts
 
-```{r cor-polyA,cache=FALSE}
+```{r cor-polyA}
 m = log2(ma[[2]][,2:5]+1)
 ggpairs(m, alpha=0.4,
         diag = list(continuous = "density"))
@@ -387,7 +385,7 @@ ggheatmap.show(ggheatmap(cor(m)))
 
 ###Genes expression of polyA + U modification
 
-```{r cor-a,cache=FALSE}
+```{r cor-a}
 m = log2(ma[[3]][,2:5]+1)
 ggpairs(m, alpha=0.4,
         diag = list(continuous = "density"))
@@ -398,7 +396,7 @@ ggheatmap.show(ggheatmap(cor(m)))
 
 ### Genes expression of polyA + UU modification
 
-```{r cor-aa,cache=FALSE}
+```{r cor-aa}
 m = log2(ma[[4]][,2:5]+1)
 ggpairs(m, alpha=0.4,
         diag = list(continuous = "density"))
@@ -408,7 +406,7 @@ ggheatmap.show(ggheatmap(cor(m)))
 
 ### Genes expression of polyA + U>3 modification
 
-```{r cor-c,cache=FALSE}
+```{r cor-c}
 m = log2(ma[[5]][,2:5]+1)
 ggpairs(m, alpha=0.4,
         diag = list(continuous = "density"))
@@ -422,7 +420,7 @@ It included stats for each sample and GO enrichment analysis
 ### Sample 1
 
 ```{r do_go-s1, results='asis',cache=FALSE}
-files = make_table(s1,  paste0(path_files, "s1") )
+files = make_table(s1,  paste0(path_files, "s1"))
 files = get_report_links(files)
 #read_summary(s1)
 #g_ezid = lapply(genes_s1, get_entrez)
@@ -440,7 +438,7 @@ lapply(1:7, function(x){
 
 ```{r do_go-s2, results='asis',cache=FALSE}
 #read_summary(s2)
-files = make_table(s2,  paste0(path_files, "s2") )
+files = make_table(s2,  paste0(path_files, "s2"))
 files = get_report_links(files)
 #g_ezid = lapply(genes_s2, get_entrez)
 #res_go = run_go_enrichment(g_ezid, "s2")
@@ -458,7 +456,7 @@ lapply(1:7, function(x){
 
 ```{r do_go-s3, results='asis',cache=FALSE}
 #read_summary(s3)
-files = make_table(s3,  paste0(path_files, "s3") )
+files = make_table(s3,  paste0(path_files, "s3"))
 files = get_report_links(files)
 #g_ezid = lapply(genes_s3, get_entrez)
 #res_go = run_go_enrichment(g_ezid, "s3")
@@ -476,7 +474,7 @@ lapply(1:7, function(x){
 
 ```{r do_go-s4, results='asis',cache=FALSE}
 #read_summary(s4)
-files = make_table(s4, paste0(path_files, "s4") )
+files = make_table(s4,  paste0(path_files, "s4"))
 files = get_report_links(files)
 #g_ezid = lapply(genes_s4, get_entrez)
 #res_go = run_go_enrichment(g_ezid, "s4")
@@ -525,8 +523,8 @@ ggplot(sp_hl %>% filter(polya>200), aes(y=ufreq,x=pi)) +
 ```
 
 
-### Corralation with tailseq 2.0
-I count only when reads of Uridaylation >= 20.
+### Corralation with tailseq 1.0
+I count only when reads of Uridaylation >= 200.
 
 ```{r hl, fig.width=9, fig.height=6,cache=FALSE}
 
@@ -534,7 +532,7 @@ dd_list = list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
 all = lapply(names(dd_list) , function (name){
         #x = normalization(dd_list[[name]])
         x=dd_list[[name]]    
-        get_size_gene(x,limit=20) %>% mutate(sample=name)
+        get_size_gene(x,limit=10) %>% mutate(sample=name)
         })
 tab = do.call(rbind,all)
 tab_hl = merge(tab, half_life, by=1)
@@ -564,7 +562,7 @@ ggplot(tab_hl %>% filter(sample=="s4"), aes(y=ufreq,x=pi)) +
 
 ### Correlation considering polyA size
 
-I did as well taking into account polyA size.
+I did as well taking into account polyA size. Genes with >100 reads supporting Urydilation
 
 ```{r hl_by_size, fig.width=9, fig.height=6,cache=FALSE}
 
@@ -572,9 +570,9 @@ dd_list = list("s1"=s1,"s2"=s2,"s3"=s3,"s4"=s4)
 all = lapply(names(dd_list) , function (name){
         #x = normalization(dd_list[[name]])
         x=dd_list[[name]]
-        rbind(get_size_gene(x,"<15",10) %>% mutate(sample=name),
-        get_size_gene(x,"<25",10) %>% mutate(sample=name),
-        get_size_gene(x,">25",10) %>% mutate(sample=name) )
+        rbind(get_size_gene(x,"<15",5) %>% mutate(sample=name),
+        get_size_gene(x,"<25",5) %>% mutate(sample=name),
+        get_size_gene(x,">25",5) %>% mutate(sample=name) )
         
         })
 tab = do.call(rbind,all)
@@ -606,23 +604,4 @@ ggplot(tab_hl %>% filter(sample=="s4"), aes(y=ufreq,x=pi)) +
 
 ```
 
-## Duplicated reads
-
-There is a kind of correlation between 
-distinct number of reads and total/average/maximum/average_trimmed reads. 
-
-```{r pcr-artifact}
-s1_pcr = read.table(paste0(root_path,"/work/s1_final_stats.pcr"))
-s1_pcr_dd = s1_pcr %>% group_by(V1) %>% summarise(distinct=n(),reads=sum(V3),ave=mean(V3),ave_trim=mean(V3,trim=0.2),max=max(V3),med=median(V3)) %>% ungroup()
-ggplot(s1_pcr_dd,aes(x=distinct,y=reads,color="total")) +
-    geom_point(alpha=0.3) +
-    geom_point(aes(x=distinct,y=ave,color="average"),alpha=0.3) +
-    geom_point(aes(x=distinct,y=ave_trim,color="average_trim"),alpha=0.3) +
-    geom_point(aes(x=distinct,y=max,color="maximum"),alpha=0.3) +
-    scale_y_log10() +
-    scale_color_brewer(palette = "Set1")+
-    ggtitle("s1: duplicated reads")
-
-
-```
 
