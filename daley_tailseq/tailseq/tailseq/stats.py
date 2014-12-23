@@ -15,7 +15,7 @@ def stats_from_read2(summary_log_file):
     read2 = defaultdict()
     with open(summary_log_file) as in_handle:
         for line in in_handle:
-            if line.find("False") == -1:
+            if line.find("False") == -1 and line.startswith("corrected"):
                 name = line.split(" ")[1]
                 new = eval(line.split("--->")[1].split("]")[0]+"]")
                 read2[name] = new
@@ -26,7 +26,7 @@ def quality_read2(polya_log_file, read2):
     with gzip.open(polya_log_file) as in_handle:
         for line in in_handle:
             name, s, e, mod, polya, qpolya, seq, qrest = line.strip().split("\t")
-            name = name.replace("@","").split(" ")[0]
+            name = name.replace("@","").split(" ")[1]
             if name in read2:
                 read2[name].append(qpolya + qrest)
     return read2

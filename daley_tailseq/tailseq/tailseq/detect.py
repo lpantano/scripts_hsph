@@ -119,9 +119,9 @@ def _adapter(seq, qual):
     #print tag_pos
     if tag_pos >= 0:
         tag_pos += 5
-        return seq[tag_pos:], qual[tag_pos:]
+        return seq[:tag_pos], [seq[tag_pos:], qual[tag_pos:]]
     else:
-        return False
+        return seq[:tag_pos], False
 
 
 def _test():
@@ -160,7 +160,7 @@ def detect(data, args):
                     seq = handle.next().strip()
                     handle.next().strip()
                     qual = handle.next().strip()
-                    find = _adapter(seq, qual)
+                    primer, find = _adapter(seq, qual)
                     #print "%s %s" % (seq, find)
                     if find:
                         seq, qual = find
@@ -175,7 +175,7 @@ def detect(data, args):
                                 qual_polyA = qual[ns[0]:ns[1]]
                                 qual_gene = qual[ns[1]:]
                                 #print "%s\t%s\t%s\t%s\t%s\t%s\n" % (name,mod,sf,qf)
-                                out.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (name, ns[0], ns[1], mod, seq_polyA, qual_polyA, seq_gene, qual_gene))
+                                out.write("%s %s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (primer, name, ns[0], ns[1], mod, seq_polyA, qual_polyA, seq_gene, qual_gene))
                                 counts['polyA'] += 1
                                 if len(mod) > 0:
                                     counts['mod'] += 1

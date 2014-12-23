@@ -17,7 +17,7 @@ def counts(data, args):
     out_file = prefix + "counts"
     data['counts'] = _cmd_counts(in_file, out_file, gtf_file, cores)
     data['assign'] = _assign_gene(data['counts'], prefix)
-    _summarize(data['detect'], data['align_r2'], data['assign'], prefix + "summary.dat")
+    _summarize(data['detect'], data['align_r2'], data['assign'], in_file, prefix + "summary.dat")
     return data
 
 
@@ -41,27 +41,36 @@ def _assign_gene(in_file, prefix):
     return out_file
 
 
-def _summarize(in_file, align_r2, count_file, out_file):
+def _summarize(in_file, align_r2, count_file, align_r1,  out_file):
     log_file = out_file + ".log"
     logger.my_logger.info("summarize results")
     read_gene, counts_gene = _get_first_read(count_file)
+    read_position = _get_read1_position(align_r1, read_gene)
     logger.my_logger.info("load read 1 done")
     read_gene = _get_second_read(align_r2, read_gene)
     logger.my_logger.info("load read 2 done")
     stats = defaultdict(Counter)
+    duplicate = {}
+    find_dup = 0
     if not os.path.exists(out_file):
         with gzip.open(in_file) as handle_polya:
             log_handle = open(log_file, 'w')
             for line in handle_polya:
                 cols = line.strip().split("\t")
-                read = cols[0].split(" ")[0].replace("@", "")
+                read = cols[0].split(" ")[1].replace("@", "")
+                primer = cols[0].split(" ")[0]
                 if read in read_gene:
                     log_handle.write("found %s %s %s ---> %s\n" % (read, cols[3], cols[4], read_gene[read]))
                     if read_gene[read][1]:
                         if len(cols[3] + cols[4] + cols[6]) > 135:
                             continue
                         find = tune(cols[3], cols[4])
-                        if find:
+                        pos = read_position[read][0]
+                        if (pos, primer) in duplicate:
+                            find_dup += 1
+                            continue
+                        if find and not (pos, primer) in duplicate:
+                            duplicate[(pos, primer)] = 0
                             log_handle.write("corrected %s %s %s --->%s %s\n" % (read, cols[3], cols[4], find, read_gene[read]))
                             #print "is polya"
                             gene = read_gene[read][0]
@@ -82,6 +91,7 @@ def _summarize(in_file, align_r2, count_file, out_file):
                                 out.write("%s %s %s %s %s\n" % (gene, mod[0], mod[1], c, u_times))
                             else:
                                 out.write("%s polyA %s %s 0\n" % (gene, mod, c))
+    logger.my_logger.info("Found %s exact duplicates\n" % find_dup)
 
 
 def _get_u_times(m):
@@ -113,6 +123,9 @@ def _get_second_read(sam_file, read1_assing):
                 name = read.qname
                 cigar = read.cigar[::-1] if read.is_reverse else read.cigar
                 read1_assing[name][1] = _is_polyA(cigar, nm, read.is_proper_pair)
+                # if name == "HISEQ:272:HAVVLADXX:1:1101:3750:2216":
+                #    print [read.is_reverse, cigar, read.is_read2]
+                #    raise
                 #print "%s %s %s %s %s %s %s" % (read.seq, name, nm, cigar, read.is_reverse, read.is_proper_pair, _is_polyA(cigar, nm, read.is_proper_pair))
     return read1_assing
 
@@ -121,7 +134,7 @@ def _is_polyA(cigar, nm, pair):
     """guess if all nt after 20 adapter are mapped"""
     if cigar[0][1] == 20 and _get_middle(cigar) > 90 and pair:
         return False
-    if cigar[0][1] - 20 >= 6:
+    if cigar[0][1] - 20 >= 6 or _get_middle(cigar) < 50:
         return [cigar, nm]
     return False
 
@@ -145,6 +158,16 @@ def _get_first_read(in_file):
             genes[cols[0]] = [cols[1], "Added"]
             stats[cols[1]] += 1
     return genes, stats
+
+
+def _get_read1_position(sam_file, genes):
+    """get all positions from SAM file and sync with _get_first_read"""
+    pos = defaultdict(list)
+    with pysam.Samfile(sam_file, 'r') as sam:
+        for read in sam.fetch():
+            if not read.is_unmapped and read.qname in genes and not read.is_secondary:
+                pos[read.qname] = [int(read.pos)]
+    return pos
 
 
 def _get_position(sam_file, genes):
