@@ -35,15 +35,21 @@ summary_all = function(dd_list){
     p = ggplot(dd_melt, aes(y=total, x=samples, fill=type, order=type )) + 
         geom_bar( stat = 'identity') +
         scale_y_log10()+
-        scale_fill_brewer(palette = "Set1")
-    ggtitle("Number of reads")
+        scale_fill_brewer(palette = "Set1")+
+    ggtitle("Number of reads: log(10)")
+    print(p)
+    p = ggplot(dd_melt, aes(y=total, x=samples, fill=type, order=type )) + 
+        geom_bar( stat = 'identity') +
+        scale_fill_brewer(palette = "Set1")+
+    ggtitle("Number of reads: ")
     print(p)
     
 }
 
 frequency_u = function(dd_list){
     all = lapply(names(dd_list) , function (name){
-        x = normalization(dd_list[[name]])
+        #x = normalization(dd_list[[name]])
+        x = (dd_list[[name]])
         rbind(get_size(x,"<15") %>% mutate(sample=name),
               get_size(x,"<25") %>% mutate(sample=name),
               get_size(x,">25") %>% mutate(sample=name) )
@@ -72,16 +78,20 @@ get_size = function(x, size){
     total
 }
 
-get_size_gene = function(x, size){
-    t = get_u_table(x %>% filter(V2==size | V3==size | V2=="total" )) %>% mutate(size=size)    
+get_size_gene = function(x, size=NULL, limit=50){
+    if (is.null(size)){
+        t = get_u_table(x,limit=limit)    
+    }else{
+        t = get_u_table(x %>% filter(V2==size | V3==size | V2=="total" ),limit=limit) %>% mutate(size=size)    
+    }
     t
 }
 
-normalization = function(x){
+normalization = function(x,L=100000){
     t = x %>% filter(V2=="total")
     th = quantile(t$V4,c(.25,.75))
     ls = sum((t %>% filter(V4>th[1] & V4<th[2]))[,4])
-    x$V4=x$V4/ls * 1000000
+    x$V4=x$V4/ls * L
     x
 }
 
@@ -89,7 +99,7 @@ get_set_genes = function(dd){
     poly = unique((dd %>% filter(V2=="polyA"))[,1])
     aa = as.character(unique((dd %>% filter(V3=="AA"))[,1]))
     a = as.character(unique((dd %>% filter(V3=="A"))[,1]))
-    a3 = as.character(unique((dd %>% filter(V5 > 0.8 & nchar(as.character(V3))>3 & V2!="total" & V2!="polyA"))[,1]))
+    a3 = as.character(unique((dd %>% filter(V5 > 0.85 & nchar(as.character(V3))>3 & V2!="total" & V2!="polyA"))[,1]))
     genes = unique(c(a,aa,a3))
     #c = unique((dd %>% filter(V2=="C"))[,1])
     #mod = unique((dd %>% filter(V2!="counts" & V2!="polyA"))[,1])
@@ -132,13 +142,13 @@ filter_out_public = function(dd, cuta=30, cutmod=1){
     dd[ dd$V1 %in%  as.character(genes$V1), ]
 }
 
-get_u_table = function(dd,by_size=NULL){
+get_u_table = function(dd,by_size=NULL,limit=50){
     dd$type = as.character(dd$V2)
     uf = get_mod_table(dd)
     total = uf %>% filter(type!="polyA" & type!="exp" & type!="polyA-NoU") %>% group_by(V1) %>% summarize(total=sum(counts))
     poly = uf %>% filter(type=="polyA")
     t = merge(total,poly, by=1)
-    t = t %>% filter(total >= 20)
+    t = t %>% filter(total >= limit)
     t$ufreq = t$total/t$counts * 100
     t[,c(1,5)]
 }
@@ -230,31 +240,21 @@ library(org.Hs.eg.db)
 cols <- c("ENSEMBL", "SYMBOL")
 make_table = function(dd, prefix){
     all = lapply(c("<15","<25",">25"), function(size){
-        get_mod_table(dd %>% filter(V2==size | V3==size | V2=="total")) %>% mutate(size=size)  
+        t = get_mod_table(dd %>% filter(V2==size | V3==size | V2=="total")) %>% mutate(size=size)  
+        t$size= sub(size,paste0("-pA",size),t$size)
+        t
     }) 
     data = do.call(rbind,all)
     raw = paste0(prefix,"_raw.txt")
     wide = paste0(prefix,"_wide.txt")
     write.table(data, raw,row.names=F, col.names=T)
     len = sapply(as.character(data$V2), nchar)
-    #data$type = "other"
-    #data$type[ data$V2=="counts" & data$type=="other"] = "counts"
-    #data$type[ data$V2=="polyA" & data$type=="other"] = "polyA"
-    #data$type[ data$V2=="A" & data$type=="other"] = "U"
-    #data$type[ data$V2=="AA" & data$type=="other"] = "UU"
-    #data$type[ data$V2=="C" & data$type=="other"] = "G"
-    #data$type[ data$V2=="CC" & data$type=="other"] = "GG"
-    #data$type[ len=1 & data$type=="other"] = "N"
-    #data$type[ len==2 & data$type=="other"] = "NN"
-    #data$type[ len==3 & data$type=="other"] = "NNN"
-    #data$type[ len==4 & data$type=="other"] = "NNNN"
-    #data$type[ len>4 & data$type=="other"] = "N>4"
-    #data = data %>% group_by(V1, type) %>% summarise(reads=sum(V3)) %>% ungroup()
-    #data$type = factor(data$type, levels=c("counts","polyA","U","UU","G","GG","N","NN","NNN","NNNN","N>4"))
     data$type = paste0(data$type,data$size)
     data = reshape(as.data.frame(data %>% dplyr::select(V1, counts,type)),  timevar = "type", idvar = "V1", direction = "wide")
     names(data) = sub("counts.","",names(data))
     data[is.na(data)] = 0
+    data = data[,!grepl("exp<",names(data))]
+    names(data) = sub("exp-pA>25","exp",names(data))
     symbol = select(org.Hs.eg.db, as.character(data$V1), cols, keytype="ENSEMBL")
     symbol = symbol %>% distinct(ENSEMBL)
     data$symbol = symbol[match(data$V1,symbol$ENSEMBL),2]
@@ -262,3 +262,26 @@ make_table = function(dd, prefix){
     c(raw,wide)
 }
 
+
+plot_family = function(dd){
+    top = head(dd %>% filter(V2=="total") %>% arrange(desc(V4)),1000 ) 
+    top$V4 = top$V4 / sum(s1 %>% filter(V2=="total") %>% dplyr::select(V4) %>% ungroup()) * 100
+   
+    mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype","interpro_short_description") , filters=
+                    "ensembl_gene_id"    , values =as.character(top$V1) ,mart=mart)
+    g$family = 
+        sapply(g$interpro_short_description,function(x){
+            strsplit(x,"_")[[1]][1]
+        })
+    g = g %>% distinct(ensembl_gene_id)
+ 
+    dd = merge(top,g,by=1) %>% arrange(desc(V4))
+    dd$hgnc_symbol = factor(dd$hgnc_symbol,levels=dd$hgnc_symbol)
+    dd = dd %>% distinct(V1) %>% group_by(family) %>% summarise(counts=sum(V4), genes = n())
+    dd$family[dd$counts<0.5] = "Others"
+    p = ggplot(dd , aes( x=family,y=(counts),fill=family )) +
+        geom_bar(stat = 'identity') +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+    print(p)
+}
