@@ -1,0 +1,415 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+
+```{r setup}
+library(knitr)
+library(rmarkdown)
+library(knitrBootstrap)
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+devtools::load_all("~/repos/isomiRs")
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=10,fig.heigh=7,
+               cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+source("~/repos/myRfunctions/transactions.R")
+dn <- "slack_mirna_mrna/new_smallrna"
+root_file = "~/repos/pipelines/slack_cel_network/reports/new_smallrna/"
+root_path<-"~/orch/scratch/celegans_network/celegans_network_raw/small_rna/"
+```
+
+```{r render,eval=FALSE}
+render_2_drop("~/repos/pipelines/slack_cel_network/reports/new_smallrna/mirna.rmd",dn)
+```
+
+
+# Exploratory analysis
+
+## size distribution
+
+```{r adapter}
+setwd(root_path)
+files <- read.table("work/summary.csv", sep=",",header=T)
+names_stats <- gsub("/n/data1/cores/bcbio/","~/orch/scratch/",files[,"size_stats"])
+samples = files[,"sample_id"]
+groups = files[,"group"]
+names(names_stats) = samples
+names(groups) = samples
+tab = data.frame()
+for (sample in samples){
+    d = read.table(names_stats[sample], sep=" ")
+    tab = rbind(tab, d %>% mutate(sample=sample, group=groups[sample]))
+}
+
+
+reads_adapter = tab %>% group_by(sample, group) %>% summarise(total=sum(V2))
+ggplot(reads_adapter, aes(x=sample,y=total,fill=group)) +
+    geom_bar(stat="identity", position = "dodge") +
+    ggtitle("total number of reads with adapter") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+ggplot(tab, aes(x=V1,y=V2,fill=sample)) +
+    geom_bar(stat="identity", position = "dodge") +
+    facet_wrap(~group, nrow=2)+
+    ggtitle("size distribution") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+## miRNA
+
+### total miRNA expression annotated with mirbase
+
+```{r mirna}
+mi_files = paste0( gsub("/n/data1/cores/bcbio/","~/orch/scratch/", files[,"miraligner"] ), ".mirna" )
+design <- as.data.frame(t(as.data.frame( sapply(as.character(files[,"group"]), strsplit, split="_",fixed=2) )))
+names(design ) <- c("sample","time")
+row.names(design) = samples
+obj <- loadIso(files = mi_files, design = design ,header = T)
+```
+
+```{r detect-mir}
+obj@counts[grepl("cel-miR-71",row.names(obj@counts)),]
+```
+
+```{r mirna-mirbase}
+ggplot(data.frame(sample=colnames(obj@counts), total=colSums(obj@counts))) +
+    geom_bar(aes(x=sample,y=total), stat='identity')+
+    scale_y_log10()
+mirna_step <- as.data.frame(colSums(obj@counts))
+```
+
+### Distribution of mirna expression
+
+```{r depth}
+ggplot(melt(obj@counts)) +
+    geom_boxplot(aes(x=X2,y=value))+
+    scale_y_log10()
+```
+
+### cumulative distribution of miRNAs
+
+```{r cum}
+tab <- data.frame()
+cs <- as.data.frame(apply(obj@counts,2,cumsum))
+cs$pos <- 1:nrow(cs)
+ggplot((melt(cs,id.vars = "pos")))+
+    geom_point(aes(x=pos,y=value,color=variable))+
+    scale_y_log10()
+```
+
+## Others
+
+### total aligned
+
+```{r cluster}
+clus <- read.table(gsub("/n/data1/cores/bcbio/","~/orch/scratch/", files[1,"clusters"] ),header=T,sep="\t",row.names=1)
+ann <- clus[,1]
+clus_ma <- clus[,2:ncol(clus)]
+
+```
+
+```{r cluster_type}
+rRNA <- colSums(clus_ma[grepl("rRNA",ann) & grepl("miRNA",ann)==F,])
+miRNA <- colSums(clus_ma[grepl("miRNA",ann),])
+tRNA <- colSums(clus_ma[grepl("tRNA",ann) & grepl("rRNA",ann)==F & grepl("repeat",ann)==F & grepl("miRNA",ann)==F,])
+rmsk <- colSums(clus_ma[grepl("repeat",ann) & grepl("rRNA",ann)==F & grepl("miRNA",ann)==F,])
+total <- colSums(clus_ma)
+
+dd <- data.frame(samples=names(rRNA),
+                 rRNA=rRNA,
+                 miRNA=miRNA,
+                 tRNA=tRNA,
+                 rmsk=rmsk,
+                total=total)
+ggplot(melt(dd)) +
+    geom_bar(aes(x=samples,y=value,fill=variable),
+             stat='identity',
+             position="dodge")+
+    scale_fill_brewer(palette = "Set1")+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+## change of miRNAs with time
+
+```{r try-norm}
+above <- rowMeans(clus_ma)>10
+cols = row.names(design)
+clus_dse <- DESeqDataSetFromMatrix(countData = clus_ma[above,cols],
+                       colData = design,
+                       design = ~ sample)
+clus_dse <- estimateSizeFactors( clus_dse )
+
+#idx <- grepl("tRNA",ann) | grepl("miRNA",ann) 
+idx <- !( grepl("repeat",ann) | grepl("rRNA",ann) )
+clus_clean_dse <- DESeqDataSetFromMatrix(countData = clus_ma[idx*above,cols],
+                       colData = design,
+                       design = ~ sample)
+clus_clean_dse <- estimateSizeFactors( clus_clean_dse )
+
+mirna_dse <- DESeqDataSetFromMatrix(countData = obj@counts[rowSums(obj@counts>2)>1,],
+                       colData = design,
+                       design = ~ sample)
+
+sizeFactors(mirna_dse) <- sizeFactors(clus_dse)
+norm_w_clus <- counts(mirna_dse,normalized=T)
+
+sizeFactors(mirna_dse) <- sizeFactors(clus_clean_dse)
+norm_w_clus_clean <- counts(mirna_dse,normalized=T)
+
+mirna_dse_alone <- estimateSizeFactors(mirna_dse)
+norm_w_mirna <- counts(mirna_dse_alone,normalized=T)
+
+raw <- obj@counts
+
+get_ratio <- function(norm){
+        norm = norm[rowMeans(norm)>5,]
+        data.frame(n2.rep3=norm[,1]/norm[,2],
+           n2.rep1=norm[,5]/norm[,6],
+           n2.rep2=norm[,9]/norm[,10],
+           ko.rep3=norm[,3]/norm[,4],
+           ko.rep1=norm[,7]/norm[,8],
+           ko.rep2=norm[,11]/norm[,12])
+}
+
+get_ratio_group <- function(norm){
+        norm = norm[rowMeans(norm)>5,]
+        d=data.frame(n2=rowMeans(norm[,c(1,5,9)])/rowMeans(norm[,c(2,6,10)]),
+                   ko=rowMeans(norm[,c(3,7,11)])/rowMeans(norm[,c(4,8,12)]) )    
+        print(t.test(d$n2,d$ko))
+        d
+}
+
+```
+
+wild-type at day 0 should has more miRNA expression than day 5. And this difference should
+disappear in the KO samples.
+
+
+```{r plot-diff}
+ggplot(melt(get_ratio_group(raw))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("raw counts")
+
+ggplot(melt(get_ratio_group(norm_w_mirna))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized with miRNAs")
+
+ggplot(melt(get_ratio_group(norm_w_clus))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized with total")
+
+ggplot(melt(get_ratio_group(norm_w_clus_clean))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized without repeats and rRNA")
+
+```
+
+### Differential expression along time
+
+With the correct normalization we should detect miRNA that changes
+differently in both conditions. I will use the normalization coming
+after removing repeats and rRNA.
+
+```{r test-de}
+get_DE <- function(norm, design,size=NULL){
+    dse <- DEGList(counts = norm,
+                       group = design$conditions)
+    dse <- estimateSizeFactors(dse)
+    if (! is.null(size)){
+        sizeFactors(dse) = size
+    }
+    dse <- estimateDispersions(dse)
+    dse <- nbinomWaldTest(dse)
+    #plotDispEsts(dse)
+    res <- results(dse,name="samplen2.timed5")
+    #resultsNames(dse)
+    #down<-(subset(res,res$padj<0.2)[,2]<0)
+    #up<-(subset(res,res$padj<0.2)[,2]>0)
+    list(subset(res,res$padj<0.2))
+}
+```
+
+
+Number of DEG mirna using the clean normalization. There is no results. Probably the
+difference is small and can not be detected after pvalue correction.
+
+```{r num-de-mirna-trna}
+get_DE(raw[rowMeans(raw)>5,],design,size=sizeFactors(clus_clean_dse))
+```
+
+
+# DE
+
+```{r cor-fn}
+get_cor <- function(norm, design,size=NULL){
+    dse <- DESeqDataSetFromMatrix(countData = norm,
+                       colData = design,
+                       design = ~ sample +time+ sample*time)
+    dse <- estimateSizeFactors(dse)
+    if (! is.null(size)){
+        sizeFactors(dse) = size
+    }
+    dse <- estimateDispersions(dse)
+    rdse <- rlog(dse, blind = TRUE)
+    par(mfrow=c(2,1))
+    ggheatmap.show(ggheatmap(cor(assay(rdse))))
+    mds(assay(rdse),condition = design$sample,d="cor",xi = 1, yi = 2)
+}
+```
+
+Using total miRNA + tRNA:
+
+## correlation
+
+```{r cor-minra-trna}
+get_cor(raw[rowMeans(raw)>5,],design,size=sizeFactors(clus_clean_dse))
+```
+
+
+```{r handle}
+
+dse_handle <- function(res){
+    res_nona <- res[!is.na(res$padj),]
+    keep <- res_nona$padj < 0.1 
+    res_nona[keep,]
+}
+```
+
+## along time
+
+```{r de}
+design$conditions <- paste0(design$sample,design$time)
+dse <- DESeqDataSetFromMatrix(countData = raw[rowMeans(raw)>5,],
+                       colData = design,
+                       design = ~ conditions)
+sizeFactors(dse) = sizeFactors(clus_clean_dse)
+dse = estimateDispersions(dse)
+dse = nbinomWaldTest(dse)
+plotDispEsts(dse)
+#resultsNames(dse)
+```
+
+### DEG mirnas in N2 strain (day5 / day0)
+
+```{r de-n2,results='asis'}
+res <- results(dse, contrast = c("conditions","n2d5","n2d0"))
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+write.table(res,paste0(root_file,"mirna_n2_de_genes.txt"),sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](mirna_n2_de_genes.txt)
+
+### DEG mirnas in KO strain (day5 / day0)
+
+```{r de-mir71,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d5","mir71d0"))
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+write.table(res,paste0(root_file,"mirna_ko_de_genes.txt"),sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+``` 
+
+There is no difference in term of mirnas that change differently. But we can
+just see the miRNAs that are different among both sets.
+
+## between strains
+
+### At day 0 (mir71 / n2)
+
+```{r de-nw-ko-day0,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d0","n2d0"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+write.table(res,paste0(root_file,"mirna_day0_de_genes.txt"),sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](mirna_day0_de_genes.txt)
+
+
+### At day 5
+
+```{r de-nw-ko-day5,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d5","n2d5"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+write.table(res,paste0(root_file,"mirna_day5_de_genes.txt"),sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](mirna_day5_de_genes.txt)
+
+
+At day 5 it seems there are more differences, maybe this help to detect some
+miRNA network in the future.
+
+## between N2 and KO taking into account time
+
+miRNAs that change different during time
+
+```{r de-condition-time}
+design$conditions <- paste0(design$sample,design$time)
+dse <- DESeqDataSetFromMatrix(countData = raw[rowMeans(raw)>5,],
+                       colData = design,
+                       design = ~ sample*time)
+sizeFactors(dse) = sizeFactors(clus_clean_dse)
+dse = estimateDispersions(dse)
+dse = nbinomWaldTest(dse)
+plotDispEsts(dse)
+#resultsNames(dse)
+res <- results(dse,name = "samplen2.timed5")
+#res <- dse_handle(res)
+#write.table(res,"mirna_n2ko_time_de_genes.txt",sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+however, there is an enrichment through small pvalues, but not enough
+to be properly corrected.
+
+```{r plot-pvalue}
+hist(res$pvalue)
+```
+
+
+### Top 5 pvalues
+
+```{r plot-top}
+top = row.names(res[order(res$pvalue),])[1:5]
+rlog_obj = rlog(dse)
+rlog_ma = assay(rlog_obj)[top,]
+dat = melt(rlog_ma)
+dat = cbind(dat,design[dat$X2,1:2])
+dat = dat %>% group_by(X1,sample,time) %>% summarise(average=mean(value))
+ggplot(dat, aes(x=time, y=average, color=sample)) +
+    geom_point()+
+    facet_wrap(~X1)
+```
+
