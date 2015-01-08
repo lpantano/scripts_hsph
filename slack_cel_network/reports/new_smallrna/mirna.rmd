@@ -13,8 +13,7 @@ output:
 
 ```{r setup}
 library(knitr)
-library(rmarkdown)
-library(knitrBootstrap)
+
 library(ggplot2)
 library(reshape)
 library(DESeq2)
@@ -35,13 +34,20 @@ root_path<-"~/orch/scratch/celegans_network/celegans_network_raw/small_rna/"
 ```
 
 ```{r render,eval=FALSE}
+library(rmarkdown)
+library(knitrBootstrap)
 render_2_drop("~/repos/pipelines/slack_cel_network/reports/new_smallrna/mirna.rmd",dn)
 ```
 
 
 # Exploratory analysis
 
+In this section we will see descriptive figures about quality of the data, 
+reads with adapter, reads mapped to miRNAs, reads mapped to other small RNAs. 
+
 ## size distribution
+
+After adapter removal, we can plot the size distribution of the small RNAs.
 
 ```{r adapter,fig.width=10}
 setwd(root_path)
@@ -72,7 +78,15 @@ ggplot(tab, aes(x=V1,y=V2,fill=sample)) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
 
+There are difference with the first replicate at day 5 in both condition. In those
+samples, the depth is much lower. As well, the size distribution is different. 
+Maybe related to the depth. 
+But is not clear the reason. 
+
 ## miRNA
+
+I mapped against mirbase database, and the number of reads mapped is similar,
+the same for the expression distribution.
 
 ### total miRNA expression annotated with mirbase
 
@@ -81,7 +95,7 @@ mi_files = paste0( gsub("/n/data1/cores/bcbio/","~/orch/scratch/", files[,"miral
 design <- as.data.frame(t(as.data.frame( sapply(as.character(files[,"group"]), strsplit, split="_",fixed=2) )))
 names(design ) <- c("sample","time")
 row.names(design) = samples
-obj <- loadIso(files = mi_files, design = design ,header = T)
+obj <- loadIso(files = mi_files, design = design ,header = T, cov = 1)
 ```
 
 ```{r detect-mir}
@@ -89,9 +103,9 @@ obj@counts[grepl("cel-miR-71",row.names(obj@counts)),]
 ```
 
 ```{r mirna-mirbase}
-ggplot(data.frame(sample=colnames(obj@counts), total=colSums(obj@counts))) +
+ggplot( data.frame(sample=colnames(obj@counts), total=colSums(obj@counts))) +
     geom_bar(aes(x=sample,y=total), stat='identity')+
-    scale_y_log10()
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 mirna_step <- as.data.frame(colSums(obj@counts))
 ```
 
@@ -100,10 +114,13 @@ mirna_step <- as.data.frame(colSums(obj@counts))
 ```{r depth}
 ggplot(melt(obj@counts)) +
     geom_boxplot(aes(x=X2,y=value))+
-    scale_y_log10()
+    scale_y_log10()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
 
 ### cumulative distribution of miRNAs
+
+We can see this time we detect much more miRNAs. The saturation is near to 200.
 
 ```{r cum}
 tab <- data.frame()
@@ -116,7 +133,10 @@ ggplot((melt(cs,id.vars = "pos")))+
 
 ## Others
 
-### total aligned
+I clustered small RNAs and annotated with standard databases, like tRNA, repeats,
+rRNA, noncoding small RNAs ...
+
+### classification
 
 ```{r cluster}
 clus <- read.table(gsub("/n/data1/cores/bcbio/","~/orch/scratch/", files[1,"clusters"] ),header=T,sep="\t",row.names=1)
@@ -124,6 +144,8 @@ ann <- clus[,1]
 clus_ma <- clus[,2:ncol(clus)]
 
 ```
+
+The major contribution are repeats and rRNA, with variation in the percentage. 
 
 ```{r cluster_type}
 rRNA <- colSums(clus_ma[grepl("rRNA",ann) & grepl("miRNA",ann)==F,])
@@ -145,7 +167,38 @@ ggplot(melt(dd)) +
     scale_fill_brewer(palette = "Set1")+
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
+dd_norm = dd
+dd_norm[,2:5] = sweep(dd[,2:5],1,dd[,6],"/")
+ggplot(melt(dd_norm[,1:5])) +
+    geom_bar(aes(x=samples,y=value,fill=variable),
+             stat='identity',
+             position="dodge")+
+    scale_fill_brewer(palette = "Set1")+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    labs(list(title="relative proportion of small RNAs",y="% reads"))
 ```
+
+
+## correlation between type of small RNA
+
+Maybe it would help to detect weird samples to show the amount of the different type of small RNA against the total reads with adapters.
+
+```{r cor-abundance}
+reads_adapter = as.data.frame(reads_adapter)
+row.names(reads_adapter) = reads_adapter[,1]
+samples = as.character(samples)
+dat = cbind(mirbase=mirna_step[samples,] , adapter=reads_adapter[samples, 3] , dd[samples, 1:6])
+ggplot(dat) +
+    geom_point(aes(x=mirbase,y=adapter,colour="mirbase"))+
+    geom_point(aes(x=total,y=adapter,colour="aligned"))+
+    geom_point(aes(x=rRNA,y=adapter,colour="rRNA"))+
+    geom_point(aes(x=rmsk,y=adapter,colour="rmsk"))+
+    facet_wrap(~samples)+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    labs(list(y="reads w adapter",x="# reads",title="annotated reads plot"))
+    
+```
+
+Replicate 1 seems different than the other two.
 
 ## change of miRNAs with time
 
@@ -174,6 +227,10 @@ norm_w_clus <- counts(mirna_dse,normalized=T)
 sizeFactors(mirna_dse) <- sizeFactors(clus_clean_dse)
 norm_w_clus_clean <- counts(mirna_dse,normalized=T)
 
+rpm_size =colSums(clus_ma[idx*above,cols])/mean(colSums(clus_ma[idx*above,cols]))
+sizeFactors(mirna_dse) = rpm_size
+norm_w_clus_clean_rpm = counts(mirna_dse,normalized=T)
+
 mirna_dse_alone <- estimateSizeFactors(mirna_dse)
 norm_w_mirna <- counts(mirna_dse_alone,normalized=T)
 
@@ -201,7 +258,16 @@ get_ratio_group <- function(norm){
 
 wild-type at day 0 should has more miRNA expression than day 5. And this difference should
 disappear in the KO samples.
+I tried different normalization:
 
+* no normalization, just for comparison purpose
+* DESeq normalization with miRNA reads
+* DESeq normalization with all aligned reads
+* DESeq normalization with non rRNA/repeats reads
+* RPM normalization with non rRNA/repeats reads
+
+
+Show is the count ratio of Day0/Day5
 
 ```{r plot-diff}
 ggplot(melt(get_ratio_group(raw))) +
@@ -228,13 +294,21 @@ ggplot(melt(get_ratio_group(norm_w_clus_clean))) +
     geom_hline(yintercept=1)+
     ggtitle("normalized without repeats and rRNA")
 
+ggplot(melt(get_ratio_group(norm_w_clus_clean_rpm))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized without repeats and rRNA using RPM")
+
+
 ```
+
+The last two seem pretty similar, and show the expected behavior.
 
 ### Differential expression along time
 
 With the correct normalization we should detect miRNA that changes
-differently in both conditions. I will use the normalization coming
-after removing repeats and rRNA.
+differently in both conditions along time. I will use DESeq normalization with non rRNA/repeats reads.
 
 ```{r test-de}
 get_DE <- function(norm, design,size=NULL){
@@ -257,15 +331,16 @@ get_DE <- function(norm, design,size=NULL){
 ```
 
 
-Number of DEG mirna using the clean normalization. There is no results. Probably the
+There is no significant results. Probably the
 difference is small and can not be detected after pvalue correction.
 
 ```{r num-de-mirna-trna}
 get_DE(raw[rowMeans(raw)>5,],design,size=sizeFactors(clus_clean_dse))
 ```
 
+# correlation
 
-# DE
+Just to check sample correlation after normalization:
 
 ```{r cor-fn}
 get_cor <- function(norm, design,size=NULL){
@@ -285,11 +360,14 @@ get_cor <- function(norm, design,size=NULL){
 ```
 
 
-## correlation
-
 ```{r cor-minra-trna}
 get_cor(raw[rowMeans(raw)>5,],design,size=sizeFactors(clus_clean_dse))
 ```
+
+
+# DE
+
+I did differential expression of all possible comparison using the previous normalization.
 
 
 ```{r handle}
@@ -300,8 +378,6 @@ dse_handle <- function(res){
     res_nona[keep,]
 }
 ```
-
-## along time
 
 ```{r de}
 design$conditions <- paste0(design$sample,design$time)
@@ -315,17 +391,22 @@ plotDispEsts(dse)
 #resultsNames(dse)
 ```
 
+## DE along time
+
 ### DEG mirnas in N2 strain (day5 / day0)
 
 ```{r de-n2,results='asis'}
 res <- results(dse, contrast = c("conditions","n2d5","n2d0"))
 DESeq::plotMA(as.data.frame(res))
 res <- dse_handle(res)
-write.table(res,paste0(root_file,"mirna_n2_de_genes.txt"),sep="\t")
+fn = paste0(root_file,"mirna_n2_de_genes.txt")
+write.table(res,fn,sep="\t")
 knitr::kable(head(res[order(res$pvalue),]))
 ```
 
-[get table](mirna_n2_de_genes.txt)
+
+[get table](`r get_report_links(fn)`)
+
 
 ### DEG mirnas in KO strain (day5 / day0)
 
@@ -333,48 +414,51 @@ knitr::kable(head(res[order(res$pvalue),]))
 res <- results(dse, contrast = c("conditions","mir71d5","mir71d0"))
 DESeq::plotMA(as.data.frame(res))
 res <- dse_handle(res)
-write.table(res,paste0(root_file,"mirna_ko_de_genes.txt"),sep="\t")
+fn = paste0(root_file,"mirna_ko_de_genes.txt")
+write.table(res,fn,sep="\t")
 knitr::kable(head(res[order(res$pvalue),]))
 ``` 
 
-[get table](mirna_ko_de_genes.txt)
+[get table](`r get_report_links(fn)`)
 
-## between strains
+## DE between strains
 
-### At day 0 (mir71 / n2)
+### DEG mirnas at day 0 (KO / n2)
 
 ```{r de-nw-ko-day0,results='asis'}
 res <- results(dse, contrast = c("conditions","mir71d0","n2d0"),cooksCutoff = FALSE)
 DESeq::plotMA(as.data.frame(res))
 res <- dse_handle(res)
-write.table(res,paste0(root_file,"mirna_day0_de_genes.txt"),sep="\t")
+fn = paste0(root_file,"mirna_day0_de_genes.txt")
+write.table(res,fn,sep="\t")
 knitr::kable(head(res[order(res$pvalue),]))
 ```
 
-[get table](mirna_day0_de_genes.txt)
+[get table](`r get_report_links(fn)`)
 
 
-### At day 5 (mir71 / n2)
+### DEG mirnas at day 5 (KO / n2)
 
 ```{r de-nw-ko-day5,results='asis'}
 res <- results(dse, contrast = c("conditions","mir71d5","n2d5"),cooksCutoff = FALSE)
 DESeq::plotMA(as.data.frame(res))
 res <- dse_handle(res)
-write.table(res,paste0(root_file,"mirna_day5_de_genes.txt"),sep="\t")
+fn = paste0(root_file,"mirna_day5_de_genes.txt")
+write.table(res,fn,sep="\t")
 knitr::kable(head(res[order(res$pvalue),]))
 ```
 
-[get table](mirna_day5_de_genes.txt)
+[get table](`r get_report_links(fn)`)
 
 
 At day 5 it seems there are more differences, maybe this help to detect some
 miRNA network in the future.
 
-## between N2 and KO taking into account time
+## DEG mirnas between N2 and KO taking into account time
 
 miRNAs that change different during time
 
-```{r de-condition-time}
+```{r de-condition-time,results='asis'}
 design$conditions <- paste0(design$sample,design$time)
 dse <- DESeqDataSetFromMatrix(countData = raw[rowMeans(raw)>5,],
                        colData = design,
@@ -390,8 +474,7 @@ res <- results(dse,name = "samplen2.timed5")
 knitr::kable(head(res[order(res$pvalue),]))
 ```
 
-however, there is an enrichment through small pvalues, but not enough
-to be properly corrected.
+however, there is an enrichment through small pvalues.
 
 ```{r plot-pvalue}
 hist(res$pvalue)
@@ -412,3 +495,73 @@ ggplot(dat, aes(x=time, y=average, color=sample)) +
     facet_wrap(~X1)
 ```
 
+
+## DEG mirnas using RPM normalization
+
+Just to check, I did the same with RPM normalization, only for the KO/N2 at day 5.
+
+```{r de-rpm,results='asis'}
+design$conditions <- paste0(design$sample,design$time)
+dse <- DESeqDataSetFromMatrix(countData = raw[rowMeans(raw)>5,],
+                       colData = design,
+                       design = ~ conditions)
+sizeFactors(dse) = rpm_size
+dse = estimateDispersions(dse)
+dse = nbinomWaldTest(dse)
+plotDispEsts(dse)
+
+res <- results(dse, contrast = c("conditions","mir71d5","n2d5"))
+DESeq::plotMA(as.data.frame(res))
+#res <- dse_handle(res)
+#write.table(res,paste0(root_file,"mirna_day5_de_genes_wo_rep1.txt"),sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+
+```
+
+The results are quite similar, an overall up-regulation in KO type.
+
+## DEG mirnas using miRNA normalization
+
+Just to know what happens if only use miRNA for normalization.
+
+```{r de-mirna,results='asis'}
+design$conditions <- paste0(design$sample,design$time)
+dse <- DESeqDataSetFromMatrix(countData = raw[rowMeans(raw)>5,],
+                       colData = design,
+                       design = ~ conditions)
+dse = DESeq(dse)
+plotDispEsts(dse)
+
+res <- results(dse, contrast = c("conditions","mir71d5","n2d5"))
+DESeq::plotMA(as.data.frame(res))
+#res <- dse_handle(res)
+#write.table(res,paste0(root_file,"mirna_day5_de_genes_wo_rep1.txt"),sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+
+```
+
+That tendency disappeared here, something we expect if the deregulation is general.
+
+## DEG mirnas after removing replicate 1
+
+As replicate 1 shows some weird pattern compared to the other two, I repeated the
+KO/N2 at day 5 differential expression analysis.
+
+```{r de-remove-rep1,results='asis'}
+idx = !(grepl("_1_",samples))
+dse <- DESeqDataSetFromMatrix(countData = raw[rowMeans(raw)>5,idx],
+                       colData = design[idx,],
+                       design = ~ conditions)
+sizeFactors(dse) = sizeFactors(clus_clean_dse)[idx]
+dse = estimateDispersions(dse)
+dse = nbinomWaldTest(dse)
+plotDispEsts(dse)
+
+res <- results(dse, contrast = c("conditions","mir71d5","n2d5"))
+DESeq::plotMA(as.data.frame(res))
+#res <- dse_handle(res)
+#write.table(res,paste0(root_file,"mirna_day5_de_genes_wo_rep1.txt"),sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+Result seems to be consistent.
