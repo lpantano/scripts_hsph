@@ -90,16 +90,24 @@ the same for the expression distribution.
 
 ### total miRNA expression annotated with mirbase
 
-```{r mirna}
+```{r mirna,results='hide'}
 mi_files = paste0( gsub("/n/data1/cores/bcbio/","~/orch/scratch/", files[,"miraligner"] ), ".mirna" )
 design <- as.data.frame(t(as.data.frame( sapply(as.character(files[,"group"]), strsplit, split="_",fixed=2) )))
 names(design ) <- c("sample","time")
 row.names(design) = samples
 obj <- loadIso(files = mi_files, design = design ,header = T, cov = 1)
+mirna_no_errors = isomiRs::makeCounts(obj,mism = TRUE)
+keep = grepl( "0$",row.names(mirna_no_errors@counts) )
+mi_counts = mirna_no_errors@counts[keep,]
 ```
 
+It should be no counts to miR-71, but still we have some reads. Considering the
+expected expression, this should be noise due to mappability issues, like short
+sequences, or cross-mapping events (reads that map to other place as well.) Or maybe 
+some small contamination or carry over of the sequencer from the wild-type samples.
+
 ```{r detect-mir}
-obj@counts[grepl("cel-miR-71",row.names(obj@counts)),]
+mi_counts[grepl("cel-miR-71",row.names(mi_counts)),]
 ```
 
 ```{r mirna-mirbase}
@@ -181,7 +189,14 @@ ggplot(melt(dd_norm[,1:5])) +
 
 ## correlation between type of small RNA
 
-Maybe it would help to detect weird samples to show the amount of the different type of small RNA against the total reads with adapters.
+A way to show the complexity of the samples is to show the % of the different
+type of small RNA respect to the total amount of reads with adapter.
+
+This way you can see easily if some type of small RNA is increasing or decreasing
+a lot in some sample, and take that into account in the normalization.
+
+In the following figures the Y axis shows the % of reads with adapter. And the
+X axis shows the % of reads of different type of small RNA.
 
 ```{r cor-abundance}
 reads_adapter = as.data.frame(reads_adapter)
@@ -198,9 +213,15 @@ ggplot(dat) +
     
 ```
 
-Replicate 1 seems different than the other two.
+Replicate 1 (in KO and N2Day5) seems different than the other two.
 
 ## change of miRNAs with time
+
+wild-type at day 0 should has more miRNA expression than day 5. And this difference should
+disappear in the KO samples.
+
+To check that I did the ratio between Day0/Day5 of
+KO and N2 type.
 
 ```{r try-norm}
 above <- rowMeans(clus_ma)>10
@@ -256,8 +277,6 @@ get_ratio_group <- function(norm){
 
 ```
 
-wild-type at day 0 should has more miRNA expression than day 5. And this difference should
-disappear in the KO samples.
 I tried different normalization:
 
 * no normalization, just for comparison purpose
@@ -267,7 +286,7 @@ I tried different normalization:
 * RPM normalization with non rRNA/repeats reads
 
 
-Show is the count ratio of Day0/Day5
+Below is the average count ratio of Day0/Day5
 
 ```{r plot-diff}
 ggplot(melt(get_ratio_group(raw))) +
@@ -368,7 +387,8 @@ get_cor(raw[rowMeans(raw)>5,],design,size=sizeFactors(clus_clean_dse))
 # DE
 
 I did differential expression of all possible comparison using the previous normalization.
-
+For each DE I tried, I plot Dispersion plot that shows the relationship between
+standard deviation expression and average expression for each miRNA.
 
 ```{r handle}
 
@@ -522,7 +542,7 @@ The results are quite similar, an overall up-regulation in KO type.
 
 ## DEG mirnas using miRNA normalization
 
-Just to know what happens if only use miRNA for normalization.
+Just to know what happens if only use miRNA for normalization, only for the KO/N2 at day 5.
 
 ```{r de-mirna,results='asis'}
 design$conditions <- paste0(design$sample,design$time)
