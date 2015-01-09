@@ -23,7 +23,7 @@ def counts(data, args):
 
 def _cmd_counts(in_file, out_file, gtf_file, cores):
     if not os.path.exists(out_file):
-        cmd = "featureCounts -R -T {cores} --primary -a {gtf_file} -o {out_file} {in_file}"
+        cmd = "featureCounts -R -T {cores} -a {gtf_file} -o {out_file} {in_file}"
         do.run(cmd.format(**locals()))
     return in_file + ".featureCounts"
 
@@ -60,12 +60,13 @@ def _summarize(in_file, align_r2, count_file, align_r1,  out_file):
                 read = cols[0].split(" ")[1].replace("@", "")
                 primer = cols[0].split(" ")[0]
                 if read in read_gene:
-                    log_handle.write("found %s %s %s ---> %s\n" % (read, cols[3], cols[4], read_gene[read]))
+                    log_handle.write("found %s %s %s %s ---> %s\n" % (read, primer, cols[3], cols[4], read_gene[read]))
                     if read_gene[read][1]:
                         if len(cols[3] + cols[4] + cols[6]) > 135:
                             continue
                         find = tune(cols[3], cols[4])
                         pos = read_position[read][0]
+                        log_handle.write("log %s %s %s %s\n" % (read, primer, pos, read_gene[read]))
                         if (pos, primer) in duplicate:
                             find_dup += 1
                             continue
@@ -116,7 +117,7 @@ def _get_second_read(sam_file, read1_assing):
             num_lines += 1
             if num_lines % 10000000 == 0:
                 logger.my_logger.info(num_lines)
-            if not read.is_unmapped and read.qname in read1_assing and not read.is_secondary:
+            if not read.is_unmapped and read.qname in read1_assing:
                 if not read.is_read2:
                     continue
                 nm = int([t[1] for t in read.tags if t[0] == "NM"][0])
@@ -165,7 +166,7 @@ def _get_read1_position(sam_file, genes):
     pos = defaultdict(list)
     with pysam.Samfile(sam_file, 'r') as sam:
         for read in sam.fetch():
-            if not read.is_unmapped and read.qname in genes and not read.is_secondary:
+            if not read.is_unmapped and read.qname in genes:
                 pos[read.qname] = [int(read.pos)]
     return pos
 
