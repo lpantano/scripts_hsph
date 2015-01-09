@@ -60,7 +60,7 @@ library(dplyr)
 library(rjson)
 library(GGally)
 source("~/repos/myRfunctions/transactions.R")
-dn <- "daley_tailseq/2.0_rmdup_read2"
+dn <- "daley_tailseq/2.0_rmdup_read2_unique"
 root_path<-"~/ody/projects/daley_mRNA_mod/tailseq-2.0"
 path_files = "~/repos/pipelines/daley_tailseq/reports/2.0_rmdup_read2/"
 ```
@@ -68,7 +68,7 @@ path_files = "~/repos/pipelines/daley_tailseq/reports/2.0_rmdup_read2/"
 ```{r render,eval=FALSE,cache=FALSE}
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
-                      cache.path="~/.cache/tailseq-report/html_cached_2.0/", eval=TRUE,
+                      cache.path="~/.cache/tailseq-report/html_cached_2.0_v2/", eval=TRUE,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
 render_2_drop("~/repos/pipelines/daley_tailseq/reports/2.0_rmdup_read2/tailseq_2.0_rmdup_read2.rmd",dn)
 ```
@@ -591,7 +591,7 @@ ggplot(s1_pcr_dd,aes(x=distinct,y=reads,color="total")) +
     geom_point(aes(x=distinct,y=ave,color="average"),alpha=0.3) +
     geom_point(aes(x=distinct,y=ave_trim,color="average_trim"),alpha=0.3) +
     geom_point(aes(x=distinct,y=max,color="maximum"),alpha=0.3) +
-    scale_y_log10() +
+    scale_y_log10() +scale_x_log10() +
     scale_color_brewer(palette = "Set1")+
     ggtitle("s1: duplicated reads")
 

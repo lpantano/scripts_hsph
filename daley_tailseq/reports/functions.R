@@ -255,7 +255,7 @@ make_table = function(dd, prefix){
     data[is.na(data)] = 0
     data = data[,!grepl("exp<",names(data))]
     names(data) = sub("exp-pA>25","exp",names(data))
-    symbol = select(org.Hs.eg.db, as.character(data$V1), cols, keytype="ENSEMBL")
+    symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(data$V1), cols, keytype="ENSEMBL")
     symbol = symbol %>% distinct(ENSEMBL)
     data$symbol = symbol[match(data$V1,symbol$ENSEMBL),2]
     write.table(data, wide,row.names=F, col.names=T)
@@ -265,7 +265,7 @@ make_table = function(dd, prefix){
 
 plot_family = function(dd){
     top = head(dd %>% filter(V2=="total") %>% arrange(desc(V4)),1000 ) 
-    top$V4 = top$V4 / sum(s1 %>% filter(V2=="total") %>% dplyr::select(V4) %>% ungroup()) * 100
+    top$V4 = top$V4 / sum(dd %>% filter(V2=="total") %>% dplyr::select(V4) %>% ungroup()) * 100
    
     mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
     g <- getBM( attributes=c("ensembl_gene_id", "hgnc_symbol","gene_biotype","interpro_short_description") , filters=
