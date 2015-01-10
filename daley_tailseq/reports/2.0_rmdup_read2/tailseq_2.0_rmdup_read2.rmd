@@ -12,7 +12,10 @@ output:
 ---
     
 # Report
-    
+
+This report is removing duplicates using position of read 1 and primer of read 2.
+Only uniquely mapped reads are annotated with ensembl gene GTF.
+
 ## Overview
 
 There are 4 samples, `s1` and `s2` get long fragments and `s3` and `s4` get short fragments.
@@ -586,6 +589,8 @@ distinct number of reads and total/average/maximum/average_trimmed reads.
 ```{r pcr-artifact}
 s1_pcr = read.table(paste0(root_path,"/work_rmdup_read2/s1_final_stats.pcr"))
 s1_pcr_dd = s1_pcr %>% group_by(V1) %>% summarise(distinct=n(),reads=sum(V3),ave=mean(V3),ave_trim=mean(V3,trim=0.2),max=max(V3),med=median(V3)) %>% ungroup()
+s1_pcr_dd = get_biotype(s1_pcr_dd)
+
 ggplot(s1_pcr_dd,aes(x=distinct,y=reads,color="total")) +
     geom_point(alpha=0.3) +
     geom_point(aes(x=distinct,y=ave,color="average"),alpha=0.3) +
@@ -594,7 +599,37 @@ ggplot(s1_pcr_dd,aes(x=distinct,y=reads,color="total")) +
     scale_y_log10() +scale_x_log10() +
     scale_color_brewer(palette = "Set1")+
     ggtitle("s1: duplicated reads")
+```
+
+Maybe that's only due to non-protein coding genes, because they are normally smaller,
+and the reads start at the 5' end, so the position is the same.
 
 
+```{r pcr_artifact-biotype}
+s1_pcr_dd$biotype_red = s1_pcr_dd$biotype
+s1_pcr_dd$biotype_red[!grepl("protein", s1_pcr_dd$biotype)] = "Other"
+ggplot(s1_pcr_dd,aes(x=distinct,y=max,color=biotype_red)) +
+    geom_point(alpha=0.3) +
+    scale_y_log10() +scale_x_log10() +
+    scale_color_brewer(palette = "Set1")+
+    ggtitle("s1: duplicated reads")+
+    facet_wrap(~biotype_red)
+```
+
+
+If we plot according to size, we see how those duplicated reads are comming from
+smaller transcripts. 
+
+```{r pcr_artifact-size}
+ref_fn = paste0(root_path,"/work_rmdup_read2/db/ref.bed")
+ref=read.table(ref_fn,sep="\t") %>% filter(grepl("transcript",V8)) %>% mutate(size=V3-V2+1)
+s1_pcr_dd$size = ref[match(s1_pcr_dd$V1, ref[,4]),"size"]
+
+ggplot(s1_pcr_dd,aes(x=distinct,y=reads,color=cut(size,breaks=c(-1,500,1000,10000000)))) +
+    geom_point(alpha=0.7) +
+    scale_color_brewer("size",palette="Set1")+
+    scale_y_log10() +scale_x_log10() +
+    ggtitle("s1: duplicated reads")+
+    facet_wrap(~biotype_red)
 ```
 
