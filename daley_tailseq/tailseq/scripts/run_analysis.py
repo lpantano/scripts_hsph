@@ -42,6 +42,7 @@ if __name__ == "__main__":
                         default=False, help="Keep multimappers")
     parser.add_argument("--sample-map", required=True, help="Sample map file.")
     parser.add_argument("--aligner-index", help="Path to aligner index.")
+    parser.add_argument("--control-index", help="Path to aligner index for control sequences (bowtie2).")
     parser.add_argument("--alignment-dir", help="Output directory")
     parser.add_argument("--gtf-file", required=True, help="GTF file")
     parser.add_argument("--num-jobs", type=int,

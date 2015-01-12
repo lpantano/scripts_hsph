@@ -18,6 +18,7 @@ def align_read1(data, args):
     if args.rmdup:
         out_file = data['sample_id'] + "_rmdup.bam"
         data["clean"] = rmdup(data["clean"], out_file)
+    _bowtie_align(fastq_path, args.control_index, out_prefix + "control.bam")
     return data
 
 
@@ -45,10 +46,20 @@ def star_align(data, args, fastq_path, out_prefix, opts=""):
     return out_file, clean_file
 
 
+def _bowtie_align(fastq_file, control_index, out_file):
+    cmd = ("bowtie2 -p 4 --no-unal -x {control_index} -U {fastq_file} | samtools view -Shb /dev/stdin > {tx_out_file} ")
+    stat_file = out_file + ".flagstat"
+    if not os.path.exists(out_file):
+        with file_transaction(out_file) as tx_out_file:
+            do.run(cmd.format(**locals()), "bowtie2 %s" % fastq_file)
+    do.run("samtools flagstat {out_file} > {stat_file}".format(**locals()), "stats control sequences")
+    return stat_file
+
+
 def qc(data, args):
     """fastqc for the sam file"""
-    sam_file = data['align']
-    out_dir = os.path.basename(sam_file) + "_fastq"
+    sam_file = data['r1_path']
+    out_dir = os.path.basename(data["sample_id"]) + "_fastqc"
     cmd = "fastqc {sam_file} -f sam -o {out_dir}".format(**locals())
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)

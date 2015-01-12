@@ -17,6 +17,7 @@ def counts(data, args):
     out_file = prefix + "counts"
     data['counts'] = _cmd_counts(in_file, out_file, gtf_file, cores)
     data['assign'] = _assign_gene(data['counts'], prefix)
+    _get_counts_stats(data['counts'], prefix + "count_stats.dat")
     _summarize(data['detect'], data['align_r2'], data['assign'], in_file, prefix + "summary.dat")
     return data
 
@@ -42,17 +43,17 @@ def _assign_gene(in_file, prefix):
 
 
 def _summarize(in_file, align_r2, count_file, align_r1,  out_file):
-    log_file = out_file + ".log"
-    logger.my_logger.info("summarize results")
-    read_gene, counts_gene = _get_first_read(count_file)
-    read_position = _get_read1_position(align_r1, read_gene)
-    logger.my_logger.info("load read 1 done")
-    read_gene = _get_second_read(align_r2, read_gene)
-    logger.my_logger.info("load read 2 done")
-    stats = defaultdict(Counter)
-    duplicate = {}
-    find_dup = 0
     if not os.path.exists(out_file):
+        log_file = out_file + ".log"
+        logger.my_logger.info("summarize results")
+        read_gene, counts_gene = _get_first_read(count_file)
+        read_position = _get_read1_position(align_r1, read_gene)
+        logger.my_logger.info("load read 1 done")
+        read_gene = _get_second_read(align_r2, read_gene)
+        logger.my_logger.info("load read 2 done")
+        stats = defaultdict(Counter)
+        duplicate = {}
+        find_dup = 0
         with gzip.open(in_file) as handle_polya:
             log_handle = open(log_file, 'w')
             for line in handle_polya:
@@ -92,7 +93,7 @@ def _summarize(in_file, align_r2, count_file, align_r1,  out_file):
                                 out.write("%s %s %s %s %s\n" % (gene, mod[0], mod[1], c, u_times))
                             else:
                                 out.write("%s polyA %s %s 0\n" % (gene, mod, c))
-    logger.my_logger.info("Found %s exact duplicates\n" % find_dup)
+        logger.my_logger.info("Found %s exact duplicates\n" % find_dup)
 
 
 def _get_u_times(m):
@@ -178,5 +179,23 @@ def _get_position(sam_file, genes):
         for read in sam.fetch():
             if not read.is_unmapped and read.qname in genes and not read.is_secondary:
                 name = read.qname
-                pos[genes[name][0]][int(read.pos)] += 1
+                pos[genes[name][0]][sam.getrname(read.rname) + ":" + str(read.pos)] += 1
     return pos
+
+
+def _get_counts_stats(count_file, out_file):
+    seen = {}
+    stats = Counter()
+    if os.path.exists(out_file):
+        return out_file
+    with file_transaction(out_file) as tx_out_file:
+        with open(count_file) as in_handle:
+            for line in in_handle:
+                read, label = line.strip().split("\t")[:2]
+                if read not in seen:
+                    stats[label] += 1
+                seen[read] = 0
+        with open(tx_out_file, "w") as out_handle:
+            for label in stats:
+                out_handle.write("%s %s\n" % (label, stats[label]))
+    return out_file
