@@ -18,16 +18,14 @@ Only uniquely mapped reads are annotated with ensembl gene GTF.
 
 ## Overview
 
-There are 4 samples, `s1` and `s2` get long fragments and `s3` and `s4` get short fragments.
-Among the pairs, there are some difference in protocol, like amplification cycles 
-and different ligation method (i am guessing from the metadata)
+This report contains the analysis of 6 samples: 3 ZCCHC6 knockdown and 3 controls
 
-[s1](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/2.0/s1_Aligned.out_fastqc.html")`)
-[s2](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/2.0/s2_Aligned.out_fastqc.html")`)
-[s3](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/2.0/s3_Aligned.out_fastqc.html")`)
-[s4](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/2.0/s4_Aligned.out_fastqc.html")`)
-
-
+[s1](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/zcchc6/sample1_R1_fastqc.html")`)
+[s2](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/zcchc6/sample2_R1_fastqc.html")`)
+[s3](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/zcchc6/sample3_R1_fastqc.html")`)
+[s4](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/zcchc6/sample4_R1_fastqc.html")`)
+[s5](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/zcchc6/sample5_R1_fastqc.html")`)
+[s6](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/zcchc6/sample6_R1_fastqc.html")`)
 
 
 ## Method
@@ -62,6 +60,7 @@ library(devtools)
 library(dplyr)
 library(rjson)
 library(GGally)
+library(biomaRt)
 source("~/repos/myRfunctions/transactions.R")
 dn <- "daley_tailseq/zcchc6"
 root_path<-"~/ody/projects/daley_mRNA_mod/tailseq-zcchc6"
@@ -71,7 +70,7 @@ path_files = "~/repos/pipelines/daley_tailseq/reports/zcchc6/"
 ```{r render,eval=FALSE,cache=FALSE}
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
-                      cache.path="~/.cache/tailseq-report/html_cached_2.0_v2/", eval=TRUE,
+                      cache.path="~/.cache/tailseq-report/html_cached_colon/", eval=TRUE,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
 render_2_drop("~/repos/pipelines/daley_tailseq/reports/zcchc6/zcchc6.rmd",dn)
 ```
@@ -156,21 +155,36 @@ ggplot( dd, aes( x=sample, y=V2, fill=V1 ) ) +
 ## reads assigned to genes
 
 The number of reads in genes is quite low. This reduces a lot the coverage. 
+The fastqc files show a lot of polyA reads in the first read file. 
 
 ```{r reads-genes,cache=FALSE}
 dd = data.frame()
 for (file in list.files(paste0(root_path,"/work/"), "count_stats.dat$") ){
-    data = read.table(paste0(root_path, "/work/", file),)
+    data = read.table(paste0(root_path, "/work/", file))
     dd = rbind(dd, data)
 }
-dd$sample = c(rep("s1",4), rep("s2",4), rep("s3",4) , rep("s4",4),
-              rep("s5",4) , rep("s6",4))
+dd$sample = c(rep("SiCtl-r1",5), rep("SiZ6-1-r1",5), rep("SiCtl-r2",5) , rep("SiZ6-1-r2",5),
+              rep("SiCtl-r3",5) , rep("SiZ6-1-r3",5))
+
 ggplot( dd, aes( x=sample, y=V2, fill=V1 ) ) +
     geom_bar( stat = 'identity', position = 'dodge') + 
     scale_fill_brewer( palette = "Set1" ) +
     labs( list( y="reads" ) )
 
 ```
+
+
+We have a lot of unmmaped reads. I tried to do quick inspection of the data and
+did the FASTQC analysis for the un-mapped reads of sample 1:
+
+[s1](`r get_report_html("~/repos/pipelines/daley_tailseq/reports/zcchc6/s1_nomapped_fastqc.html")`)
+
+We have a lot of polyA reads (I counted reads with more than 13A and I got 2 mill reads)
+Then we have a little bit more than 1 mill reads with the small RNA seq adapter. 
+
+This will add up to 3 mill, so will explain half of the unmapped reads for that sample, still
+(I think) a little higher than expected, but makes sense.
+
 
 ## After filtering
 
@@ -234,27 +248,16 @@ type_name = c("polyA","a","aa","a3","top10","top5")
 names(type) = type_name
 
  void = lapply(type_name, function(x){
-     venn(list(c1=genes_s1[[x]],
-               c2=genes_s3[[x]],
-               c3=genes_s5[[x]]))
+     venn(list(SiCtl1=genes_s1[[x]],
+               SiCtl2=genes_s3[[x]],
+               SiCtl3=genes_s5[[x]]))
      title(type[x])
  })
 
  void = lapply(type_name, function(x){
-     venn(list(t4=genes_s2[[x]],
-               t5=genes_s4[[x]],
-               t6=genes_s6[[x]]))
-     title(type[x])
- })
-```
-
-#### s1/s2 with public data
-
-```{r common-public-30,eval=FALSE}
- void = lapply(type_name, function(x){
-     venn(list(s1=genes_s1[[x]],
-               s2=genes_s2[[x]],
-               public=genes_public[[x]]))
+     venn(list(SiZ61=genes_s2[[x]],
+               SiZ62=genes_s4[[x]],
+               SiZ63=genes_s6[[x]]))
      title(type[x])
  })
 ```
@@ -283,8 +286,7 @@ design = data.frame(row.names = names(dd_list), condition = groups)
 counts_table = get_counts(dd_list)
 ma = get_norm_counts(counts_table, design)
 m = log2(ma[[1]]+1)
-ggpairs(m, alpha=0.4,
-        diag = list(continuous = "density"))
+#ggpairs(m, alpha=0.4,        diag = list(continuous = "density"))
 ggheatmap.show(ggheatmap(cor(m)))
 
 ```
@@ -293,8 +295,7 @@ ggheatmap.show(ggheatmap(cor(m)))
 
 ```{r cor-polyA,cache=FALSE}
 m = log2(ma[[2]]+1)
-ggpairs(m, alpha=0.4,
-        diag = list(continuous = "density"))
+#ggpairs(m, alpha=0.4,diag = list(continuous = "density"))
 ggheatmap.show(ggheatmap(cor(m)))
 
 ```
@@ -304,8 +305,7 @@ ggheatmap.show(ggheatmap(cor(m)))
 
 ```{r cor-a,cache=FALSE}
 m = log2(ma[[3]]+1)
-ggpairs(m, alpha=0.4,
-        diag = list(continuous = "density"))
+#ggpairs(m, alpha=0.4,        diag = list(continuous = "density"))
 ggheatmap.show(ggheatmap(cor(m)))
 
 ```
@@ -315,8 +315,7 @@ ggheatmap.show(ggheatmap(cor(m)))
 
 ```{r cor-aa,cache=FALSE}
 m = log2(ma[[4]]+1)
-ggpairs(m, alpha=0.4,
-        diag = list(continuous = "density"))
+#ggpairs(m, alpha=0.4,        diag = list(continuous = "density"))
 ggheatmap.show(ggheatmap(cor(m)))
 ```
 
@@ -325,30 +324,32 @@ ggheatmap.show(ggheatmap(cor(m)))
 
 ```{r cor-c,cache=FALSE}
 m = log2(ma[[5]]+1)
-ggpairs(m, alpha=0.4,
-        diag = list(continuous = "density"))
+#ggpairs(m, alpha=0.4,        diag = list(continuous = "density"))
 ggheatmap.show(ggheatmap(cor(m)))
 ```
 
 ## Differential expression
 
 I normalized with the factors coming from the total expression of genes.
+We are assumming that the total gene expression don't change a lot among conditions.
 
-We detect the gene ZCCHC6 as down-regulated in the knowcdown samples.
+We detect the gene ZCCHC6 as down-regulated in the knockdown samples.
 
 ```{r deg,results='asis'}
 deg_list_raw = get_DEG(get_counts( list("SiCtl-r1"=s1_raw,"SiZ6-1-r1"=s2_raw,"SiCtl-r2"=s3_raw,"SiZ6-1-r2"=s4_raw,"SiCtl-r3"=s5_raw,"SiZ6-1-r3"=s6_raw)), design)
 
 total_exp = results(deg_list_raw[[1]], contrast = c("condition", "SiZ6", "SiCtl"))
-total_exp["ENSG00000083223",]
+knitr::kable(total_exp["ENSG00000083223",])
 ```
 
 In general, it seems there is an up-regulation of polyA genes, and down-regulation 
-of polyA-U.. genes. But counts are quite small, so there is not enough power to detect
-statistically this trend. 
+of polyA-U.. genes. But counts are quite low, so there is not enough power to detect
+statistically this trend. Beside dispersion seems weird, but I think is due to
+the low coverage.
 
+### Total expression analysis
 
-```{r deg-tables}
+```{r deg-tables, results='asis'}
 deg_list = get_DEG(counts_table, design)
 
 plot_DEG = function(name){
@@ -364,6 +365,30 @@ plot_DEG = function(name){
     res = get_description(res)
     knitr::kable(res, row.names = TRUE)
 }
-lapply(names(deg_list),plot_DEG)
+lapply(names(deg_list)[1],plot_DEG)
 ```
 
+### Poly-A expression analysis
+
+There is like a trend in up-regulation of polyA genes, although very low, so 
+there is no significant genes.
+
+```{r deg-polya}
+lapply(names(deg_list)[2],plot_DEG)
+```
+
+
+### Poly-A + U expression analysis
+
+Counts are very low here, so there is no power for the analysis. But there is 
+a general trend to down-regulation of uridylation
+
+```{r deg-polya-u}
+lapply(names(deg_list)[3],plot_DEG)
+```
+
+### Poly-A + UU expression analysis
+
+```{r deg-polya-uu}
+lapply(names(deg_list)[4],plot_DEG)
+```
