@@ -33,7 +33,7 @@ summary_all = function(dd_list){
     dd_melt = tab %>% group_by(type,samples) %>% summarise(total=sum(counts)) %>% ungroup()
     dd_melt$type = factor(dd_melt$type, levels=rev(c("U>3","UU","U","polyA","exp")))
     p = ggplot(dd_melt, aes(y=total, x=samples, fill=type, order=type )) + 
-        geom_bar( stat = 'identity') +
+        geom_bar( stat = 'identity', position = 'dodge') +
         scale_y_log10()+
         scale_fill_brewer(palette = "Set1")+
     ggtitle("Number of reads: log(10)")
@@ -93,6 +93,19 @@ normalization = function(x,L=100000){
     ls = sum((t %>% filter(V4>th[1] & V4<th[2]))[,4])
     x$V4=x$V4/ls * L
     x
+}
+
+deseq_factors = function(x, d){
+    x = x[rowMeans(x)>5,]
+    dse = DESeqDataSetFromMatrix(countData = x, colData = d,  formula("~ condition") )   
+    dse = DESeq::estimateSizeFactors(dse)
+    sizeFactors(dse)
+}
+
+deseq_norm = function(x, d, size){
+    dse = DESeqDataSetFromMatrix(countData = x, colData = d,  formula("~ condition") )
+    sizeFactors(dse) = size
+    dse
 }
 
 get_set_genes = function(dd){
@@ -199,6 +212,7 @@ poly_read_summary = function(dd){
     dd_melt = dd_melt %>% group_by(type) %>% summarise(total=sum(counts)) %>% ungroup()
     p = ggplot(dd_melt, aes(y=total, x=type)) + 
         geom_bar( stat = 'identity') +
+        geom_text(aes(label=total), position=position_dodge(width=0.9), size=6, color="orange") +
         scale_y_log10()+
         ggtitle("Number of reads")
     print(p)
@@ -211,15 +225,13 @@ poly_read_summary = function(dd){
     #print(p)
 }
 
-
 rm_na = function(x){
     x[!is.na(x)]
 }
 
-
 get_counts = function(dd_list){
     all = lapply(names(dd_list) , function (name){
-        x = normalization(dd_list[[name]])
+        x = dd_list[[name]]
         t = get_mod_table(x) %>% mutate(sample=name)
     })
     tab = do.call(rbind,all)
@@ -235,6 +247,32 @@ get_counts = function(dd_list){
     p[is.na(p)] = 0
     list(exp=e,polya=p,u=u,uu=u,u3=u3)
 }
+
+get_norm_counts = function(counts, design){
+    e = counts[[1]]
+    library_size = deseq_factors(e[,2:ncol(e)],design)
+    norm_list = lapply(counts, function(x){
+        dse = deseq_norm(x[,2:ncol(x)],design,library_size)
+        counts(dse, normalized=TRUE)
+    })
+    names(norm_list) = names(counts)
+    norm_list
+}
+
+get_DEG = function(counts, design){
+    e = counts[[1]]
+    library_size = deseq_factors(e[,2:ncol(e)],design)
+    deg_list = lapply(counts, function(x){
+        row.names(x) = x[,1]
+        x = x[,2:ncol(x)]
+        dse = deseq_norm(x,design,library_size)
+        dse = estimateDispersions(dse)
+        dse = nbinomWaldTest(dse)
+    })
+    names(deg_list) = names(counts)
+    deg_list
+}
+
 
 library(org.Hs.eg.db)
 cols <- c("ENSEMBL", "SYMBOL")
@@ -285,3 +323,32 @@ plot_family = function(dd){
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
     print(p)
 }
+
+
+get_biotype = function(dd)
+{
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id","gene_biotype") , filters=
+                    "ensembl_gene_id"    , values =as.character(dd$V1) ,mart=mart)
+    dd$biotype = g[match(dd$V1, g[,1]),2]
+    dd
+}
+
+get_description = function(dd)
+{
+    if (nrow(dd)==0) return(dd)
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id","external_gene_name","gene_biotype","description") , filters=
+                    "ensembl_gene_id"    , values =as.character(dd$gene) ,mart=mart)
+    dd= cbind(dd,g[match(dd$gene, g[,1]),2:4])
+    dd
+}
+
+
+get_size_gene = function(dd,ref_fn){
+    ref=read.table(ref_fn,sep="\t") %>% filter(grepl("transcript",V8)) %>% mutate(size=V3-V2+1)
+    dd$size = ref[match(dd$V1, ref[,4]),"size"]
+}
+
