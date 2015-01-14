@@ -411,6 +411,19 @@ plotDispEsts(dse)
 #resultsNames(dse)
 ```
 
+```{r tables}
+rlog_ma = assay(rlog(dse))
+count_ma = counts(dse, normalized=TRUE)
+fn_log = paste0(root_file,"log_matrix.txt")
+write.table(rlog_ma,fn_log,sep="\t")
+fn_count = paste0(root_file,"count_matrix.txt")
+write.table(count_ma,fn_count,sep="\t")
+```
+
+[get table normalized to log2](`r get_report_links(fn_log)`)
+[get table normalized count table](`r get_report_links(fn_count)`)
+
+
 ## DE along time
 
 ### DEG mirnas in N2 strain (day5 / day0)
