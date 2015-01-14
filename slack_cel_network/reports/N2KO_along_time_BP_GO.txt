@@ -1,0 +1,19 @@
+"go" "term" "OddsRatio" "FDR"
+"1" "GO:0042302" "structural constituent of cuticle" 13.6994428056375 2.16665419757178e-47
+"2" "GO:0005198" "structural molecule activity" 6.79494500561167 2.1694964763535e-47
+"3" "GO:0004725" "protein tyrosine phosphatase activity" 9.409375 7.12931076017580e-12
+"4" "GO:0004721" "phosphoprotein phosphatase activity" 5.46093037397385 2.7783006044235e-10
+"5" "GO:0042578" "phosphoric ester hydrolase activity" 3.85535900104058 9.80217078638358e-10
+"6" "GO:0016788" "hydrolase activity, acting on ester bonds" 2.55794731103373 6.45894623019465e-07
+"7" "GO:0004672" "protein kinase activity" 2.23244195835005 2.09051301968035e-05
+"8" "GO:0004713" "protein tyrosine kinase activity" 4.01285832251976 7.21846690060304e-05
+"9" "GO:0003993" "acid phosphatase activity" 7.36541068040119 0.000202995777890668
+"10" "GO:0016773" "phosphotransferase activity, alcohol group as acceptor" 1.94525666016894 0.000280838067695272
+"11" "GO:0016301" "kinase activity" 1.86511123168747 0.000544613711668827
+"12" "GO:0004222" "metalloendopeptidase activity" 2.5087199249049 0.00449343018301624
+"13" "GO:0004175" "endopeptidase activity" 1.89619006849315 0.0110228038626778
+"14" "GO:0008237" "metallopeptidase activity" 1.87707967707968 0.0287828668361349
+"15" "GO:0004553" "hydrolase activity, hydrolyzing O-glycosyl compounds" 2.38652310136358 0.0363218229311998
+"16" "GO:0016798" "hydrolase activity, acting on glycosyl bonds" 2.13614800759013 0.0426050317432366
+"17" "GO:0050660" "flavin adenine dinucleotide binding" 2.41353038895572 0.0426050317432366
+"18" "GO:0022804" "active transmembrane transporter activity" 1.63430777716492 0.0434655349403232

@@ -1,0 +1,2 @@
+pysam
+ipython-cluster-helper

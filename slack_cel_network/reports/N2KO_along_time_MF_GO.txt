@@ -1,0 +1,4 @@
+"go" "term" "OddsRatio" "FDR"
+"1" "GO:0030246" "carbohydrate binding" 4.04301558752998 0.0031364029819292
+"2" "GO:0042302" "structural constituent of cuticle" 4.81806680161943 0.00423246767759385
+"3" "GO:0005198" "structural molecule activity" 2.29859733150872 0.0225424649599407

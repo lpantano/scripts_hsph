@@ -1,0 +1,8 @@
+c1l1.tcrc.gla.ac.uk cluster 01
+c1l2.tcrc.gla.ac.uk cluster 02
+http://lustre-tms.eth.cluster/ for LS stats
+	after vpn connection and init password
+	need proxy: depend on proxy go to C1 or C2
+	https://github.com/wwcrc/wwcrc/blob/master/docs/proxy.md
+/scratch lustre-FS
+/home NFS-FS

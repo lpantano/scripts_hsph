@@ -1,0 +1,16 @@
+MANIFEST.in
+setup.py
+scripts/run_analysis.py
+tailseq/__init__.py
+tailseq/align.py
+tailseq/cluster.py
+tailseq/detect.py
+tailseq/do.py
+tailseq/quality.py
+tailseq/tools.py
+tailseq/utils.py
+tailseq.egg-info/PKG-INFO
+tailseq.egg-info/SOURCES.txt
+tailseq.egg-info/dependency_links.txt
+tailseq.egg-info/requires.txt
+tailseq.egg-info/top_level.txt
