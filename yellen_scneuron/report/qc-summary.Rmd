@@ -1,0 +1,366 @@
+---
+output:
+    knitrBootstrap::bootstrap_document:
+        theme: readable
+        highlight: zenburn
+        theme.chooser: TRUE
+        highlight.chooser: TRUE
+    html_document:
+        toc: true
+        highlight: zenburn
+---
+
+```{r custom}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "yellen_scneuron/report"
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+```
+
+
+```{r render,eval=FALSE,cache=FALSE}
+render_2_drop("~/repos/pipelines/yellen_scneuron/report/qc-summary.Rmd",dn)
+```
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(dplyr)
+library(statmod)
+
+project_summary = "/home/lpantano/orch/scratch/yellen_singlecell_neuron/scneuron/final/2015-01-12_scneuron/project-summary_metadata.csv"
+counts_file = "/home/lpantano/orch/scratch/yellen_singlecell_neuron/scneuron/final/2015-01-12_scneuron/combined.counts"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+summarydata = read.table(project_summary, header=TRUE, sep=",")
+rownames(summarydata) = summarydata$Name
+summarydata = summarydata[order(summarydata$Name),]
+counts = read.table(counts_file, header=TRUE, row.names="id")
+counts = counts[, order(colnames(counts))]
+counts = counts[rowSums(counts)>1,]
+colnames(counts) = sub(".counts","",colnames(counts))
+```
+
+# Results
+
+## QC figures
+
+### Mapped reads
+```{r mapped-plot}
+ggplot(summarydata, aes(x=Name, y=Mapped)) + 
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    ylab("mapped reads") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Genomic mapping rate
+```{r mapping-rate-plot}
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) + 
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Number of genes detected
+```{r genes-detected-plot}
+ggplot(summarydata, aes(x=Name, y=Genes.Detected)) +
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) + 
+    ylab("genes detected") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Exonic mapping rate
+```{r exonic-mapping-plot}
+ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) + 
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    ylab("exonic mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### rRNA mapping rate
+```{r rRNA-rate-plot}
+ggplot(summarydata, aes(x=Name, y=rRNA.rate)) + 
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    ylab("rRNA rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Estimated fragment length of paired-end reads
+```{r fragment-length-plot}
+ggplot(summarydata, aes(x=Name, y=Fragment.Length.Mean)) + 
+    geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    ylab("fragment length") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Boxplot of log10 counts per gene
+```{r boxplot-raw}
+melted = melt(counts)
+colnames(melted) = c("sample", "count")
+melted$sample = factor(melted$sample)
+melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Correlation heatmap of raw counts
+```{r heatmap-raw}
+pheatmap(cor(counts),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")])
+```
+
+### Correlation heatmap of log2 raw counts
+```{r heatmap-log2-raw}
+pheatmap(cor(log2(counts+0.5)),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")])
+```
+This means the correlation is due to highly expressed genes, because after log2 transformation
+the correlation values are much lower. Now, samples cluster by # mapped reads and 
+rRNA ammount.
+
+### Boxplot of log10 TMM-normalized counts per gene
+Trimmed mean of M-values (TMM) normalization is described
+[here](http://genomebiology.com/2010/11/3/R25)
+
+Robinson, M. D., & Oshlack, A. (2010). A scaling normalization method for differential expression analysis of RNA-seq data. Genome Biology, 11(3). doi:10.1186/gb-2010-11-3-r25
+
+```{r boxplot-normalized}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample)
+melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Correlation heatmap of TMM-normalized counts
+```{r heatmap-normalized}
+pheatmap(cor(normalized_counts),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")])
+```
+
+### Correlation (Spearman) heatmap of TMM-normalized counts
+```{r spearman-heatmap-normalized}
+pheatmap(cor(normalized_counts, method="spearman"),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")])
+```
+
+### Correlation (Spearman) heatmap of log2-TMM-normalized counts
+```{r spearman-heatmap-log2-normalized}
+log2_normalized_counts = cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
+pheatmap(cor(normalized_counts, method="spearman"),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")])
+```
+
+
+### MDS plot of TMM-normalized counts
+```{r mds-normalized}
+mds(normalized_counts, k=length(colnames(normalized_counts)) - 1, condition = summarydata$Mapped) + 
+    ggtitle("With Mapped reads information")
+mds(normalized_counts, k=length(colnames(normalized_counts)) - 1, condition = summarydata$rRNA.rate) +
+    ggtitle("With rRNA ratio information")
+```
+
+### Heatmap of top 30 most expressed genes
+```{r top-count-genes, results='asis'}
+pheatmap(as.matrix(counts[select,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")])
+```
+
+## Heatmap of TMM normalized counts using list of genes
+```{r ensembl-converter}
+library(org.Mm.eg.db)
+cols <- c("ENSEMBL", "SYMBOL")
+name2ensembl = function(x){
+    symbol = AnnotationDbi::select(org.Mm.eg.db, as.character(x), cols, keytype="SYMBOL")
+    symbol = symbol %>% distinct(ENSEMBL)
+    symbol$ENSEMBL
+}
+ensembl2name = function(x){
+    symbol = AnnotationDbi::select(org.Mm.eg.db, as.character(x), cols, keytype="ENSEMBL")
+    symbol = symbol %>% distinct(SYMBOL)
+    symbol$SYMBOL
+}
+get_description = function(v)
+{
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id","external_gene_name","description") , filters=
+                    "ensembl_gene_id"    , values =as.character(v) ,mart=mart)
+    row.names(g) = g[,1]
+    g
+}
+```
+
+In general clusters correlates with samples with higher coverage, we need to be
+carefull with this.
+
+```{r markers}
+markers = read.table("~/repos/pipelines/yellen_scneuron/report/markers.txt")
+markers = intersect(name2ensembl(markers$V1),row.names(log2_normalized_counts))
+pheatmap(as.matrix(log2_normalized_counts[markers,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")],
+         main = "markers genes")
+
+```
+
+```{r helixloophelix}
+hlh = read.table("~/repos/pipelines/yellen_scneuron/report/helixloophelix.txt")
+hlh = intersect(name2ensembl(hlh$V1),row.names(log2_normalized_counts))
+pheatmap(as.matrix(log2_normalized_counts[hlh,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")],
+         main = "helix-loop-helix genes")
+```
+
+```{r ichannel}
+ichannel = read.table("~/repos/pipelines/yellen_scneuron/report/ionchannel.txt")
+ichannel = intersect(name2ensembl(ichannel$V1),row.names(log2_normalized_counts))
+pheatmap(as.matrix(log2_normalized_counts[ichannel,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")],
+         main = "ion channel genes")
+```
+
+```{r receptors}
+receptors = read.table("~/repos/pipelines/yellen_scneuron/report/receptors.txt")
+receptors = intersect(name2ensembl(receptors$V1),row.names(log2_normalized_counts))
+pheatmap(as.matrix(log2_normalized_counts[receptors,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")],
+         main = "receptors genes")
+```
+
+
+## Filtering data and clustering again
+
+First I remove samples with less than 2000 genes detected, keeping them just introduce
+noise to the analysis.
+
+Then, I apply Winsorization procedure to the expression matrix, this will change
+extreme values on a gene in only a sample. We are looking for variability coming for
+a group of sample, not only for one-two samples.
+
+```{r winsorization}
+y = DGEList(counts=counts[,summarydata$Name[ summarydata$Genes.Detected > 2000 ]])
+y = calcNormFactors(y)
+ed = cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
+
+winsorize <- function (x, fraction=0.05) {
+   if(length(fraction) != 1 || fraction < 0 ||
+         fraction > 0.5) {
+      stop("bad value for 'fraction'")
+   }
+   lim <- quantile(x, probs=c(fraction, 1-fraction))
+   x[ x < lim[1] ] <- lim[1]
+   x[ x > lim[2] ] <- lim[2]
+   x
+}
+
+# winsorize to remove 2 most extreme cells (from each side)
+wed <- t(apply(ed, 1, winsorize, fraction=2/ncol(ed)))
+```
+
+### Heatmap of genes list after filtering low coverage samples
+
+```{r filter-gene-list}
+pheatmap(as.matrix(wed[hlh,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")],
+         main = "helix-loop-helix genes after filtering")
+pheatmap(as.matrix(wed[ichannel,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")],
+         main = "ion channel genes after filtering")
+pheatmap(as.matrix(wed[receptors,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")],
+         main = "receptors genes after filtering")
+```
+
+### Clustering using the most variable genes
+
+We calculate the most variable genes and see the heatmap only with the top-100.
+
+```{r most-variable}
+# now let's recalculate the most variable genes with the winsorized matrix (wed)
+means = rowMeans(wed); vars = apply(wed,1,var); cv2 <- vars/means^2
+useForFit <- means >= unname( quantile( means[ which( cv2 > .3 ) ], .95 ) ) 
+fit <- glmgam.fit( cbind( a0 = 1, a1tilde = 1/means[useForFit] ),cv2[useForFit] )
+afit <- fit$coef["a1tilde"]/means+fit$coef["a0"]
+xg <- exp(seq( min(ed), max(ed), length.out=1000 ))
+vfit <- fit$coef["a1tilde"]/xg+fit$coef["a0"]
+
+varFitRatio <- vars/(afit*means^2)
+varorder <- order(varFitRatio,decreasing=T)
+oed <- wed[varorder,]
+
+pheatmap(as.matrix(oed[1:100,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")], clustering_distance_cols = "correlation",clustering_method = "ward")
+```
+
+
+It seems there are some clusters that are not correlated with coverage.
+
+```{r select-cluster}
+dist = as.dist(1-cor(oed[1:100,]))
+hc = hclust(dist,method = "ward.D2")
+dist = as.dist(1-cor(t(oed[1:100,])))
+hr = hclust(dist,method = "ward.D2")
+
+#heatmap.2(as.matrix(oed[1:100,]), Colv = as.dendrogram(hc), Rowv = as.dendrogram(hr), trace = "none",
+#          distfun = function(x){ as.dist(1/cor(t(x))) }, hclustfun = function(x) {hclust(x,method="ward.D2")} )
+
+cut_row = cutree(hr,k = 4)
+top = names(sort(summary(as.factor(cut_row))))[3:4]
+```
+
+At least two set of genes can classify samples. But the number of samples is 
+small, so will need to wait for the final data.
+
+```{r select-g1,results='asis'}
+select = names(cut_row[cut_row==top[1]])
+dist = as.dist(1-cor(oed[select,])^2)
+hc = hclust(dist,method = "ward.D2")
+dist = as.dist(1-cor(t(oed[select,]))^2)
+hr = hclust(dist,method = "ward.D2")
+
+pheatmap(as.matrix(oed[select[hr$order],hc$order]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")], cluster_rows = FALSE, cluster_cols = FALSE)
+#ensembl2name(select)
+
+tab = get_description(select)
+tab = tab[select[hr$order],]
+knitr::kable(tab)
+
+```
+
+
+
+```{r select-g2,results='asis'}
+select = names(cut_row[cut_row==top[2]])
+dist = as.dist(1-cor(oed[select,])^2)
+hc = hclust(dist,method = "ward.D2")
+dist = as.dist(1-cor(t(oed[select,]))^2)
+hr = hclust(dist,method = "ward.D2")
+
+pheatmap(as.matrix(oed[select[hr$order],hc$order]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")], cluster_rows = FALSE, cluster_cols = FALSE)
+#ensembl2name(select)
+
+tab = get_description(select)
+tab = tab[select[hr$order],]
+knitr::kable(tab)
+
+```
+
+
+
+
