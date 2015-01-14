@@ -254,6 +254,9 @@ mirna_dse <- DESeqDataSetFromMatrix(countData = obj@counts[rowSums(obj@counts>2)
 sizeFactors(mirna_dse) <- sizeFactors(clus_dse)
 norm_w_clus <- counts(mirna_dse,normalized=T)
 
+sizeFactors(mirna_dse) <- colSums(clus_ma[idx*above,])/mean(colSums(clus_ma[idx*above,]))
+norm_w_total_clean <- counts(mirna_dse,normalized=T)
+
 sizeFactors(mirna_dse) <- sizeFactors(clus_clean_dse)
 norm_w_clus_clean <- counts(mirna_dse,normalized=T)
 

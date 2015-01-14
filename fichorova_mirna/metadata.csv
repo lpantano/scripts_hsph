@@ -1,25 +1,25 @@
-Probeset	SampleID	Expcode	Experiment
-1	A1_serum_1	random serum	NA
-2	Exosome_21_1	mediumNoBacteria	4
-3	Exosome_3_1	PrevotellaBivia 	1
-4	Exosome_10_1	LactobacillusCrispatus	2
-5	Exosome_9_1	LactobacillusGasseri	2
-6	V_pos_34_1	T. vaginalis +virus (VEC tissue)	3
-7	Exosome_5_1	polyIC 	1
-8	Vag Swab_P05_1	TV+ vag swab	swab
-9	A12_Plasma_1	random plasma	NA
-10	Exosome_1_2	mediumNoBacteria	1
-11	Exosome_4_1	MALP-2	1
-12	Exosome_11_1	PrevotellaBivia 	2
-13	PIC_46_1	polyIC (VEC tissue)	3
-14	Lc_16_1	Lactobacillus crispatus(VEC)	3
-15	Exosome_7_1	PrevotellaBivia_PolyIC 	1
-16	VagSwab_P06_1	TV+ vag swab	swab
-17	Exosome_20_1	Tvaginalis_virus 	4
-18	Exosome_2_3	LactobacillusCrispatus	1
-19	Exosome_8_1	mediumNoBacteria	2
-20	Exosome_12_1	AtopobiumVaginae	2
-21	v_neg_43_1	T. vaginalis -virus (VEC tissue)	3
-22	Med_25_1	polyIC  (VEC tissue)	3
-23	VagSwab_P04_1	TV- vag swab	swab
-24	Vag_Swab_P07_1	TV- vag swab	swab
+Probeset	SampleID	Expcode	Experiment	Group
+1	A1_serum_1	random serum	NA	A1_serum
+2	Exosome_21_1	mediumNoBacteria	4	No bacteria
+3	Exosome_3_1	PrevotellaBivia 	1	P. bivia
+4	Exosome_10_1	LactobacillusCrispatus	2	L. crispatus
+5	Exosome_9_1	LactobacillusGasseri	2	L. gasseri
+6	V_pos_34_1	T. vaginalis +virus (VEC tissue)	3	tv
+7	Exosome_5_1	polyIC 	1	poly(I:C)
+8	Vag Swab_P05_1	TV+ vag swab	swab	swab
+9	A12_Plasma_1	random plasma	NA	random
+10	Exosome_1_2	mediumNoBacteria	1	No bacteria
+11	Exosome_4_1	MALP-2	1	MALP-2
+12	Exosome_11_1	PrevotellaBivia 	2	P. bivia
+13	PIC_46_1	polyIC (VEC tissue)	3	swap
+14	Lc_16_1	Lactobacillus crispatus(VEC)	3	L. crispatus
+15	Exosome_7_1	PrevotellaBivia_PolyIC 	1	P. bivia with poly(I:C)
+16	VagSwab_P06_1	TV+ vag swab	swab	swab
+17	Exosome_20_1	Tvaginalis_virus 	4	Tv
+18	Exosome_2_3	LactobacillusCrispatus	1	L. crispatus
+19	Exosome_8_1	mediumNoBacteria	2	No bacteria
+20	Exosome_12_1	AtopobiumVaginae	2	A. vaginae
+21	v_neg_43_1	T. vaginalis -virus (VEC tissue)	3	swag
+22	Med_25_1	polyIC  (VEC tissue)	3	polyic
+23	VagSwab_P04_1	TV- vag swab	swab	swab
+24	Vag_Swab_P07_1	TV- vag swab	swab	swab
