@@ -429,7 +429,7 @@ write.table(count_ma,fn_count,sep="\t")
 ### DEG mirnas in N2 strain (day5 / day0)
 
 ```{r de-n2,results='asis'}
-res <- results(dse, contrast = c("conditions","n2d5","n2d0"))
+res <- results(dse, contrast = c("conditions","n2d5","n2d0"),cooksCutoff = FALSE)
 DESeq::plotMA(as.data.frame(res))
 res <- dse_handle(res)
 fn = paste0(root_file,"mirna_n2_de_genes.txt")
@@ -444,7 +444,7 @@ knitr::kable(head(res[order(res$pvalue),]))
 ### DEG mirnas in KO strain (day5 / day0)
 
 ```{r de-mir71,results='asis'}
-res <- results(dse, contrast = c("conditions","mir71d5","mir71d0"))
+res <- results(dse, contrast = c("conditions","mir71d5","mir71d0"),cooksCutoff = FALSE)
 DESeq::plotMA(as.data.frame(res))
 res <- dse_handle(res)
 fn = paste0(root_file,"mirna_ko_de_genes.txt")
@@ -598,3 +598,128 @@ knitr::kable(head(res[order(res$pvalue),]))
 ```
 
 Result seems to be consistent.
+
+
+## Considering only perfect miRNA match
+
+```{r de-perfect}
+exact_match = isomiRs::makeCounts(obj,ref = T, iso5 = T,iso3 = T,add = T,mism = T)
+keep = grepl( "ref",row.names(exact_match@counts) )
+exact_count = exact_match@counts[keep,]
+
+dse <- DESeqDataSetFromMatrix(countData = exact_count[rowMeans(exact_count)>5,],
+                       colData = design,
+                       design = ~ conditions)
+sizeFactors(dse) = sizeFactors(clus_clean_dse)
+dse = estimateDispersions(dse)
+dse = nbinomWaldTest(dse)
+plotDispEsts(dse)
+#resultsNames(dse)
+```
+
+```{r tables-perfect}
+rlog_ma = assay(rlog(dse))
+count_ma = counts(dse, normalized=TRUE)
+fn_log = paste0(root_file,"log_matrix_perfect.txt")
+write.table(rlog_ma,fn_log,sep="\t")
+fn_count = paste0(root_file,"count_matrix_perfect.txt")
+write.table(count_ma,fn_count,sep="\t")
+```
+
+[get table normalized to log2](`r get_report_links(fn_log)`)
+[get table normalized count table](`r get_report_links(fn_count)`)
+
+
+## DE along time
+
+### DEG mirnas in N2 strain (day5 / day0)
+
+```{r de-n2-perfect,results='asis'}
+res <- results(dse, contrast = c("conditions","n2d5","n2d0"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_n2_de_genes_perfect.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](`r get_report_links(fn)`)
+
+
+### DEG mirnas in KO strain (day5 / day0)
+
+```{r de-mir71-perfect,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d5","mir71d0"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_ko_de_genes_perfect.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+``` 
+
+[get table](`r get_report_links(fn)`)
+
+## DE between strains
+
+### DEG mirnas at day 0 (KO / n2)
+
+```{r de-nw-ko-day0-perfect,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d0","n2d0"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_day0_de_genes_perfect.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](`r get_report_links(fn)`)
+
+
+### DEG mirnas at day 5 (KO / n2)
+
+```{r de-nw-ko-day5-perfect,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d5","n2d5"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_day5_de_genes_perfect.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](`r get_report_links(fn)`)
+
+
+## DEG mirnas between N2 and KO taking into account time
+
+
+```{r de-condition-time-perfect,results='asis'}
+
+dse <- DESeqDataSetFromMatrix(countData = exact_count[rowMeans(exact_count)>5,],
+                       colData = design,
+                       design = ~ sample*time)
+sizeFactors(dse) = sizeFactors(clus_clean_dse)
+dse = estimateDispersions(dse)
+dse = nbinomWaldTest(dse)
+plotDispEsts(dse)
+#resultsNames(dse)
+res <- results(dse,name = "samplen2.timed5")
+#res <- dse_handle(res)
+#write.table(res,"mirna_n2ko_time_de_genes.txt",sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+
+```{r plot-pvalue-perfect}
+hist(res$pvalue)
+```
+
+
+## Day0/Day5 ratio
+```{r ratio-perfect}
+ggplot(melt(get_ratio_group(count_ma))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized without repeats and rRNA")
+```
+
