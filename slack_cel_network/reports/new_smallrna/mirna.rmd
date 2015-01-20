@@ -600,7 +600,7 @@ knitr::kable(head(res[order(res$pvalue),]))
 Result seems to be consistent.
 
 
-## Considering only perfect miRNA match
+# Considering only perfect miRNA match
 
 ```{r de-perfect}
 exact_match = isomiRs::makeCounts(obj,ref = T, iso5 = T,iso3 = T,add = T,mism = T)
@@ -723,3 +723,126 @@ ggplot(melt(get_ratio_group(count_ma))) +
     ggtitle("normalized without repeats and rRNA")
 ```
 
+# DEG of isomirs
+
+The annotation going in the next order:
+
+* after the word `iso` the changes are coded:
+
+** trimming at 5' end: `u-N` indicates that the isomiR 5' position is `upstream` of the miRBase 5' position, so `N` nucleotides has been added to the ref miRNA, meaning that the sequences starts before the miRBase 5' position. `d-N` indicates the isomiR 5' position is `downstram` of the miRBase 5' position, so `N` nucleotides has been clipped to the ref miRNA, meaning that the sequences starts after the miRBase 5' position 
+
+** trimming at 3' end: `u-N` indicates that the isomiR 3' position is `upstream` of the miRBase 3' position, so `N` nucleotides has been added to the ref miRNA, meaning that the sequences ends after the miRBase 3' position. `d-N` indicates that  the isomiR 3' position is `downstream` of the miRBase 3' position, so `N` nucleotides has been clipped to the ref miRNA, meaning that the sequences ends before the miRBase 3' position  
+ ** addition at 3' end: `u-N` indicates that `N` nucleotides has beed added to the end of the sequences as non-template nucleotides
+
+** mismatches: `9GT` indicates at position `9`, a `T` has been changed to `G`. 
+
+
+As example, `cel-miR-90-3p.iso.0.u-CT.u-T.0` means isomirs ends after the miRBase 3' end annotation and has an addition of `T` at the 3' end. 
+
+
+```{r de-isomir}
+all_match = isomiRs::makeCounts(obj,ref = T, iso5 = T,iso3 = T,add = T,mism = T)
+
+dse <- DESeqDataSetFromMatrix(countData = all_match@counts[rowMeans(all_match@counts)>5,],
+                       colData = design,
+                       design = ~ conditions)
+sizeFactors(dse) = sizeFactors(clus_clean_dse)
+dse = estimateDispersions(dse)
+dse = nbinomWaldTest(dse)
+plotDispEsts(dse)
+#resultsNames(dse)
+```
+
+```{r tables-isomir}
+rlog_ma = assay(rlog(dse))
+count_ma = counts(dse, normalized=TRUE)
+fn_log = paste0(root_file,"log_matrix_isomirs.txt")
+write.table(rlog_ma,fn_log,sep="\t")
+fn_count = paste0(root_file,"count_matrix_isomirs.txt")
+write.table(count_ma,fn_count,sep="\t")
+```
+
+[get table normalized to log2](`r get_report_links(fn_log)`)
+[get table normalized count table](`r get_report_links(fn_count)`)
+
+
+## DE along time
+
+### DEG mirnas in N2 strain (day5 / day0)
+
+```{r de-n2-isomir,results='asis'}
+res <- results(dse, contrast = c("conditions","n2d5","n2d0"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_n2_de_genes_isomirs.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](`r get_report_links(fn)`)
+
+
+### DEG mirnas in KO strain (day5 / day0)
+
+```{r de-mir71-isomir,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d5","mir71d0"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_ko_de_genes_isomirs.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+``` 
+
+[get table](`r get_report_links(fn)`)
+
+## DE between strains
+
+### DEG mirnas at day 0 (KO / n2)
+
+```{r de-nw-ko-day0-isomir,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d0","n2d0"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_day0_de_genes_isomirs.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](`r get_report_links(fn)`)
+
+
+### DEG mirnas at day 5 (KO / n2)
+
+```{r de-nw-ko-day5-isomir,results='asis'}
+res <- results(dse, contrast = c("conditions","mir71d5","n2d5"),cooksCutoff = FALSE)
+DESeq::plotMA(as.data.frame(res))
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_day5_de_genes_isomirs.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](`r get_report_links(fn)`)
+
+
+## DEG mirnas between N2 and KO taking into account time
+
+
+```{r de-condition-time-isomir,results='asis'}
+
+dse <- DESeqDataSetFromMatrix(countData = all_match@counts[rowMeans(all_match@counts)>5,],
+                       colData = design,
+                       design = ~ sample*time)
+sizeFactors(dse) = sizeFactors(clus_clean_dse)
+dse = estimateDispersions(dse)
+dse = nbinomWaldTest(dse)
+plotDispEsts(dse)
+#resultsNames(dse)
+res <- results(dse,name = "samplen2.timed5")
+res <- dse_handle(res)
+fn = paste0(root_file,"mirna_n2vsmir71_alongtime_genes_isomirs.txt")
+write.table(res,fn,sep="\t")
+knitr::kable(head(res[order(res$pvalue),]))
+```
+
+[get table](`r get_report_links(fn)`)
