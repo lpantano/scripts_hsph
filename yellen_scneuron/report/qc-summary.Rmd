@@ -13,6 +13,7 @@ output:
 ```{r custom}
 source("~/repos/myRfunctions/transactions.R")
 dn <- "yellen_scneuron/report"
+files_path = "~/repos/pipelines/yellen_scneuron/report/"
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                       eval=TRUE, fig.width= 9,
@@ -286,7 +287,19 @@ pheatmap(as.matrix(wed[ichannel,]),annotation = summarydata[,c("rRNA.rate","Gene
          main = "ion channel genes after filtering")
 pheatmap(as.matrix(wed[receptors,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")],
          main = "receptors genes after filtering")
+fn_ichannel = paste0(files_path, "ichannel_filter_counts.txt")
+write.table(ed[ichannel,],fn_ichannel)
+fn_hlh = paste0(files_path, "hlh_filter_counts.txt")
+write.table(ed[hlh,],fn_hlh)
+fn_receptors = paste0(files_path, "receptors_filter_counts.txt")
+write.table(ed[receptors,],fn_receptors)
 ```
+
+[get ionchannel table](`r get_report_links(fn_ichannel)`)
+
+[get hlh table](`r get_report_links(fn_hlh)`)
+
+[get receptors table](`r get_report_links(fn_receptors)`)
 
 ### Clustering using the most variable genes
 
@@ -361,6 +374,32 @@ knitr::kable(tab)
 
 ```
 
+## DE between  GABAergic vs dopamine neurons
+
+I did DE of the 3 dopa samples ("AL_26s_A8_R","AL_26s_B9_R","AL_26s_B12_R") 
+against the rest to see if any ion channel gene came up. We have a few of them
+than seem different between the two group of cells.
+
+```{r de, results='asis'}
+keep = summarydata$Name[ summarydata$Genes.Detected > 2000 ]
+dopa = c("AL_26s_A8_R","AL_26s_B9_R","AL_26s_B12_R")
+group = rep("gaba", length(keep))
+names(group) = keep
+group[dopa] = "dopa"
+design  = data.frame(row.names = keep, type = group)
+dse = DESeqDataSetFromMatrix( counts[,keep], design,formula("~ type") )
+dse = DESeq(dse)
+res = results(dse)
+res$gene = row.names(res)
+tab = as.data.frame(res[ichannel,]) %>% filter(padj<0.1)
+gene_desc = get_description(tab$gene)
+tab = cbind(gene_desc[tab$gene,],tab[,1:6])
+
+rlog_ma = assay(rlog(dse))
+pheatmap(rlog_ma[tab$ensembl_gene_id,],annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")])
+
+knitr::kable(tab, row.names = FALSE)
+```
 
 
 
