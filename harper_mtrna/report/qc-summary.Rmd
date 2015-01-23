@@ -38,6 +38,7 @@ library(edgeR)
 library(CHBUtils)
 library(ggbio)
 library(dplyr)
+library(pheatmap)
 project_summary = "/home/lpantano/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/project-summary.csv"
 counts_file = "/home/lpantano/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/combined.counts"
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
@@ -232,6 +233,10 @@ ggheatmap.show(p)
 
 # Differential expression
 
+
+I merged technical replicates together. so now we have 6 samples. I just summed up the counts
+of both replicates.
+
 ```{r de-setup}
 library(DESeq2)
 devtools::load_all("~/repos/DEGreport/")
@@ -320,6 +325,9 @@ for(i in seq(length(all_results))) {
 
 ## DEGreport
 
+We plot some information about how p-values is correlated with the average mean or
+the standard desviation. We should see the same distribution for each p-value bin.
+
 ```{r get-groups}
 get_groups <- function(d, comp, condition)
 {
@@ -331,25 +339,6 @@ get_groups <- function(d, comp, condition)
 summarydata_deg = summarydata[names(counts),]
 ```
 
-### Mean of DEG genes versus background
-```{r DEGreport-MB}
-for(i in seq(length(all_results))) {
-  g <- get_groups(summarydata_deg, names(all_results)[i], condition)
-  detag <- row.names(subset(as.data.frame(all_results[[i]]), padj <= 0.1))
-  print(degMB(detag, g[[1]], g[[2]], rlogMat) + 
-  ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i])))
-}
-```
-
-### Variance of DEG genes versus background
-```{r DEGreport-VB}
-for(i in seq(length(all_results))) {
-  g <- get_groups(summarydata_deg, names(all_results)[i], condition)
-  detag <- row.names(subset(as.data.frame(all_results[[i]]), padj <= 0.1))
-  print(degVB(detag, g[[1]], g[[2]], rlogMat) + 
-  ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i])))
-}
-```
 
 ### Pvalues-vs-Mean
 ```{r DEGreport-M}
@@ -368,6 +357,13 @@ for(i in seq(length(all_results))) {
 ```
 
 ### Mean-vs-Variation
+
+Always it good to plot the correlation between the average expression of the gene,
+and the variance of the gene. In this case it was took the minimum average expression among the two groups, and
+the maximum variance expression among the both groups. That will tell if there is some problems with some genes with
+low expressed genes in one group and high variance in the other, that potentially could be a problem. Normally this
+affects to unbalanced groups. Not the case here.
+
 ```{r DEGreport-MV}
 for(i in seq(length(all_results))) {
   g <- get_groups(summarydata_deg, names(all_results)[i], condition)
@@ -407,14 +403,18 @@ res$gene = row.names(res)
 res = res %>% filter(padj<0.1)
 res_anno = get_description(res$gene)
 tab_anno = cbind(res,res_anno[res$gene,])
-knitr::kable(head(tab_anno))
+knitr::kable(head(tab_anno[ ,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description") ]))
 ```
 
 
 ## MRPP genes
+No significant MRPP genes
+
 
 ```{r mrpp-tables,results='asis'}
-knitr::kable(tab_anno %>% filter(grepl("TRMT",external_gene_name)))
+knitr::kable(tab_anno %>% filter(grepl("HSD17B10",external_gene_name) & 
+                                     grepl("TRMT10C",external_gene_name) &
+                                     grepl("KIAA0391",external_gene_name) ))
 ```
 
 ## Mitochondrial genes
@@ -426,7 +426,7 @@ tab_anno$class[grepl("tRNA",tab_anno$description)] = "tRNA"
 ggplot(tab_anno %>% filter(chromosome_name=="MT"))+
     geom_point(aes(log2FoldChange,padj,colour=class))
 
-knitr::kable( tab_anno %>% filter(chromosome_name=="MT") )
+knitr::kable( tab_anno[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter(chromosome_name=="MT") )
 ```
 
 ## showing pvalue of tRNA genes and MRPP genes
@@ -437,21 +437,25 @@ knitr::kable( tab_anno %>% filter(chromosome_name=="MT") )
   res_anno = get_description(res$gene)
   tab_anno_non_filtered = cbind(res,res_anno[res$gene,])
 
-knitr::kable(tab_anno_non_filtered %>% filter(grepl("TRMT",external_gene_name) & pvalue<0.05 ) )
+knitr::kable(tab_anno_non_filtered[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter(grepl("HSD17B10",external_gene_name) | 
+                                     grepl("TRMT10C",external_gene_name) |
+                                     grepl("KIAA0391",external_gene_name) ) )
 
 
 ```
 
 
-`r knitr::kable( tab_anno_non_filtered %>% filter( grepl("MT-T",external_gene_name) & pvalue<0.06 ) )`
+`r knitr::kable( tab_anno_non_filtered[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter( grepl("MT-T",external_gene_name) & pvalue<0.06 ) )`
 
 ## heatmap of tRNA genes
+
+Just with the idea to see the general pattern of these genes in the samples
 
 ```{rtrna-heatmap} 
 mtrna_genes = tab_anno_non_filtered %>% filter( grepl("MT-T",external_gene_name) & !is.na(pvalue)  ) %>% dplyr::select(gene)
 ma = rlogMat[mtrna_genes[,1],]
 row.names(ma) = tab_anno_non_filtered[row.names(ma),"external_gene_name"]
-pheatmap(ma, clustering_distance_rows = "correlation", clustering_distance_cols = "correlation", clustering_method = "ward",scale = "row")
+pheatmap(ma, clustering_distance_rows = "correlation", clustering_distance_cols = "correlation", clustering_method = "ward")
 
 ```
 
@@ -495,7 +499,9 @@ tracks(type,pvalue,padj)
 ```
 
 
-# DE (ignoring paired data)
+# DE (ignoring paired-end data)
+
+I was counting just as if they were single reads.
 
 ```{r de-single, cache=TRUE}
 single_counts = read.table("~/orch/groups/harper_rnaseq/mtrna/merged/count_nonB.tsv", header=T,row.names=1)
@@ -517,13 +523,13 @@ tab_anno_single = cbind(res,res_anno[res$gene,])
 
 ```
 
-### tRNA genes
+### tRNA genes and MRPP
 
 
-`r knitr::kable(tab_anno_single %>% filter(grepl("TRMT",external_gene_name) & pvalue<0.05 ) )`
+`r knitr::kable(tab_anno_single[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter(grepl("HSD17B10",external_gene_name) |  grepl("TRMT10C",external_gene_name) | grepl("KIAA0391",external_gene_name)  ))`
 
 
-`r knitr::kable( tab_anno_single %>% filter( grepl("MT-T",external_gene_name) ) )`
+`r knitr::kable( tab_anno_single[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter( grepl("MT-T",external_gene_name) ) )`
 
 It is worse to count data as single reads.
 
@@ -551,12 +557,12 @@ tab_anno_all = cbind(res,res_anno[res$gene,])
 
 ```
 
-### tRNA genes
+### tRNA genes and MRPP
 
-`r knitr::kable(tab_anno_all %>% filter(grepl("TRMT",external_gene_name) & pvalue<0.3 ) ) `
+`r knitr::kable(tab_anno_all[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter(grepl("HSD17B10",external_gene_name) | grepl("TRMT10C",external_gene_name) | grepl("KIAA0391",external_gene_name))) `
 
 
-`r knitr::kable( tab_anno_all %>% filter( grepl("MT-T",external_gene_name) ) ) `
+`r knitr::kable( tab_anno_all[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter( grepl("MT-T",external_gene_name) ) ) `
 
 
 It is worse to count multi-mapped reads.
@@ -565,7 +571,7 @@ It is worse to count multi-mapped reads.
 
 # Coverage along tRNA-Met
 
-MT-TM is the Met-tRNA
+MT-TM is the Met-tRNA. The lower graph is a zoom in of the tRNA genes.
 
 
 ```{r met-coverage}
@@ -597,17 +603,18 @@ gplot_cov = ggplot( coverage_dat, aes(y=norm,x=V2, colour=sample) ) +
 
 genes = ggplot(gr, aes(fill = type)) + geom_rect() + scale_fill_brewer() + geom_text(aes(label=names,x=start,y=c(0.8,1,2,1.2,0.8)),size=5,hjust=0 )
 
-tracks(genes,gplot_cov,xlim = c(3932,4744 ) )
+tracks(genes+xlim(3932,4744 ),gplot_cov+xlim(3932,4744 ))
 
-
-tracks(genes,gplot_cov+ylim(0,2000),xlim = c(4250,4470 ))
+p1 = genes+xlim(4250,4470)
+p2 = gplot_cov+ylim(0,2000)+xlim(4250,4470)
+tracks(p1,p2 )
 
 ```
 
 
 # Coverage along tRNA-Lys
 
-MT-TL is the Lys-tRNA
+MT-TK is the Lys-tRNA
 
 ```{r lys-coverage}
 samples = c("D1","D2","D3","T1","T2","T3")
@@ -638,10 +645,10 @@ gplot_cov = ggplot( coverage_dat, aes(y=norm,x=V2, colour=sample) ) +
 
 genes = ggplot(gr, aes(fill = type)) + geom_rect() + scale_fill_brewer() + geom_text(aes(label=names,x=start,y=c(0.8,1,0.3)),size=5,hjust=0 )
 
-tracks(genes,gplot_cov,xlim = c(8230,8450 ) )
+tracks(genes+ xlim(8230,8450) ,gplot_cov + xlim(8230,8450 ) )
 
 
-tracks(genes,gplot_cov+ylim(0,2000),xlim = c(8290,8369 ))
+tracks(genes+ xlim(8290,8369) ,gplot_cov+ylim(0,2000)+ xlim(8290,8369))
 
 ```
 
