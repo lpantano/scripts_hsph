@@ -1,0 +1,332 @@
+---
+output:
+    knitrBootstrap::bootstrap_document:
+        theme: readable
+        highlight: zenburn
+        theme.chooser: TRUE
+        highlight.chooser: TRUE
+    html_document:
+        toc: true
+        highlight: zenburn
+
+---
+```{r custom-code}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "slack_mtrna/"
+path_files = "~/repos/pipelines/slack_cel_network/reports/"
+```
+
+
+```{r setup, echo=FALSE, eval=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+                      eval=TRUE,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+render_2_drop("~/repos/pipelines/slack_cel_network/network/interaction.rmd",dn)
+
+```
+# Introduction
+
+The main idea is to find miRNA that correlated to genes that have been found deregulated in RNAseq data. 
+Currently using targetscanworm for the miRNA-gene pairs matrix.
+miRNA-mRNA interactions with (negative) correlation < -.7 and FDR<0.1 are considered.
+
+# Load data
+
+
+```{r load}
+suppressMessages(library(DESeq2,quietly=TRUE))
+library(ggplot2)
+library(plyr)
+
+mirna<-read.table("~/repos/pipelines/slack_cel_network/reports/new_smallrna/log_matrix_perfect.txt",header=T,row.names=1)
+row.names(mirna)<-sub(".ref.0.0.0.0","",row.names(mirna))
+
+
+mrna<-read.table("~/repos/pipelines/slack_cel_network/reports/rlog_mat.txt",header=T,row.names=1)
+names(mrna) = c("N2_1_Day0","N2_1_Day5","N2_2_Day0","N2_2_Day5","N2_3_Day0","N2_3_Day5",     "mir71_1_Day0", "mir71_1_Day5","mir71_2_Day0","mir71_2_Day5","mir71_3_Day0","mir71_3_Day5")
+#tf<-read.table("tf.list2",sep=" ")
+#chea<-read.table("chea-database",header=F,sep=",")
+
+n2_labels = c("N2_1_Day0","N2_1_Day5","N2_2_Day0","N2_2_Day5","N2_3_Day0","N2_3_Day5")
+ko_labels = c("mir71_1_Day0","mir71_1_Day5","mir71_2_Day0","mir71_2_Day5","mir71_3_Day0","mir71_3_Day5")
+
+```
+
+
+Load target~miRNA (miRMAP) table and deregulated genes (from RNAseq data)
+```{r load-targets}
+target<-read.table("~/orch/scratch/celegans_network/celegans_network_raw/data/targets.csv",as.is=c(TRUE,TRUE))
+target_tf<-read.table("~/orch/scratch/celegans_network/celegans_network_raw/data/aging_master_table.txt",as.is=c(TRUE,TRUE))
+```
+
+
+# Methods
+Create function to detect negative correlation and get pvalue.
+Very basic method: pearson correlation.
+```{r cor-functions}
+getcor_gene<-function(g,logmrna="",logmirna=""){
+  #print(g)
+  mir<-target[target[,2]==g,1]
+  mir<-intersect(mir,row.names(logmirna))
+  if (length(mir)>0){
+  gexp=as.numeric(logmrna[g,])
+  #print(mir)
+  corlist<-do.call("rbind",(lapply(mir,function(m){
+    mexp<-unlist(logmirna[m,])
+    #print(mexp)
+    #print(gexp)
+    c<-cor.test(gexp,mexp,method="pearson")
+    return(data.frame(rho=c$estimate,pvalue=c$p.value))
+    })))
+  #print(corlist)
+  return(cbind(data.frame(g=g,mir=mir), corlist))
+  }else{
+    return(data.frame(g=g,mir="mir",rho=NA,pvalue=NA))
+  }
+}
+
+
+getcor_mirna<-function(mir,logmrna="",logmirna=""){
+  #print(g)
+  genes<-target[target[,1]==mir,2]
+  genes<-intersect(genes,row.names(logmrna))
+  if (length(genes)>0){
+  mexp=as.numeric(logmirna[mir,])
+  #print(mir)
+  corlist<-do.call("rbind",(lapply(genes,function(g){
+    gexp<-unlist(logmrna[g,])
+    #print(mexp)
+    #print(gexp)
+    c<-cor.test(gexp,mexp,method="pearson")
+    return(data.frame(rho=c$estimate,pvalue=c$p.value))
+    })))
+  #print(corlist)
+  return(cbind(data.frame(g=genes,mir=mir), corlist))
+  }else{
+    return(data.frame(g="genes",mir=mir,rho=NA,pvalue=NA))
+  }
+}
+#testing 
+#getcor("WBGene00000012",mrna[, n2_labels],mirna[, n2_labels])
+```
+
+
+```{r cor-wrapper}
+getTargets = function(de,genes,micros,fn_cor){
+    res<-do.call("rbind",lapply(de,fn_cor,logmrna=genes,logmirna=micros))
+    res = res %>% filter(!is.na(rho) & rho < 0) %>% mutate(adj=p.adjust(pvalue,method="BH"))
+    hist(res$pvalue)
+    res[order(res$rho,res$pvalue),]
+}
+```
+
+apply function to data
+
+
+```{r n2-cor, cache=FALSE}
+n2_de<-read.table("~/repos/pipelines/slack_cel_network/reports/n2_de_genes.txt",as.is=TRUE)
+n2_deg_mirna<-read.table("~/repos/pipelines/slack_cel_network/reports/new_smallrna/mirna_n2_de_genes_perfect.txt",header=T,row.names=1)
+row.names(n2_deg_mirna)<-sub(".ref.0.0.0.0","",row.names(n2_deg_mirna))
+n2_res = getTargets(as.character(n2_de$id), mrna[, n2_labels], mirna[, n2_labels],getcor_gene)
+n2_mir_res = getTargets(as.character(row.names(n2_deg_mirna)), mrna[, n2_labels], mirna[, n2_labels],getcor_mirna)
+n2_both_res = getTargets(as.character(row.names(n2_deg_mirna)), mrna[n2_de$id, n2_labels], mirna[, n2_labels],getcor_mirna)
+n2_res_sign = n2_res %>% filter(adj<0.1)
+n2_mir_res_sign = n2_mir_res %>% filter(adj<0.1)
+n2_both_res_sign = n2_both_res %>% filter(adj<0.1)
+
+ko_de<-read.table("~/repos/pipelines/slack_cel_network/reports/ko_de_genes.txt",as.is=TRUE)
+ko_deg_mirna<-read.table("~/repos/pipelines/slack_cel_network/reports/new_smallrna/mirna_ko_de_genes_perfect.txt",header=T,row.names=1)
+row.names(ko_deg_mirna)<-sub(".ref.0.0.0.0","",row.names(ko_deg_mirna))
+ko_res = getTargets(as.character(ko_de$id), mrna[, ko_labels], mirna[, ko_labels],getcor_gene)
+ko_mir_res = getTargets(as.character(row.names(ko_deg_mirna)), mrna[, n2_labels], mirna[, n2_labels],getcor_mirna)
+ko_both_res = getTargets(as.character(row.names(ko_deg_mirna)), mrna[ko_de$id, ko_labels], mirna[, ko_labels],getcor_mirna)
+ko_res_sign = ko_res %>% filter(adj<0.1)
+ko_mir_res_sign = ko_mir_res %>% filter(adj<0.1)
+ko_both_res_sign = ko_both_res %>% filter(adj<0.1)
+
+
+```
+
+
+# Results 
+
+We are using DEG miRNA and DEG genes. We calculate the correlation for the pairs
+annotated in targetscanWorm and apply a p.adjust correction to keep only
+pairs with correlation < -.7 and p-adjusted < 0.1 (10%)
+
+## N2
+
+
+### Results for miRNA-mRNA
+
+Just relations with FDR<0.1 and rho< -0.7. Total of `r nrow(n2_both_res_sign)` interactions
+
+
+by `r length(unique(n2_both_res_sign$mir))` miRNAs
+
+```{r n2_genes_mirna}
+
+mir.sum<-ddply(n2_both_res_sign,"mir",summarise,N=length(mir))
+ggplot(mir.sum,aes(N))+geom_bar()+
+  theme_bw() + labs(list(title="Distribution of genes/miRNA",x="targets per miRNA"))
+```
+
+and `r length(unique(n2_both_res_sign$g))` genes
+
+```{r n2_mirna_genes}
+
+mir.sum<-ddply(n2_both_res_sign,"g",summarise,N=length(mir))
+ggplot(mir.sum,aes(N))+geom_bar()+
+  theme_bw() + labs(list(title="Distribution of sites/gene ",x="miRNA per gene"))
+```
+
+### Network
+
+Some miRNA target more than one gene (top 60 interactions)
+
+```{r n2_network}
+plotNetwork = function(dd){
+    suppressMessages(library(igraph))
+    gr<-graph.data.frame(dd[1:60,c(2,1)],directed = F)
+    V(gr)$color<-"steelblue"
+    V(gr)$color[grep("cel-",V(gr)$name)]<-"yellow2"
+    V(gr)$name[grepl("WBG",V(gr)$name)]=""
+    V(gr)$name<-sub("cel-","",V(gr)$name)
+    plot.igraph(gr, layout=layout.auto,vertex.color=V(gr)$color,vertex.label.cex=1,vertex.size=15,edge.width=2,vertex.label.color="black")
+}
+
+plotNetwork(n2_both_res_sign)
+
+```
+
+### Some examples
+
+```{r n2_examples}
+
+plotTop = function(dd, genes, micros, labels, groups){
+    for (i in 1:5){
+        mie<-unlist(micros[as.character(dd[i,2]),labels])
+        me<-unlist(genes[as.character(dd[i,1]),labels])
+        d<-data.frame(mir=mie,mrna=me,groups=factor(groups,levels=unique(groups)))
+        p<-ggplot(d)+
+            geom_point(aes(mir,mrna,colour=groups))+
+            scale_color_discrete("miRNA exp")+
+            theme_bw()+
+            labs(list(x=as.character(dd[i,2]),
+                      y=as.character(dd[i,1])))
+        plot(p)
+        }
+}
+con = c("Day0","Day5","Day0","Day5","Day0","Day5")
+plotTop(n2_both_res_sign, mrna, mirna, n2_labels, con)
+
+```
+
+
+### Enrichment in DEG miRNAs/Genes
+
+We assume that should be an enrichment of de-regulated miRNA and genes that have been detected here.
+To calculate this, we create a background distribution doing 400 permutations. Each time, we randomly select the same number of miRNAs (we detected in the analysis) from the list of possible miRNA-Gene pairs. That list is containing only expressed miRNA in this dataset. 
+After that we can calculate the overlap between the DEG list and the real miRNAs or the random miRNAs. 
+To get a pvalue of enrichment, we apply: sum(real_overlap > random_overlap)/401
+
+If the overlap between the miRNAs targetting genes and DEG miRNAs is bigger than the values comming from 
+the permutations, we can say that the overlap is above a random noise.
+
+For miRNA:
+
+```{r n2_mir_enrichment}
+getEnrichment = function(dd, sign, interaction, exp, col){
+    require(gplots)
+    interaction = intersect(interaction,exp)
+    common = length(intersect(as.character(unique(dd[,col])),as.character(sign)))
+    #venn( list( interaction=as.character(unique(dd[,col])),DEG=as.character(sign) ) )
+    random<-unlist(lapply(1:400,function(x){
+        r<-sample( as.character(exp),length( unique(dd[,col]) ) ) # random interaction miRNAs
+        o<-length(intersect(as.character(sign),as.character(r))) # intersect random interaction w dergulated mirna
+        return(o)
+        }))
+    plot(density(unlist(random)),xlim=c(min(c(common,random)),max(c(common,random))),col="steelblue",xlab="")
+    abline(v=common,col="red")
+    text(common,0.02,format(sum(random>=common)/401, digit=3),pos = 2)
+    
+}
+
+
+getEnrichment(n2_both_res_sign, row.names(n2_deg_mirna), unique(target[,1]), row.names(mirna), 2)
+title("miRNA with interaction enriched in DEG miRNAs along age")
+```
+
+For genes: In this case I randomly select the same number of genes we detec as targeted by miRNAs.
+
+```{r n2_gene_enrichment}
+getEnrichment(n2_both_res_sign, n2_de$id ,unique(target[,2]), row.names(mrna), 1)
+title("Genes with interaction enriched in DEG genes along age")
+```
+
+```
+
+## mir71 KO
+
+### Results for miRNA-mRNA
+
+Just relations with FDR<0.1 and rho< -0.7. Total of `r nrow(ko_both_res_sign)` interactions
+
+
+by `r length(unique(ko_both_res_sign$mir))` miRNAs
+
+```{r ko_genes_mirna}
+
+mir.sum<-ddply(ko_both_res_sign,"mir",summarise,N=length(mir))
+ggplot(mir.sum,aes(N))+geom_bar()+
+  theme_bw() + labs(list(title="Distribution of genes/miRNA",x="targets per miRNA"))
+```
+
+and `r length(unique(ko_both_res_sign$g))` genes
+
+```{r ko_mirna_genes}
+
+mir.sum<-ddply(ko_both_res_sign,"g",summarise,N=length(mir))
+ggplot(mir.sum,aes(N))+geom_bar()+
+  theme_bw() + labs(list(title="Distribution of sites/gene ",x="miRNA per gene"))
+```
+
+### Network
+
+Some miRNA target more than one gene (top 60 interactions)
+
+```{r ko_network}
+
+plotNetwork(ko_both_res_sign)
+
+```
+
+### Some examples
+
+```{r ko_examples}
+
+con = c("Day0","Day5","Day0","Day5","Day0","Day5")
+plotTop(ko_both_res_sign, mrna, mirna, ko_labels, con)
+
+```
+
+
+### Enrichment in DEG miRNAs/Genes
+
+For miRNA
+
+```{r ko_mir_enrichment}
+
+getEnrichment(ko_both_res_sign, row.names(ko_deg_mirna), unique(target[,1]), row.names(mirna), 2)
+title("miRNA with interaction enriched in DEG miRNAs along age")
+```
+
+For Genes
+
+```{r ko_gene_enrichment}
+getEnrichment(ko_both_res_sign, ko_de$id ,unique(target[,2]), row.names(mrna), 1)
+title("Genes with interaction enriched in DEG genes along age")
+```
+
+
