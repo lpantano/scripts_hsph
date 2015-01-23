@@ -165,15 +165,15 @@ ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
     theme(panel.grid.major = element_line(size = .5, color = "grey"))
 ```
 
-## Correlation of raw counts with size
 
-```{r cor-size}
+```{r cor-size,eval=FALSE,echo=FALSE}
 ref_fn = paste0(root_path, "/ref-transcripts.db")
-ref=read.table(ref_fn,sep="\t") %>% filter(grepl("transcript",V3)) %>% mutate(size=V5-V4+1) %>% group_by(V10) %>% summarise(average=mean(size))
+ref=read.table(ref_fn,sep="\t") %>% dplyr::filter(grepl("transcript",V3)) %>% mutate(size=V5-V4+1) %>% dplyr::group_by(V10) %>% dplyr::summarise(average=mean(size))
+
 dd = as.data.frame(counts)
 dd$gene = row.names(counts)
-dd$size = match(ref$V10,dd$gene)
-dd = melt(dd,id.vars = c("gene","size")) %>% filter(size<1000) %>% mutate(size_tag=cut(size,breaks=c(0,50,100,2000)), exp=cut(value,breaks=c(-1,0,1e23),labels=c("No","Yes")))
+dd$size = ref[match(dd$gene,ref$V10),"average"]
+dd = reshape::melt(dd,id.vars = c("gene","size")) %>% dplyr::filter(size<1000) %>% dplyr::mutate(size_tag=cut(size,breaks=c(0,50,100,2000)), exp=cut(value,breaks=c(-1,0,1e23),labels=c("No","Yes")))
 ggplot(dd, aes(x=exp, fill=variable)) +
     geom_bar(position='dodge') +
     facet_wrap(~size_tag)
@@ -182,7 +182,7 @@ ggplot(dd, aes(x=exp, fill=variable)) +
 
 ## Correlation heatmap of raw counts
 ```{r heatmap-raw}
-pheatmap(cor(counts),annotation = summarydata[,c("group","batch")])
+pheatmap(cor(counts),annotation = summarydata[,c("type","batch")])
 ```
 
 ## Boxplot of log10 TMM-normalized counts per gene
@@ -209,12 +209,12 @@ ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
 
 ## Correlation heatmap of TMM-normalized counts
 ```{r heatmap-normalized}
-pheatmap(cor(normalized_counts),annotation = summarydata[,c("group","batch")])
+pheatmap(cor(normalized_counts),annotation = summarydata[,c("type","batch")])
 ```
 
 ## Correlation (Spearman) heatmap of TMM-normalized counts
 ```{r spearman-heatmap-normalized}
-pheatmap(cor(normalized_counts, method="spearman"),annotation = summarydata[,c("group","batch")])
+pheatmap(cor(normalized_counts, method="spearman"),annotation = summarydata[,c("type","batch")])
 ```
 
 ## MDS plot of TMM-normalized counts
@@ -270,7 +270,7 @@ meanSdPlot(assay(vsd[notAllZero,]), ylim = c(0,2.5))
 ```
 
 ```{r rlog-heatmap}
-pheatmap(cor(rlogMat, method="spearman"),annotation = summarydata[,c("group","batch")])
+pheatmap(cor(rlogMat, method="spearman"),annotation = summarydata[,c("type","batch")])
 ```
 
 ## Dispersion estimates
@@ -328,12 +328,13 @@ get_groups <- function(d, comp, condition)
   g2 <- d$Name[d[, (names(d)==condition)]==g[3]]
   list(g1,g2)
 }
+summarydata_deg = summarydata[names(counts),]
 ```
 
 ### Mean of DEG genes versus background
 ```{r DEGreport-MB}
 for(i in seq(length(all_results))) {
-  g <- get_groups(summarydata, names(all_results)[i], condition)
+  g <- get_groups(summarydata_deg, names(all_results)[i], condition)
   detag <- row.names(subset(as.data.frame(all_results[[i]]), padj <= 0.1))
   print(degMB(detag, g[[1]], g[[2]], rlogMat) + 
   ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i])))
@@ -343,9 +344,9 @@ for(i in seq(length(all_results))) {
 ### Variance of DEG genes versus background
 ```{r DEGreport-VB}
 for(i in seq(length(all_results))) {
-  g <- get_groups(summarydata, names(all_results)[i], condition)
+  g <- get_groups(summarydata_deg, names(all_results)[i], condition)
   detag <- row.names(subset(as.data.frame(all_results[[i]]), padj <= 0.1))
-  print(degMB(detag, g[[1]], g[[2]], rlogMat) + 
+  print(degVB(detag, g[[1]], g[[2]], rlogMat) + 
   ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i])))
 }
 ```
@@ -369,7 +370,7 @@ for(i in seq(length(all_results))) {
 ### Mean-vs-Variation
 ```{r DEGreport-MV}
 for(i in seq(length(all_results))) {
-  g <- get_groups(summarydata, names(all_results)[i], condition)
+  g <- get_groups(summarydata_deg, names(all_results)[i], condition)
   print(degMV(g[[1]], g[[2]], all_results[[i]]$pvalue, rlogMat) + 
   ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i])))
 }
@@ -416,7 +417,7 @@ knitr::kable(head(tab_anno))
 knitr::kable(tab_anno %>% filter(grepl("TRMT",external_gene_name)))
 ```
 
-## MT genes
+## Mitochondrial genes
 
 ```{r mit-tables,results='asis'}
 tab_anno$class = "non-tRNA"
@@ -425,7 +426,7 @@ tab_anno$class[grepl("tRNA",tab_anno$description)] = "tRNA"
 ggplot(tab_anno %>% filter(chromosome_name=="MT"))+
     geom_point(aes(log2FoldChange,padj,colour=class))
 
-tab_anno %>% filter(chromosome_name=="MT")
+knitr::kable( tab_anno %>% filter(chromosome_name=="MT") )
 ```
 
 ## showing pvalue of tRNA genes and MRPP genes
@@ -437,9 +438,12 @@ tab_anno %>% filter(chromosome_name=="MT")
   tab_anno_non_filtered = cbind(res,res_anno[res$gene,])
 
 knitr::kable(tab_anno_non_filtered %>% filter(grepl("TRMT",external_gene_name) & pvalue<0.05 ) )
-knitr::kable( tab_anno_non_filtered %>% filter( grepl("MT-T",external_gene_name) & pvalue<0.06 ) )
+
 
 ```
+
+
+`r knitr::kable( tab_anno_non_filtered %>% filter( grepl("MT-T",external_gene_name) & pvalue<0.06 ) )`
 
 ## heatmap of tRNA genes
 
@@ -452,7 +456,9 @@ pheatmap(ma, clustering_distance_rows = "correlation", clustering_distance_cols 
 ```
 
 
-## MiT chromosome map
+## Mitochondrial chromosome map
+
+Each segment represent a gene colored by type, pvalue or adjusted-pvalue for the analysis.
 
 ```{r de-mit-map-pvalue}
 
@@ -465,16 +471,16 @@ get_type = function(g){
     dd[g,2]
 
 }
-
+library(GenomicFeatures)
 mit_gtf = makeTranscriptDbFromGFF(paste0( root_path,"/mt_good.gtf" ),format = "gtf")
 
 mit_gr <- GenomicFeatures::genes(mit_gtf)
-mcols(mit_gr)$pvalue = tab_anno_single[ unlist(mcols(mit_gr)$gene_id) , "pvalue" ]
-mcols(mit_gr)$padj = tab_anno_single[ unlist(mcols(mit_gr)$gene_id) , "padj" ]
+mcols(mit_gr)$pvalue = tab_anno_non_filtered[ unlist(mcols(mit_gr)$gene_id) , "pvalue" ]
+mcols(mit_gr)$padj = tab_anno_non_filtered[ unlist(mcols(mit_gr)$gene_id) , "padj" ]
 mcols(mit_gr)$type = get_type(unlist(mcols(mit_gr)$gene_id))
 
 colfuncRed <- colorRampPalette(c("red4", "red"))
-ggplot(mit_gr, aes(fill = cut(pvalue,breaks=c(-1,0.001,0.01,0.05,1.1)), colour=type ) ) + geom_rect() + scale_fill_manual(values = c(colfuncRed(3),"grey50"))  + scale_colour_brewer(palette = "Set1")
+#ggplot(mit_gr, aes(fill = cut(pvalue,breaks=c(-1,0.001,0.01,0.05,1.1)), colour=type ) ) + geom_rect() + scale_fill_manual(values = c(colfuncRed(3),"grey50"))  + scale_colour_brewer(palette = "Set1")
 
 
 type = ggplot(mit_gr, aes(fill = type ) ) + geom_rect() + scale_fill_brewer(palette = "Set1")
@@ -506,7 +512,6 @@ dds = DESeq(dds)
 res = results(dds)
 res = as.data.frame(res) 
 res$gene = row.names(res)
-res = res %>% filter(padj<0.5)
 res_anno = get_description(res$gene)
 tab_anno_single = cbind(res,res_anno[res$gene,])
 
@@ -514,17 +519,18 @@ tab_anno_single = cbind(res,res_anno[res$gene,])
 
 ### tRNA genes
 
-```{r}
-knitr::kable(tab_anno_single %>% filter(grepl("TRMT",external_gene_name) & pvalue<0.05 ) )
-knitr::kable( tab_anno_single %>% filter( grepl("MT-T",external_gene_name) ) )
-```
+
+`r knitr::kable(tab_anno_single %>% filter(grepl("TRMT",external_gene_name) & pvalue<0.05 ) )`
+
+
+`r knitr::kable( tab_anno_single %>% filter( grepl("MT-T",external_gene_name) ) )`
 
 It is worse to count data as single reads.
 
 
 # DE (counting multi-mapped reads)
 
-```{r de-single, cache=TRUE}
+```{r de-all, cache=TRUE}
 all_counts = read.table("~/orch/groups/harper_rnaseq/mtrna/merged/count_nonM.tsv", header=T,row.names=1)
 size = all_counts[,"Length",drop=F]
 all_counts = all_counts[,c(6:ncol(all_counts))]
@@ -547,16 +553,20 @@ tab_anno_all = cbind(res,res_anno[res$gene,])
 
 ### tRNA genes
 
-```{r}
-knitr::kable(tab_anno_all %>% filter(grepl("TRMT",external_gene_name) & pvalue<0.05 ) )
-knitr::kable( tab_anno_all %>% filter( grepl("MT-T",external_gene_name) ) )
-```
-
-It is worse to count data as single reads.
+`r knitr::kable(tab_anno_all %>% filter(grepl("TRMT",external_gene_name) & pvalue<0.3 ) ) `
 
 
+`r knitr::kable( tab_anno_all %>% filter( grepl("MT-T",external_gene_name) ) ) `
 
-# Coverage aroung tRNA-Met
+
+It is worse to count multi-mapped reads.
+
+
+
+# Coverage along tRNA-Met
+
+MT-TM is the Met-tRNA
+
 
 ```{r met-coverage}
 samples = c("D1","D2","D3","T1","T2","T3")
@@ -573,7 +583,7 @@ mttm = mt_track %>% filter( ((V4>3932 & V5<4744) | V5>3932 & V4<4744) & V3=="tra
 gr <- GRanges(seqnames =mttm$V1,
 ranges = IRanges(start=mttm$V4, end=mttm$V5),
 strand = strand(mttm$V7),
-type = c("PT","tRNA","tRNA","tRNA","PT"),
+type = c("Protein","tRNA","tRNA","tRNA","Protein"),
 names=c("MT-ND1-201","MT-TI","MT-TQ","MT-TM","MT-ND2-201"))
 
 colfuncGreen <- colorRampPalette(c("green4", "green"))
@@ -595,9 +605,11 @@ tracks(genes,gplot_cov+ylim(0,2000),xlim = c(4250,4470 ))
 ```
 
 
-# Coverage aroung tRNA-Met
+# Coverage along tRNA-Lys
 
-```{r met-coverage}
+MT-TL is the Lys-tRNA
+
+```{r lys-coverage}
 samples = c("D1","D2","D3","T1","T2","T3")
 coverage_dat = data.frame()
 names(size_factor) = c("T1","T2","T3","D1","D3","D2")
@@ -612,8 +624,8 @@ mttm = mt_track %>% filter( ((V4>8230 & V5<8450) | V5>8230 & V4<8450) & V3=="tra
 gr <- GRanges(seqnames =mttm$V1,
 ranges = IRanges(start=mttm$V4, end=mttm$V5),
 strand = strand(mttm$V7),
-type = c("PT","tRNA","PT"),
-names=c("MT-CO2","MT-TL","MT-ATP8"))
+type = c("PT","tRNA","Protein"),
+names=c("MT-CO2","MT-TK","MT-ATP8"))
 
 colfuncGreen <- colorRampPalette(c("green4", "green"))
 colfuncRed <- colorRampPalette(c("red4", "red"))
