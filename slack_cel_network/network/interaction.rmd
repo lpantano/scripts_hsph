@@ -13,7 +13,7 @@ output:
 ```{r custom-code}
 source("~/repos/myRfunctions/transactions.R")
 dn <- "slack_mtrna/"
-path_files = "~/repos/pipelines/slack_cel_network/reports/"
+path_files = "~/repos/pipelines/slack_cel_network/network"
 ```
 
 
@@ -116,7 +116,7 @@ getcor_mirna<-function(mir,logmrna="",logmirna=""){
 getTargets = function(de,genes,micros,fn_cor){
     res<-do.call("rbind",lapply(de,fn_cor,logmrna=genes,logmirna=micros))
     res = res %>% filter(!is.na(rho) & rho < 0) %>% mutate(adj=p.adjust(pvalue,method="BH"))
-    hist(res$pvalue)
+    #hist(res$pvalue)
     res[order(res$rho,res$pvalue),]
 }
 ```
@@ -150,6 +150,18 @@ ko_both_res_sign = ko_both_res %>% filter(adj<0.1)
 
 
 # Results 
+
+```{r interaction-tables}
+fn_n2 = paste0(path_files,"/n2_interaction.txt")
+write.table(n2_both_res_sign, fn_n2)
+fn_ko = paste0(path_files,"/ko_interaction.txt")
+write.table(ko_both_res_sign, fn_ko)
+```
+
+[n2 interactions](`r get_report_links(fn_n2)`)
+
+[ko interactions](`r get_report_links(fn_ko)`)
+
 
 We are using DEG miRNA and DEG genes. We calculate the correlation for the pairs
 annotated in targetscanWorm and apply a p.adjust correction to keep only
@@ -247,7 +259,7 @@ getEnrichment = function(dd, sign, interaction, exp, col){
         o<-length(intersect(as.character(sign),as.character(r))) # intersect random interaction w dergulated mirna
         return(o)
         }))
-    plot(density(unlist(random)),xlim=c(min(c(common,random)),max(c(common,random))),col="steelblue",xlab="")
+    plot(density(unlist(random)),xlim=c(min(c(common,random)),max(c(common,random))),col="steelblue",xlab="",main="")
     abline(v=common,col="red")
     text(common,0.02,format(sum(random>=common)/401, digit=3),pos = 2)
     
@@ -265,7 +277,6 @@ getEnrichment(n2_both_res_sign, n2_de$id ,unique(target[,2]), row.names(mrna), 1
 title("Genes with interaction enriched in DEG genes along age")
 ```
 
-```
 
 ## mir71 KO
 
@@ -330,3 +341,129 @@ title("Genes with interaction enriched in DEG genes along age")
 ```
 
 
+# Comparison of N2 and mir71-KO
+
+We calculate whether the common miRNAs/Genes are more or less than expected if
+the two list of interactions, in both conditions, were taken randomly.
+We work only with all interactions where the miRNA and the mRNA are expressed in our
+conditions.
+
+## Common miRNAs
+
+```{r common-mirna}
+get_commons = function(dd1, dd2, cols=1){
+    x1_vec = unique(n2_both_res_sign[,cols])
+    x2_vec = unique(ko_both_res_sign[,cols])
+
+    length(  intersect(x1_vec, x2_vec) )/min( length(x1_vec), length(x2_vec) )
+}
+
+venn(list( n2=unique(n2_both_res_sign$mir), ko=unique(ko_both_res_sign$mir) ) )
+n2_ratio_mir = get_commons(n2_both_res_sign, ko_both_res_sign, 2)
+n2_ratio_gene = get_commons(n2_both_res_sign, ko_both_res_sign, 1)
+
+```
+
+Expected overlap
+
+```{r expected-mirna}
+expected_overlap = function(perm, dd1="",dd2="",u="", cols=1){
+    x1 = nrow(dd1)
+    x2 = nrow(dd2)
+    rdd1 = (dplyr::sample_n(u, x1))[,cols]
+    rdd2 = (dplyr::sample_n(u, x2))[,cols]
+    n = length( intersect( unique(rdd1), unique(rdd2) ) )
+    n/(min( length(unique(rdd1)), length(unique(rdd2)) ))
+}
+
+plot_random = function(random,common){
+    plot(density(unlist(random)),xlim=c(min(c(common,random)),max(c(common,random))),col="steelblue",xlab="",main="")
+    abline(v=common,col="red")
+    text(common,0.02,format(sum(random>=common)/401, digit=3),pos = 2)
+}
+
+universe = target[,2:1] %>% filter(V1 %in% row.names(mirna) & V2 %in% row.names(mrna))
+
+random_overlap = sapply(1:400, expected_overlap, dd1=n2_both_res_sign,dd2=ko_both_res_sign,u=universe,cols=2)
+
+plot_random(random_overlap, n2_ratio_mir)
+```
+
+
+## Common genes
+
+```{r common-genes}
+venn(list( n2=unique(n2_both_res_sign$g), ko=unique(ko_both_res_sign$g) ) )
+dataset = "celegans_gene_ensembl"
+filter = "ensembl_gene_id"
+symbol = "external_gene_name"
+entres <- "entrezgene"
+annotate_df = function(g, dataset, filter, symbol) {
+  require(biomaRt)
+  ensembl = useMart('ensembl', dataset = dataset)
+  getBM(attributes=c(filter, symbol, "description"), filters=filter, values=g,
+                    mart=ensembl)
+  
+}
+```
+
+
+
+```{r random-genes}
+random_overlap = sapply(1:400, expected_overlap, dd1=n2_both_res_sign,dd2=ko_both_res_sign,u=universe,cols=1)
+
+plot_random(random_overlap, n2_ratio_gene)
+
+```
+
+All this it could mean that the common targeted genes overlap more than expected by random,
+probably because they represent changes during time. But the common miRNAs are less than
+expected by random, maybe because the two conditions have a different set of miRNA
+expressed and the regulatory network have changed to regulated the mainly genes related 
+to the phenotype.
+
+## Difference miRNA targets
+
+```{r mirna-diff-targets,results='asis'}
+knitr::kable(merge(n2_both_res_sign %>% group_by(mir) %>% dplyr::summarise( n2 = n()) ,
+ko_both_res_sign %>% group_by(mir) %>% dplyr::summarise( ko = n()) ,all=T))
+```
+
+
+## tables
+
+```{r genes-tables}
+fn_common = paste0(path_files,"/genes_common.txt")
+common_anno = annotate_df( intersect(unique(n2_both_res_sign$g), unique(ko_both_res_sign$g)) , dataset, filter, symbol)
+write.table(common_anno,fn_common)
+
+fn_n2 = paste0(path_files,"/genes_n2.txt")
+n2_anno = annotate_df( setdiff(unique(n2_both_res_sign$g), unique(ko_both_res_sign$g)) , dataset, filter, symbol)
+write.table(n2_anno,fn_n2)
+
+fn_ko = paste0(path_files,"/genes_ko.txt")
+ko_anno = annotate_df( setdiff(unique(ko_both_res_sign$g), unique(n2_both_res_sign$g)) , dataset, filter, symbol)
+write.table(ko_anno,fn_ko)
+```
+
+[n2 genes](`r get_report_links(fn_n2)`)
+
+[ko genes](`r get_report_links(fn_ko)`)
+
+[common genes](`r get_report_links(fn_common)`)
+
+```{r based-interaction-tables}
+fn_common = paste0(path_files,"/interaction_common.txt")
+n2 = n2_both_res_sign %>% mutate(id = paste0(g,mir))
+ko = ko_both_res_sign %>% mutate(id = paste0(g,mir))
+common_anno = n2 %>% filter(id %in% ko$id) %>% dplyr::select(g,mir)
+write.table(common_anno,fn_common)
+
+fn_dif_mir = paste0(path_files,"/interaction_mir_substitution.txt")
+same_gene = inner_join(n2[,1:2],ko[,1:2],by="g") %>% filter(! mir.x %in% mir.y)
+write.table(same_gene,fn_dif_mir)
+```
+
+[common interaction](`r get_report_links(fn_common)`)
+
+[common genes with different miRNA regulation](`r get_report_links(fn_dif_mir)`)
