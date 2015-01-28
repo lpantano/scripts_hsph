@@ -290,7 +290,7 @@ handle_deseq2 = function(dds, summarydata, column) {
   all_results = list()
   contrast_strings = list()
   for(comb in all_combs) {
-    contrast_string = paste(comb, collapse=" vs ")
+    contrast_string = paste(comb, collapse="vs")
     contrast = c(column, comb)
     res = results(dds, contrast=contrast)
     res = res[order(res$padj),]
@@ -331,9 +331,9 @@ the standard desviation. We should see the same distribution for each p-value bi
 ```{r get-groups}
 get_groups <- function(d, comp, condition)
 {
-  g <- unlist(strsplit(comp," "))
+  g <- unlist(strsplit(comp,"vs"))
   g1 <- d$Name[d[, (names(d)==condition)]==g[1]]
-  g2 <- d$Name[d[, (names(d)==condition)]==g[3]]
+  g2 <- d$Name[d[, (names(d)==condition)]==g[2]]
   list(g1,g2)
 }
 summarydata_deg = summarydata[names(counts),]
@@ -349,6 +349,7 @@ for(i in seq(length(all_results))) {
 ```
 
 ### Pvalues-vs-Variation
+
 ```{r DEGreport-V}
 for(i in seq(length(all_results))) {
   print(degVar(all_results[[i]]$pvalue, rlogMat) + 
@@ -383,7 +384,11 @@ for(i in seq(length(all_results))) {
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
 }
+
 ```
+
+[download table](`r get_report_links(paste0(path_files,"/controlvstreat.tsv"))`)
+
 
 ## DEG by chr
 
@@ -569,12 +574,12 @@ It is worse to count multi-mapped reads.
 
 
 
-# Coverage along tRNA-Met
+# Coverage 
 
-MT-TM is the Met-tRNA. The lower graph is a zoom in of the tRNA genes.
+MT-TM is the Met-tRNA. 
 
 
-```{r met-coverage}
+```{r met-coverage,eval=FALSE,echo=FALSE}
 samples = c("D1","D2","D3","T1","T2","T3")
 coverage_dat = data.frame()
 names(size_factor) = c("T1","T2","T3","D1","D3","D2")
@@ -612,11 +617,9 @@ tracks(p1,p2 )
 ```
 
 
-# Coverage along tRNA-Lys
-
 MT-TK is the Lys-tRNA
 
-```{r lys-coverage}
+```{r lys-coverage,eval=FALSE,echo=FALSE}
 samples = c("D1","D2","D3","T1","T2","T3")
 coverage_dat = data.frame()
 names(size_factor) = c("T1","T2","T3","D1","D3","D2")
@@ -649,6 +652,59 @@ tracks(genes+ xlim(8230,8450) ,gplot_cov + xlim(8230,8450 ) )
 
 
 tracks(genes+ xlim(8290,8369) ,gplot_cov+ylim(0,2000)+ xlim(8290,8369))
+
+```
+
+# All profiles
+
+```{r all-trna}
+colfuncGreen <- colorRampPalette(c("green4", "green"))
+colfuncRed <- colorRampPalette(c("red4", "red"))
+
+mt = read.table(paste0( merged_path,"/mit_genes.tab" ),sep="\t")
+regions = read.table(paste0( merged_path,"/region.tab" ),sep="\t")
+
+read_cov = function(in_file){
+    samples = c("D1","D2","D3","T1","T2","T3")
+    coverage_dat = data.frame()
+    names(size_factor) = c("T1","T2","T3","D1","D3","D2")
+    for (sample in samples){
+        d = read.table(paste0(merged_path,"/coverage_region/",sample,in_file))
+        d = d %>% mutate(norm=V3/size_factor[sample])
+        coverage_dat = rbind(coverage_dat,d %>% mutate(sample=sample))
+    }
+    coverage_dat
+}
+
+
+for ( gene_name in regions$V6 ) {
+    #paste0(merged_path,"/coverage",)
+    fn = paste0("_coverage_",gene_name,".dat")
+    dd = read_cov(fn)
+    coor = regions %>% filter(V6 == gene_name)
+    min_pos = coor$V4-100
+    max_pos = coor$V5+100
+    
+    gplot_cov = ggplot( dd, aes(y=norm,x=V2, colour=sample) ) +
+    geom_line() +
+    scale_color_manual(values = c(colfuncGreen(3),colfuncRed(3))) 
+    
+    mttm = mt %>% filter( V5>min_pos & V4<max_pos ) 
+    mttm = mttm %>% mutate(y=runif(nrow(mttm),min = 0.8,max = 1.2))
+    gr <- GRanges(seqnames =mttm$V1,
+    ranges = IRanges(start=mttm$V4, end=mttm$V5),
+    strand = strand(mttm$V6),
+    type = mttm$V2,
+    names= mttm$V7,
+    y=mttm$y)
+
+    
+    genes = ggplot(gr, aes(fill = type)) + geom_rect() + scale_fill_brewer() +
+    geom_text(aes(label=names,x=start+2,y=y),size=3,hjust=0 )
+
+    p=tracks(genes+ xlim(min_pos,max_pos) ,gplot_cov + xlim(min_pos,max_pos) )
+    print(p)
+}
 
 ```
 
