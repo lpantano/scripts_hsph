@@ -48,6 +48,8 @@ counts = read.table(counts_file, header=TRUE, row.names="id")
 counts = counts[, order(colnames(counts))]
 counts = counts[rowSums(counts)>1,]
 colnames(counts) = sub(".counts","",colnames(counts))
+fpkm_file = read.table("/home/lpantano/orch/scratch/yellen_singlecell_neuron/gaba/work/htseq-count/combined.fpkm",header=T)
+
 ```
 
 # Results
@@ -186,10 +188,6 @@ mds(normalized_counts, k=length(colnames(normalized_counts)) - 1, condition = su
     ggtitle("With rRNA ratio information")
 ```
 
-### Heatmap of top 30 most expressed genes
-```{r top-count-genes, results='asis'}
-pheatmap(as.matrix(counts[select,]),annotation = summarydata[,c("rRNA.rate","Genes.Detected","Mapped")])
-```
 
 ## Heatmap of TMM normalized counts using list of genes
 ```{r ensembl-converter}
@@ -373,6 +371,19 @@ tab = tab[select[hr$order],]
 knitr::kable(tab)
 
 ```
+## FPKM of GABA neurons
+
+```{r gaba-fpkm,cache=TRUE}
+fpkm_file = fpkm_file %>% filter(gaba_R>0)
+dd = get_description(fpkm_file$id)
+
+dat = cbind( fpkm_file,dd[fpkm_file$id,] )
+fn = paste0(files_path ,"/gaba_fpkm.txt")
+write.table(dat, fn)
+```
+
+[get fpkm table](`r get_report_links(fn)`)
+
 
 ## DE between  GABAergic vs dopamine neurons
 
