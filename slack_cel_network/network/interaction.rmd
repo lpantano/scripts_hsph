@@ -12,7 +12,7 @@ output:
 ---
 ```{r custom-code}
 source("~/repos/myRfunctions/transactions.R")
-dn <- "slack_mtrna/"
+dn <- "slack_mirna-mrna/"
 path_files = "~/repos/pipelines/slack_cel_network/network"
 ```
 
@@ -54,8 +54,10 @@ ko_labels = c("mir71_1_Day0","mir71_1_Day5","mir71_2_Day0","mir71_2_Day5","mir71
 ```
 
 
-Load target~miRNA (miRMAP) table and deregulated genes (from RNAseq data)
+Load target~miRNA (targetscanWorm) table and deregulated genes (from RNAseq data)
 ```{r load-targets}
+gene_map = read.table("~/orch/scratch/celegans_network/celegans_network_raw/data/gene_map.dat",as.is=c(TRUE,TRUE))
+ago = gene_map %>%filter(grepl("ago",V3))
 target<-read.table("~/orch/scratch/celegans_network/celegans_network_raw/data/targets.csv",as.is=c(TRUE,TRUE))
 target_tf<-read.table("~/orch/scratch/celegans_network/celegans_network_raw/data/aging_master_table.txt",as.is=c(TRUE,TRUE))
 ```
@@ -131,9 +133,9 @@ row.names(n2_deg_mirna)<-sub(".ref.0.0.0.0","",row.names(n2_deg_mirna))
 n2_res = getTargets(as.character(n2_de$id), mrna[, n2_labels], mirna[, n2_labels],getcor_gene)
 n2_mir_res = getTargets(as.character(row.names(n2_deg_mirna)), mrna[, n2_labels], mirna[, n2_labels],getcor_mirna)
 n2_both_res = getTargets(as.character(row.names(n2_deg_mirna)), mrna[n2_de$id, n2_labels], mirna[, n2_labels],getcor_mirna)
-n2_res_sign = n2_res %>% filter(adj<0.1)
-n2_mir_res_sign = n2_mir_res %>% filter(adj<0.1)
-n2_both_res_sign = n2_both_res %>% filter(adj<0.1)
+n2_res_sign = n2_res %>% filter(adj<0.1 & rho< -.7)
+n2_mir_res_sign = n2_mir_res %>% filter(adj<0.1 & rho< -.7)
+n2_both_res_sign = n2_both_res %>% filter(adj<0.1 & rho< -.7)
 
 ko_de<-read.table("~/repos/pipelines/slack_cel_network/reports/ko_de_genes.txt",as.is=TRUE)
 ko_deg_mirna<-read.table("~/repos/pipelines/slack_cel_network/reports/new_smallrna/mirna_ko_de_genes_perfect.txt",header=T,row.names=1)
@@ -141,9 +143,9 @@ row.names(ko_deg_mirna)<-sub(".ref.0.0.0.0","",row.names(ko_deg_mirna))
 ko_res = getTargets(as.character(ko_de$id), mrna[, ko_labels], mirna[, ko_labels],getcor_gene)
 ko_mir_res = getTargets(as.character(row.names(ko_deg_mirna)), mrna[, n2_labels], mirna[, n2_labels],getcor_mirna)
 ko_both_res = getTargets(as.character(row.names(ko_deg_mirna)), mrna[ko_de$id, ko_labels], mirna[, ko_labels],getcor_mirna)
-ko_res_sign = ko_res %>% filter(adj<0.1)
-ko_mir_res_sign = ko_mir_res %>% filter(adj<0.1)
-ko_both_res_sign = ko_both_res %>% filter(adj<0.1)
+ko_res_sign = ko_res %>% filter(adj<0.1 & rho< -.7)
+ko_mir_res_sign = ko_mir_res %>% filter(adj<0.1 & rho< -.7)
+ko_both_res_sign = ko_both_res %>% filter(adj<0.1 & rho< -.7)
 
 
 ```
@@ -193,6 +195,13 @@ ggplot(mir.sum,aes(N))+geom_bar()+
   theme_bw() + labs(list(title="Distribution of sites/gene ",x="miRNA per gene"))
 ```
 
+### Interaction in custom pairs
+
+```{r n2-custom-pairs}
+knitr::kable( n2_both_res_sign %>% mutate(id=paste0(mir,g)) %>% filter( id %in% paste0(target_tf$V1,target_tf$V2)  ) )
+```
+
+
 ### Network
 
 Some miRNA target more than one gene (top 60 interactions)
@@ -235,13 +244,51 @@ plotTop(n2_both_res_sign, mrna, mirna, n2_labels, con)
 
 ```
 
+### miRNA vs Gene
+
+```{r n2-mirna-genes,fig.width=11,fig.height=11}
+scale_exp = function(v){
+    mx = max(v)
+    mn = min(v)
+    (v-mn)/(mx-mn)
+}
+
+fix_name = function(s){
+    strsplit(s,"_")[[1]][3]
+}
+
+dat = data.frame()
+for (m in unique(n2_both_res_sign$mir)){
+    genes = n2_both_res_sign %>% dplyr::filter(mir==m) %>% dplyr::select(g)
+    ma = as.data.frame(t(apply(mrna[as.character(genes$g),n2_labels],1,scale_exp))) %>% mutate(type="mRNA",gene=genes$g)
+    mir = scale_exp(mirna[m,n2_labels])
+    ma = tidyr::gather(ma,"sample","value",1:6)
+    dd = rbind(ma,data.frame(type="mir",variable=names(mir),value=unlist(mir[1,]),gene="mir"))
+    dd$time = sapply(as.character(dd$variable),fix_name)
+    dd = dd %>% group_by(gene,type,time) %>% dplyr::summarise(expression=mean(value)) %>% ungroup()
+    dd$gene = as.character(dd$gene)
+    dd$type = as.character(dd$type)
+    dd$time = as.character(dd$time)
+    dd$mir = as.character(m)
+    dat = rbind(dat,dd)
+}
+
+ggplot(dat,aes( x=time, y=expression, color=type, group=gene )) +
+    geom_line() + labs(list(y="% expression")) +
+    scale_color_brewer(guide=FALSE,palette = "Set1")+
+    facet_wrap(~mir)
+
+
+
+```
+
 
 ### Enrichment in DEG miRNAs/Genes
 
 We assume that should be an enrichment of de-regulated miRNA and genes that have been detected here.
 To calculate this, we create a background distribution doing 400 permutations. Each time, we randomly select the same number of miRNAs (we detected in the analysis) from the list of possible miRNA-Gene pairs. That list is containing only expressed miRNA in this dataset. 
 After that we can calculate the overlap between the DEG list and the real miRNAs or the random miRNAs. 
-To get a pvalue of enrichment, we apply: sum(real_overlap > random_overlap)/401
+To get a pvalue of enrichment, we apply: sum(real_overlap > random_overlap)/401. That is show in the figure as a number bext to the red line which indicates the observed value from the data.
 
 If the overlap between the miRNAs targetting genes and DEG miRNAs is bigger than the values comming from 
 the permutations, we can say that the overlap is above a random noise.
@@ -303,14 +350,19 @@ ggplot(mir.sum,aes(N))+geom_bar()+
   theme_bw() + labs(list(title="Distribution of sites/gene ",x="miRNA per gene"))
 ```
 
+### Interaction in custom pairs
+
+```{r ko-custom-pairs}
+knitr::kable( ko_both_res_sign %>% mutate(id=paste0(mir,g)) %>% filter( id %in% paste0(target_tf$V1,target_tf$V2)  ) )
+```
+
+
 ### Network
 
 Some miRNA target more than one gene (top 60 interactions)
 
 ```{r ko_network}
-
 plotNetwork(ko_both_res_sign)
-
 ```
 
 ### Some examples
@@ -322,6 +374,32 @@ plotTop(ko_both_res_sign, mrna, mirna, ko_labels, con)
 
 ```
 
+### miRNA vs Gene
+
+```{r ko-mirna-genes,fig.width=11,fig.height=11}
+
+dat = data.frame()
+for (m in unique(ko_both_res_sign$mir)){
+    genes = ko_both_res_sign %>% dplyr::filter(mir==m) %>% dplyr::select(g)
+    ma = as.data.frame(t(apply(mrna[as.character(genes$g),ko_labels],1,scale_exp))) %>% mutate(type="mRNA",gene=genes$g)
+    mir = scale_exp(mirna[m,ko_labels])
+    ma = tidyr::gather(ma,"sample","value",1:6)
+    dd = rbind(ma,data.frame(type="mir",variable=names(mir),value=unlist(mir[1,]),gene="mir"))
+    dd$time = sapply(as.character(dd$variable),fix_name)
+    dd = dd %>% group_by(gene,type,time) %>% dplyr::summarise(expression=mean(value)) %>% ungroup()
+    dd$gene = as.character(dd$gene)
+    dd$type = as.character(dd$type)
+    dd$time = as.character(dd$time)
+    dd$mir = as.character(m)
+    dat = rbind(dat,dd)
+}
+
+ggplot(dat,aes( x=time, y=expression, color=type, group=gene )) +
+    geom_line() + labs(list(y="% expression")) +
+    scale_color_brewer(guide=FALSE,palette = "Set1")+
+    facet_wrap(~mir)
+
+```
 
 ### Enrichment in DEG miRNAs/Genes
 
@@ -422,11 +500,16 @@ expected by random, maybe because the two conditions have a different set of miR
 expressed and the regulatory network have changed to regulated the mainly genes related 
 to the phenotype.
 
-## Difference miRNA targets
+## Difference in numbers of targets for each miRNA
 
 ```{r mirna-diff-targets,results='asis'}
-knitr::kable(merge(n2_both_res_sign %>% group_by(mir) %>% dplyr::summarise( n2 = n()) ,
-ko_both_res_sign %>% group_by(mir) %>% dplyr::summarise( ko = n()) ,all=T))
+dd = merge(n2_both_res_sign %>% group_by(mir) %>% dplyr::summarise( n2 = n()) ,
+ko_both_res_sign %>% group_by(mir) %>% dplyr::summarise( ko = n()) ,all=T)
+
+dd = left_join(dd, target %>% filter(grepl("WBG",V2)) %>% group_by(V1) %>% dplyr::summarise( pairs = n()) %>% mutate(ratio=pairs/length(unique(target$V2)), mir=V1) , by='mir') %>% dplyr::select(mir,n2,ko,ratio)
+
+knitr::kable(dd)
+
 ```
 
 
@@ -460,7 +543,7 @@ common_anno = n2 %>% filter(id %in% ko$id) %>% dplyr::select(g,mir)
 write.table(common_anno,fn_common)
 
 fn_dif_mir = paste0(path_files,"/interaction_mir_substitution.txt")
-same_gene = inner_join(n2[,1:2],ko[,1:2],by="g") %>% filter(! mir.x %in% mir.y)
+same_gene = inner_join(n2[,1:2],ko[,1:2],by="g") %>% filter(! mir.x %in% mir.y) %>% transmute(n2.mir=mir.x,ko.mir=mir.y)
 write.table(same_gene,fn_dif_mir)
 ```
 
