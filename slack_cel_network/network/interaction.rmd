@@ -230,7 +230,7 @@ cytoscape = function(dd, gdeg, mdeg){
 
 n2_cyto = cytoscape(n2_both_res_sign, n2_de, n2_deg_mirna) 
 fn_n2 = paste0(path_files,"/n2_cytoscape.txt")
-write.table(n2_cyto, fn_n2)
+write.table(n2_cyto, fn_n2,row.names=F, quote = F)
 ```
 
 [n2 cytoscape file](`r get_report_links(fn_n2)`)
@@ -379,7 +379,7 @@ Some miRNA target more than one gene (top 200 interactions)
 plotNetwork(ko_both_res_sign)
 ko_cyto = cytoscape(ko_both_res_sign, ko_de, ko_deg_mirna) 
 fn_ko = paste0(path_files,"/ko_cytoscape.txt")
-write.table(ko_cyto, fn_ko)
+write.table(ko_cyto, fn_ko,row.names=F, quote = F)
 ```
 
 [ko cytoscape file](`r get_report_links(fn_ko)`)
