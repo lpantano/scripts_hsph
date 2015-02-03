@@ -371,13 +371,15 @@ tab = tab[select[hr$order],]
 knitr::kable(tab)
 
 ```
+
+
 ## FPKM of GABA neurons
 
 ```{r gaba-fpkm,cache=TRUE}
 fpkm_file = fpkm_file %>% filter(gaba_R>0)
 dd = get_description(fpkm_file$id)
 
-dat = cbind( fpkm_file,dd[fpkm_file$id,] )
+dat = cbind( fpkm_file,dd[as.character(fpkm_file$id),] )
 fn = paste0(files_path ,"/gaba_fpkm.txt")
 write.table(dat, fn)
 ```
