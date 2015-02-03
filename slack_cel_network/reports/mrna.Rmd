@@ -245,7 +245,7 @@ ggplot(dd, aes(y=exp, x=time, colour=type)) +
 ## N2 along time
 
 ```{r N2-time}
-res <- results(dds, contrast = c("conditions","N2Day0","N2Day5"))
+res <- results(dds, contrast = c("conditions","N2Day5","N2Day0"))
 DESeq::plotMA(as.data.frame(res))
 res_nona <- res[!is.na(res$padj),]
 keep <- res_nona$padj < 0.01 & abs(res_nona$log2FoldChange)>2 & res_nona$baseMean>20
@@ -287,7 +287,7 @@ MF:
 ## KO along time
 
 ```{r KO-time}
-res <- results(dds, contrast = c("conditions","mir.71Day0","mir.71Day5"))
+res <- results(dds, contrast = c("conditions","mir.71Day5","mir.71Day0"))
 DESeq::plotMA(as.data.frame(res))
 res_nona <- res[!is.na(res$padj),]
 keep <- res_nona$padj < 0.01 & abs(res_nona$log2FoldChange)>2 & res_nona$baseMean>20
@@ -325,7 +325,8 @@ MF:
 positive FC should be UP in N2 and Day5 
 
 ```{r interaction}
-
+summarydata$type = factor(summarydata$type, levels=c("mir-71","N2"))
+summarydata$time = factor(summarydata$time, levels=c("Day0","Day5"))
 summarydata$conditions <- paste0(summarydata$type,summarydata$time)
 dds = DESeqDataSetFromMatrix(countData=counts,
     colData=summarydata, design = ~ time*type)
