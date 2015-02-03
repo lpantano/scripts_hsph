@@ -37,7 +37,8 @@ miRNA-mRNA interactions with (negative) correlation < -.7 and FDR<0.1 are consid
 ```{r load}
 suppressMessages(library(DESeq2,quietly=TRUE))
 library(ggplot2)
-library(plyr)
+library(dplyr)
+library(tidyr)
 
 mirna<-read.table("~/repos/pipelines/slack_cel_network/reports/new_smallrna/log_matrix_perfect.txt",header=T,row.names=1)
 row.names(mirna)<-sub(".ref.0.0.0.0","",row.names(mirna))
@@ -204,12 +205,12 @@ knitr::kable( n2_both_res_sign %>% mutate(id=paste0(mir,g)) %>% filter( id %in% 
 
 ### Network
 
-Some miRNA target more than one gene (top 60 interactions)
+Some miRNA target more than one gene (top 200 interactions)
 
 ```{r n2_network}
 plotNetwork = function(dd){
     suppressMessages(library(igraph))
-    gr<-graph.data.frame(dd[1:60,c(2,1)],directed = F)
+    gr<-graph.data.frame(dd[1:200,c(2,1)],directed = F)
     V(gr)$color<-"steelblue"
     V(gr)$color[grep("cel-",V(gr)$name)]<-"yellow2"
     V(gr)$name[grepl("WBG",V(gr)$name)]=""
@@ -219,7 +220,20 @@ plotNetwork = function(dd){
 
 plotNetwork(n2_both_res_sign)
 
+cytoscape = function(dd, gdeg, mdeg){
+    mdeg$id = row.names(mdeg)
+    add_gdeg = dplyr::inner_join(dd[,c(2,1,3:5)], gdeg %>% dplyr::select(g=id,genelog2FC=log2FoldChange), by = "g") 
+    add_mdeg = dplyr::inner_join(add_gdeg, mdeg %>% dplyr::select(mir=id,mirlog2FC = log2FoldChange), by = "mir") 
+    add_mdeg
+
+}
+
+n2_cyto = cytoscape(n2_both_res_sign, n2_de, n2_deg_mirna) 
+fn_n2 = paste0(path_files,"/n2_cytoscape.txt")
+write.table(n2_cyto, fn_n2)
 ```
+
+[n2 cytoscape file](`r get_report_links(fn_n2)`)
 
 ### Some examples
 
@@ -359,11 +373,16 @@ knitr::kable( ko_both_res_sign %>% mutate(id=paste0(mir,g)) %>% filter( id %in% 
 
 ### Network
 
-Some miRNA target more than one gene (top 60 interactions)
+Some miRNA target more than one gene (top 200 interactions)
 
 ```{r ko_network}
 plotNetwork(ko_both_res_sign)
+ko_cyto = cytoscape(ko_both_res_sign, ko_de, ko_deg_mirna) 
+fn_ko = paste0(path_files,"/ko_cytoscape.txt")
+write.table(ko_cyto, fn_ko)
 ```
+
+[ko cytoscape file](`r get_report_links(fn_ko)`)
 
 ### Some examples
 
