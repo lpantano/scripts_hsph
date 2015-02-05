@@ -41,6 +41,8 @@ library(dplyr)
 library(pheatmap)
 project_summary = "/home/lpantano/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/project-summary.csv"
 counts_file = "/home/lpantano/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/combined.counts"
+ann = read.table("/home/lpantano/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/annotated_combined.counts",sep="\t", header=T)
+
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 "#0072B2", "#D55E00", "#CC79A7")
 summarydata = read.table(project_summary, header=TRUE, sep=",")
@@ -378,9 +380,12 @@ for(i in seq(length(all_results))) {
 ```{r DESeq-tables, results='asis'}
 for(i in seq(length(all_results))) {
   cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
-  out_df = all_results[[i]]
+  out_df = cbind( as.data.frame(all_results[[i]]), id=row.names(all_results[[i]]) )
+  ma = as.data.frame( cbind(id=row.names(rlogMat), rlogMat) )
+  out_df = inner_join(out_df, ma, by = "id")
+  out_df = inner_join(out_df, ann[,c("symbol","id")], by = "id")
   knitr::kable(head(out_df))
-  write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
+  write.table(out_df, file=paste0(path_files,"/",names(all_results)[i], ".tsv", sep=""),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
 }
@@ -676,11 +681,27 @@ read_cov = function(in_file){
     coverage_dat
 }
 
+write_wig = function(d, name){
+    fn = paste0(path_files,"/",name,'.wig')
+    fn_table = paste0(path_files,"/",name,'.tsv')
+    write.table(d %>% select(chr=V1, pos=V2, counts=V3, norm, sample), fn_table, row.names=F, quote=F)
+    unlink(fn)
+    for (s in as.character(unique(d$sample))) {
+        d_s = d %>% filter(sample==s) %>% arrange(V2)
+        #print(head(d_s))
+        write(paste0('track type=wiggle_0 name="',s,'" description="',s,'" visibility=full\nvariableStep chrom=chrM'),fn,append = T)
+        d_s[,2] = d_s[,2] + 1
+        write.table(d_s[,c(2,4)] ,fn, append=T, row.names=F, col.names=F, quote=F, sep="\t")
+    }
+    return(fn)
+}
+write_wig(dd, gene_name )
 
 for ( gene_name in regions$V6 ) {
     #paste0(merged_path,"/coverage",)
     fn = paste0("_coverage_",gene_name,".dat")
     dd = read_cov(fn)
+    write_wig(dd, gene_name )
     coor = regions %>% filter(V6 == gene_name)
     min_pos = coor$V4-100
     max_pos = coor$V5+100
