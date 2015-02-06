@@ -36,6 +36,8 @@ counts_file = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-
 
 xpress_file = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/combined.isoform.express_counts"
 
+xpress_tpm_file = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/combined.isoform.express_tpm"
+
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 "#0072B2", "#D55E00", "#CC79A7")
 summarydata = read.table(project_summary, header=TRUE, sep=",")
@@ -51,6 +53,10 @@ counts = counts[, order(colnames(counts))]
 xpress = read.table(xpress_file, header=TRUE, row.names="id")
 colnames(xpress) = sub("_eff.counts","", colnames(xpress))
 xpress = xpress[, order(colnames(xpress))]
+
+xpress_tpm = read.table(xpress_tpm_file, header=TRUE, row.names="id")
+colnames(xpress_tpm) = sub(".tpm","", colnames(xpress_tpm))
+xpress_tpm = xpress_tpm[, order(colnames(xpress_tpm))]
 
 ```
 
@@ -201,10 +207,20 @@ condition = "group"
 # Differential expression
 
 ```{r deseq2-expression-analysis, results='asis'}
-xpress <- counts[rowSums(xpress>0)>1,]
+xpress <- xpress[rowSums(xpress>0)>1,]
 dds = DESeqDataSetFromMatrix(countData=xpress,
     colData=summarydata, design = design)
 dds = DESeq(dds)
+
+xpress_tpm <- xpress_tpm[rowSums(xpress_tpm>0)>1,]
+dds_tpm = DESeqDataSetFromMatrix(countData=round(xpress_tpm,0),
+    colData=summarydata, design = design)
+dds_tpm = DESeq(dds_tpm)
+
+counts <- counts[rowSums(counts>0)>1,]
+dds_c = DESeqDataSetFromMatrix(countData=counts,
+    colData=summarydata, design = design)
+dds_c = DESeq(dds_c)
 ```
 
 ## Effect of variance stabilization
@@ -296,25 +312,58 @@ for(i in seq(length(all_results))) {
 
 ## markers
 
-```{r markers-mod}
-genes = row.names(xpress)[!grepl("^b",row.names(xpress))]
+```{r markers-xpress}
+genes = c(row.names(xpress)[!grepl("^Tb",row.names(xpress))],"Tb2945","Tb2699")
 dd = melt(rlogMat[genes,])
 dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
+dd$X1 = as.character(dd$X1)
+dd$X1[dd$X1=="Tb2945"] = "endA"
+dd$X1[dd$X1=="Tb2699"] = "recA"
+dd$X1 = factor(dd$X1, levels=c("endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
+
 
 ggplot(dd, aes(y=value, x=X2, color=group)) +
     geom_point() +
     facet_wrap(~X1)
 ```
 
-```{r markers-del}
-genes = c("endA","recA","araA","adhP","ldhA")
-genes_id = ("b2945","b2699","","b1478","")
-dd = melt(rlogMat[genes,])
+
+```{r markers-xpress-tpm}
+rld_t <- rlog(dds_tpm)
+rlogMat_tpm <- assay(rld_t)
+
+genes = c(row.names(xpress_tpm)[!grepl("^Tb",row.names(xpress_tpm))],"Tb2945","Tb2699")
+dd = melt(rlogMat_tpm[genes,])
 dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
+dd$X1 = as.character(dd$X1)
+dd$X1[dd$X1=="Tb2945"] = "endA"
+dd$X1[dd$X1=="Tb2699"] = "recA"
+dd$X1 = factor(dd$X1, levels=c("endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
+
 
 ggplot(dd, aes(y=value, x=X2, color=group)) +
     geom_point() +
     facet_wrap(~X1)
+```
+
+
+```{r markers-count}
+rld_c <- rlog(dds_c)
+rlogMat_c <- assay(rld_c)
+
+genes = c(row.names(counts)[!grepl("^b",row.names(counts))],"b2945","b2699")
+dd = melt(rlogMat_c[genes,])
+dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
+dd$X1 = as.character(dd$X1)
+dd$X1[dd$X1=="b2945"] = "endA"
+dd$X1[dd$X1=="b2699"] = "recA"
+dd$X1 = factor(dd$X1, levels=c("endA","recA","Bs.idi","Ec.dxs","ispDF","Sc.FPPS","CtF4aN.CDS","Sr.VO.F219L.T487N","t69.Sr.CPR"))
+
+
+ggplot(dd, aes(y=value, x=X2, color=group)) +
+    geom_point() +
+    facet_wrap(~X1) +
+    scale_color_brewer(palette = "Set1")
 ```
 
 ## General trend in low expressed
