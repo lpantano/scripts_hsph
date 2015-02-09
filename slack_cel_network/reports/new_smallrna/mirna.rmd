@@ -275,6 +275,21 @@ get_ratio_group <- function(norm){
         d
 }
 
+get_ratio_time <- function(norm){
+        norm = norm[rowMeans(norm)>5,]
+        d=data.frame( n2=rowMeans(norm[,c(2,6,10)])/rowMeans(norm[,c(1,5,9)]) ,
+                   ko=rowMeans(norm[,c(4,8,12)])/rowMeans(norm[,c(3,7,11)]) )    
+        print( t.test(log2(d$n2),log2(d$ko),alternative = "less" ))
+        d
+}
+
+get_ratio_group <- function(norm){
+        norm = norm[rowMeans(norm)>5,]
+        d=data.frame(day0=(rowMeans(norm[,c(1,5,9)])+1)/(rowMeans(norm[,c(3,7,10)]) +1),day5=(rowMeans(norm[,c(2,6,10)])+1)/(rowMeans(norm[,c(4,8,12)])+1) )  
+        print( t.test(log2(d$day0),log2(d$day5),alternative = "greater" ))
+        d
+}
+
 ```
 
 I tried different normalization:
@@ -289,31 +304,31 @@ I tried different normalization:
 Below is the average count ratio of Day0/Day5
 
 ```{r plot-diff}
-ggplot(melt(get_ratio_group(raw))) +
+ggplot(melt(get_ratio_time(raw))) +
     geom_boxplot(aes(x=variable,y=value))+
     scale_y_log10()+
     geom_hline(yintercept=1)+
     ggtitle("raw counts")
 
-ggplot(melt(get_ratio_group(norm_w_mirna))) +
+ggplot(melt(get_ratio_time(norm_w_mirna))) +
     geom_boxplot(aes(x=variable,y=value))+
     scale_y_log10()+
     geom_hline(yintercept=1)+
     ggtitle("normalized with miRNAs")
 
-ggplot(melt(get_ratio_group(norm_w_clus))) +
+ggplot(melt(get_ratio_time(norm_w_clus))) +
     geom_boxplot(aes(x=variable,y=value))+
     scale_y_log10()+
     geom_hline(yintercept=1)+
     ggtitle("normalized with total")
 
-ggplot(melt(get_ratio_group(norm_w_clus_clean))) +
+ggplot(melt(get_ratio_time(norm_w_clus_clean))) +
     geom_boxplot(aes(x=variable,y=value))+
     scale_y_log10()+
     geom_hline(yintercept=1)+
     ggtitle("normalized without repeats and rRNA")
 
-ggplot(melt(get_ratio_group(norm_w_clus_clean_rpm))) +
+ggplot(melt(get_ratio_time(norm_w_clus_clean_rpm))) +
     geom_boxplot(aes(x=variable,y=value))+
     scale_y_log10()+
     geom_hline(yintercept=1)+
@@ -321,6 +336,26 @@ ggplot(melt(get_ratio_group(norm_w_clus_clean_rpm))) +
 
 
 ```
+
+### Summary
+
+```{r summary-ratio}
+
+ggplot(melt(get_ratio_time(norm_w_clus_clean))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized without repeats and rRNA")
+
+
+ggplot(melt(get_ratio_group(norm_w_clus_clean))) +
+    geom_boxplot(aes(x=variable,y=value))+
+    scale_y_log10()+
+    geom_hline(yintercept=1)+
+    ggtitle("normalized without repeats and rRNA")
+
+```
+
 
 The last two seem pretty similar, and show the expected behavior.
 
@@ -333,7 +368,7 @@ differently in both conditions along time. I will use DESeq normalization with n
 get_DE <- function(norm, design,size=NULL){
     dse <- DESeqDataSetFromMatrix(countData = norm,
                        colData = design,
-                       design = ~ sample +time+ sample*time)
+                       design = ~ sample*time)
     dse <- estimateSizeFactors(dse)
     if (! is.null(size)){
         sizeFactors(dse) = size
