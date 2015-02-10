@@ -13,8 +13,8 @@ output:
 
 ```{r custom}
 source("~/repos/myRfunctions/transactions.R")
-dn <- "glasgow_cluster/wgs_10_samples"
-files_path = "~/repos/pipelines/glasgow_cluster/x10_WGS_2/"
+dn <- "glasgow_cluster/wgs_1_sample/"
+files_path = "~/repos/pipelines/glasgow_cluster/x1_WGS/"
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                       eval=TRUE, fig.width= 9,
@@ -24,7 +24,7 @@ setwd(files_path)
 
 
 ```{r render,eval=FALSE,cache=FALSE}
-#render_2_drop("~/repos/pipelines/glasgow_cluster/create_stats_report.Rmd",dn)
+render_2_drop("~/repos/pipelines/glasgow_cluster/create_stats_report.Rmd",dn)
 ```
 
 ```{r functions}
@@ -33,63 +33,65 @@ get_figures = function(p, pattern){
 }
 ```
 
-```{r report}
+```{r report,eval=FALSE}
 library("Nozzle.R1")
 report <- ""
-report  <-  newCustomReport( "10 samples at 30x WGS" );
+report  <-  newCustomReport( "1 sample at 30x WGS" );
 ```
 
 
 # CPU stats
 
 ```{r cpu,results='asis'}
-section = newSection("CPU",class="results")
-
+#section = newSection("CPU",class="results")
+section = ""
 for ( fn in get_figures(files_path,"cpu") ){
     name = strsplit(fn,"_")[[1]][1]
-    #print( paste0(name,":![",name,"](",get_report_links( paste0(files_path,fn) ),")" ) )
     fn = get_report_links( paste0(files_path,fn) )
-    print(fn)
-    fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
-    section  =  addTo( section, fg )
+    section = paste0(section,"### ",name,"\n <img src=",fn,' width=950 height=350>\n\n') 
+    
+    #print(fn)
+    #fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
+    #section  =  addTo( section, fg )
 }
-
-report  =  addTo(report,section);
+cat(section)
+#report  =  addTo(report,section);
 ```
-
 
 # MEM stats
 
 ```{r mem,results='asis'}
-section = newSection("Memory",class="results")
-
+#section = newSection("Memory",class="results")
+section = ""
 for ( fn in get_figures(files_path,"memory") ){
     name = strsplit(fn,"_")[[1]][1]
-    #print( paste0("[",name,"](",get_report_links( paste0(files_path,fn) ),")" ) )
     fn = get_report_links( paste0(files_path,fn) )
-    fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
-    section  =  addTo( section, fg )
+    section = paste0(section,"### ",name,"\n <img src=",fn,' width=950 height=300>\n\n') 
+
+    #fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
+    #section  =  addTo( section, fg )
 
 }
-report  =  addTo(report,section);
-
+#report  =  addTo(report,section);
+cat(section)
 ```
 
 # sda disk stats
 
 ```{r disk,results='asis'}
-section = newSection("SDA Disk",class="results")
-
+#section = newSection("SDA Disk",class="results")
+section = ""
 for ( fn in get_figures(files_path,"disk") ){
     name = strsplit(fn,"_")[[1]][1]
-    #print( paste0("[",name,"](",get_report_links( paste0(files_path,fn) ),")" ) )
     fn = get_report_links( paste0(files_path,fn) )
-    fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
-    section  =  addTo( section, fg )
+    section = paste0(section,"### ",name,"\n <img src=",fn,' width=950 height=300>\n\n')
+    
+    #fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
+    #section  =  addTo( section, fg )
 
 }
-report  =  addTo(report,section);
-
+#report  =  addTo(report,section);
+cat(section)
 ```
 
 
@@ -97,20 +99,20 @@ report  =  addTo(report,section);
 
 Adding the screenshot from the web app to compare.
 
-```{r lustre,results='asis'}
-section = newSection("lustre Disk",class="results")
-
+```{r lustre,results='asis',eval=F}
+#section = newSection("lustre Disk",class="results")
+section = ""
 for ( fn in get_figures(files_path,"lustre") ){
     if (grepl("png",fn)){
         name = strsplit(fn,"_")[[1]][1]
         #print( paste0("[",name,"](",get_report_links( paste0(files_path,fn) ),")" ) )
         fn = get_report_links( paste0(files_path,fn) )
-        fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
-        section  =  addTo( section, fg )
+        #fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
+        #section  =  addTo( section, fg )
     }
 }
-report  =  addTo(report,section);
-
+#report  =  addTo(report,section);
+cat(section)
 ```
 
 
@@ -118,22 +120,23 @@ report  =  addTo(report,section);
 # network bits stats
 
 ```{r net,results='asis'}
-section = newSection("Network",class="results")
-
+#section = newSection("Network",class="results")
+section = ""
 for ( fn in get_figures(files_path,"net_bytes") ){
     name = strsplit(fn,"_")[[1]][1]
-    #print( paste0("[",name,"](",get_report_links( paste0(files_path,fn) ),")" ) )
     fn = get_report_links( paste0(files_path,fn) )
-    fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
-    section  =  addTo( section, fg )
+    section = paste0(section,"### ",name,"\n <img src=",fn,' width=950 height=300>\n\n')
+    
+    #fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
+    #section  =  addTo( section, fg )
 
 }
-report  =  addTo(report,section);
+#report  =  addTo(report,section);
 
-writeReport( report, filename=paste0(files_path,"report"))
+#writeReport( report, filename=paste0(files_path,"report"))
 
-copy_2_drop(paste0(files_path,"report.html"),dn)
-
+#copy_2_drop(paste0(files_path,"report.html"),dn)
+cat(section)
 ```
 
 
