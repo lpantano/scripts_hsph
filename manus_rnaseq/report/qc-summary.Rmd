@@ -7,7 +7,7 @@
 ```{r custom-code}
 source("~/repos/myRfunctions/transactions.R")
 dn <- "manus_rnaseq/"
-root_path<-"~/orch/groups/"
+#root_path<-"~/orch/groups/"
 path_files = "~/repos/pipelines/manus_rnaseq/report"
 setwd(path_files)
 ```
@@ -30,9 +30,13 @@ library(gplots)
 library(edgeR)
 library(CHBUtils)
 library(pheatmap)
+library(dplyr)
 project_summary = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/project-summary.csv"
 
 counts_file = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/combined.counts"
+
+bowtie2_file = "/home/lpantano/orch/scratch/manus-rnaseq/analysis/manus-MB0009_bowtie2/work/htseq-count/combined.counts"
+
 
 xpress_file = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/combined.isoform.express_counts"
 
@@ -50,6 +54,11 @@ counts = read.table(counts_file, header=TRUE, row.names="id")
 colnames(counts) = sub(".counts","", colnames(counts))
 counts = counts[, order(colnames(counts))]
 
+bowtie2 = read.table(bowtie2_file, header=TRUE, row.names="id")
+colnames(bowtie2) = sub(".counts","", colnames(bowtie2))
+bowtie2 = bowtie2[, order(colnames(bowtie2))]
+
+
 xpress = read.table(xpress_file, header=TRUE, row.names="id")
 colnames(xpress) = sub("_eff.counts","", colnames(xpress))
 xpress = xpress[, order(colnames(xpress))]
@@ -58,6 +67,15 @@ xpress_tpm = read.table(xpress_tpm_file, header=TRUE, row.names="id")
 colnames(xpress_tpm) = sub(".tpm","", colnames(xpress_tpm))
 xpress_tpm = xpress_tpm[, order(colnames(xpress_tpm))]
 
+
+gene_map = read.table("/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/gene_map.tsv",sep="\t")
+rRNA = gene_map %>% filter(V1=="rRNA")
+
+
+xpress_tpm = xpress_tpm[ ! row.names(xpress_tpm) %in% rRNA$V3,]
+xpress = xpress[ ! row.names(xpress) %in% rRNA$V3,]
+counts = counts[ ! row.names(counts) %in% rRNA$V2,]
+bowtie2 = bowtie2[ ! row.names(bowtie2) %in% rRNA$V2,]
 ```
 
 # Quality control metrics
@@ -170,6 +188,10 @@ y = DGEList(counts=xpress)
 y = calcNormFactors(y)
 normalized_xpress = cpm(y, normalized.lib.sizes=TRUE)
 
+y = DGEList(counts=bowtie2)
+y = calcNormFactors(y)
+normalized_bowtie2 = cpm(y, normalized.lib.sizes=TRUE)
+
 ```
 
 ## Spearman Correlation heatmap of TMM-normalized counts
@@ -177,6 +199,20 @@ normalized_xpress = cpm(y, normalized.lib.sizes=TRUE)
 pheatmap(cor(normalized_counts,method = "spearman"),annotation = summarydata[,c("rRNA.rate"),drop=F],main = "counts")
 pheatmap(cor(normalized_xpress,method = "spearman"),annotation = summarydata[,"rRNA.rate",drop=F],main = "eXpress")
 ```
+
+## Pearson Correlation heatmap of TMM-normalized counts
+```{r heatmap-normalized-pearson}
+pheatmap(cor(normalized_counts),annotation = summarydata[,c("rRNA.rate"),drop=F],main = "counts")
+pheatmap(cor(normalized_xpress),annotation = summarydata[,"rRNA.rate",drop=F],main = "eXpress")
+```
+
+## Pearson Correlation heatmap of log2(TMM-normalized counts)
+```{r heatmap-normalized-pearson}
+pheatmap(cor(log2(normalized_counts+1)),annotation = summarydata[,c("rRNA.rate"),drop=F],main = "counts")
+pheatmap(cor(log2(normalized_xpress+1)),annotation = summarydata[,"rRNA.rate",drop=F],main = "eXpress")
+pheatmap(cor(log2(normalized_bowtie2+1)),annotation = summarydata[,"rRNA.rate",drop=F],main = "bowtie2")
+```
+
 
 ## MDS plot of TMM-normalized counts
 ```{r mds-normalized}
@@ -313,13 +349,21 @@ for(i in seq(length(all_results))) {
 ## markers
 
 ```{r markers-xpress}
-genes = c(row.names(xpress)[!grepl("^Tb",row.names(xpress))],"Tb2945","Tb2699")
+genes = c(row.names(xpress)[!grepl("^Tb",row.names(xpress))],"Tb2945","Tb2699",
+          "Tb3368", "Tb2536", "Tb4265", "Tb0912")
 dd = melt(rlogMat[genes,])
 dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
 dd$X1 = as.character(dd$X1)
-dd$X1[dd$X1=="Tb2945"] = "endA"
-dd$X1[dd$X1=="Tb2699"] = "recA"
-dd$X1 = factor(dd$X1, levels=c("endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
+
+tids= c("Tb2945","Tb2699","Tb3368", "Tb2536", "Tb4265", "Tb0912")
+names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
+
+for (tid in names(tids)){
+    dd$X1[dd$X1==tids[tid]] = tid
+}
+
+
+dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
 
 
 ggplot(dd, aes(y=value, x=X2, color=group)) +
@@ -332,13 +376,20 @@ ggplot(dd, aes(y=value, x=X2, color=group)) +
 rld_t <- rlog(dds_tpm)
 rlogMat_tpm <- assay(rld_t)
 
-genes = c(row.names(xpress_tpm)[!grepl("^Tb",row.names(xpress_tpm))],"Tb2945","Tb2699")
+genes = c(row.names(xpress_tpm)[!grepl("^Tb",row.names(xpress_tpm))],"Tb2945","Tb2699", "Tb3368", "Tb2536", "Tb4265", "Tb0912")
+
 dd = melt(rlogMat_tpm[genes,])
 dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
 dd$X1 = as.character(dd$X1)
-dd$X1[dd$X1=="Tb2945"] = "endA"
-dd$X1[dd$X1=="Tb2699"] = "recA"
-dd$X1 = factor(dd$X1, levels=c("endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
+tids= c("Tb2945","Tb2699","Tb3368", "Tb2536", "Tb4265", "Tb0912")
+names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
+
+for (tid in names(tids)){
+    dd$X1[dd$X1==tids[tid]] = tid
+}
+
+
+dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
 
 
 ggplot(dd, aes(y=value, x=X2, color=group)) +
@@ -351,15 +402,19 @@ ggplot(dd, aes(y=value, x=X2, color=group)) +
 rld_c <- rlog(dds_c)
 rlogMat_c <- assay(rld_c)
 
-genes = c(row.names(counts)[!grepl("^b",row.names(counts))],"b2945","b2699")
+genes = c(row.names(counts)[!grepl("^b",row.names(counts))],"b2945","b2699", "b3368", "b2536", "b4265", "b0912")
 dd = melt(rlogMat_c[genes,])
 dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
+
 dd$X1 = as.character(dd$X1)
-dd$X1[dd$X1=="b2945"] = "endA"
-dd$X1[dd$X1=="b2699"] = "recA"
-dd$X1 = factor(dd$X1, levels=c("endA","recA","Bs.idi","Ec.dxs","ispDF","Sc.FPPS","CtF4aN.CDS","Sr.VO.F219L.T487N","t69.Sr.CPR"))
+tids= c("b2945","b2699","b3368", "b2536", "b4265", "b0912")
+names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
 
+for (tid in names(tids)){
+    dd$X1[dd$X1==tids[tid]] = tid
+}
 
+dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","TBs.idi","Ec.dxs","ispDF","Sc.FPPS","CtF4aN.CDS","Sr.VO.F219L.T487N","t69.Sr.CPR"))
 ggplot(dd, aes(y=value, x=X2, color=group)) +
     geom_point() +
     facet_wrap(~X1) +
