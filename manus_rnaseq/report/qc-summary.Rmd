@@ -196,8 +196,8 @@ normalized_bowtie2 = cpm(y, normalized.lib.sizes=TRUE)
 
 ## Spearman Correlation heatmap of TMM-normalized counts
 ```{r heatmap-normalized}
-pheatmap(cor(normalized_counts,method = "spearman"),annotation = summarydata[,c("rRNA.rate"),drop=F],main = "counts")
-pheatmap(cor(normalized_xpress,method = "spearman"),annotation = summarydata[,"rRNA.rate",drop=F],main = "eXpress")
+pheatmap(cor(normalized_counts,method = "spearman"),annotation = summarydata[,c("rRNA.rate"),drop=F],main = "counts",clustering_method = "ward")
+pheatmap(cor(normalized_xpress,method = "spearman"),annotation = summarydata[,"rRNA.rate",drop=F],main = "eXpress",clustering_method = "ward")
 ```
 
 ## Pearson Correlation heatmap of TMM-normalized counts
@@ -232,6 +232,8 @@ pheatmap(as.matrix(normalized_xpress[select_e,]),annotation = summarydata[,"rRNA
 
 ```
 
+
+# Differential expression
 ```{r de-setup}
 library(DESeq2)
 library(DEGreport)
@@ -239,8 +241,6 @@ library(vsn)
 design = ~ group
 condition = "group"
 ```
-
-# Differential expression
 
 ```{r deseq2-expression-analysis, results='asis'}
 xpress <- xpress[rowSums(xpress>0)>1,]
@@ -310,6 +310,121 @@ for(i in seq(length(all_results))) {
   plotMA(all_results[[i]])
   title(paste("MAplot ", names(all_results)[i]))
 }
+```
+
+## boxplot after DESeq2 normalization
+
+```{r boxplot-deseq2}
+norm_counts = counts(dds, normalized=T)
+boxplot(log2(norm_counts+1))
+```
+
+## check librarysize
+
+```{r check-librarysize}
+sizeFactors(dds)
+mean_by_gene = apply(counts, 1, mean)
+ratio_by_gene = sweep(counts,1,mean_by_gene,"/")
+ggplot(melt(ratio_by_gene), aes(value) ) +
+    geom_density() +
+    facet_wrap(~variable, nrow = 4)
+```
+
+
+### removing variation
+
+with express data
+
+```{r ruv-seq}
+library(RUVSeq)
+ruv_normalization = function(dds_obj){
+    raw = counts(dds_obj)
+    norm = counts(dds_obj, normalized=T)
+    set <- newSeqExpressionSet(as.matrix(round(norm)),
+                               phenoData =summarydata[,"group",drop=F])
+    differences <- matrix(data=c(1:3, 4:6, 7:9, 10:12), byrow=TRUE, nrow=4)
+    after_ruv <- RUVs(set, row.names(norm), k=1, differences)
+    
+    dds_ruv = DESeqDataSetFromMatrix(countData=raw,
+                                     colData=pData(after_ruv), design = ~ W_1 + group)
+    dds_ruv = DESeq(dds_ruv)
+    dds_ruv
+}
+
+xpress_ruv = ruv_normalization(dds)
+all_results_ruv = handle_deseq2(xpress_ruv, summarydata, condition)
+all_results_ruv = all_results_ruv[1:3]
+par(mfrow=c(1,3))
+for(i in seq(length(all_results_ruv))) {
+  plotMA(all_results_ruv[[i]])
+  title(paste("MAplot ", names(all_results_ruv)[i]))
+}
+
+rlog_mat_ruv = assay(rlog(xpress_ruv))
+pheatmap(cor(rlog_mat_ruv),clustering_method = "ward")
+```
+
+with featureCount data
+
+```{r ruv-counts}
+counts_ruv = ruv_normalization(dds_c)
+all_results_ruv = handle_deseq2(counts_ruv, summarydata, condition)
+all_results_ruv = all_results_ruv[1:3]
+par(mfrow=c(1,3))
+for(i in seq(length(all_results_ruv))) {
+  plotMA(all_results_ruv[[i]])
+  title(paste("MAplot ", names(all_results_ruv)[i]))
+}
+
+rlog_mat_ruv = assay(rlog(counts_ruv))
+pheatmap(cor(rlog_mat_ruv),clustering_method = "ward")
+
+```
+
+with xpress TPM data
+
+```{r ruv-counts}
+tpm_ruv = ruv_normalization(dds_tpm)
+all_results_ruv = handle_deseq2(tpm_ruv, summarydata, condition)
+all_results_ruv = all_results_ruv[1:3]
+par(mfrow=c(1,3))
+for(i in seq(length(all_results_ruv))) {
+  plotMA(all_results_ruv[[i]])
+  title(paste("MAplot ", names(all_results_ruv)[i]))
+}
+
+rlog_mat_ruv = assay(rlog(tpm_ruv))
+pheatmap(cor(rlog_mat_ruv),clustering_method = "ward")
+
+```
+
+### correlation among express and count data
+
+```{r cor-xpress-count}
+new_names = paste0("T",row.names(counts))
+dd = rbind( melt(xpress %>% mutate( id= row.names(xpress) ) ) %>% mutate(method="eXpress"),
+            melt(counts %>% mutate( id=new_names ) ) %>% mutate(method="counts") )
+dd_wide = reshape(dd, direction = "wide" ,timevar = "method", idvar = c("id","variable"))
+
+ggplot(dd_wide, aes(x=log2(value.eXpress+1),y=log2(value.counts+1)) ) +
+    geom_point(alpha=0.5) +
+    facet_wrap(~variable,nrow=4)
+```
+
+
+```{r cor-xpress-count}
+rlog_mat_count_ruv = as.data.frame(assay(rlog(counts_ruv)))
+rlog_mat_xpress_ruv = as.data.frame(assay(rlog(xpress_ruv)))
+
+new_names = paste0("T",row.names(rlog_mat_count_ruv))
+
+dd = rbind( melt(rlog_mat_xpress_ruv %>% mutate( id= row.names(rlog_mat_xpress_ruv) ) ) %>% mutate(method="eXpress"),
+            melt(rlog_mat_count_ruv %>% mutate( id=new_names ) ) %>% mutate(method="counts") )
+dd_wide = reshape(dd, direction = "wide" ,timevar = "method", idvar = c("id","variable"))
+
+ggplot(dd_wide, aes(x=value.eXpress,y=value.counts) ) +
+    geom_point(alpha=0.5) +
+    facet_wrap(~variable,nrow=4)
 ```
 
 ## Volcano-plots
