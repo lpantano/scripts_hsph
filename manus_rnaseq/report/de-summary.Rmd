@@ -1,9 +1,15 @@
 ---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
   html_document:
     toc: true
     highlight: zenburn
-    theme: united
 ---
+
 ```{r custom-code}
 source("~/repos/myRfunctions/transactions.R")
 dn <- "manus_rnaseq/"
@@ -14,14 +20,26 @@ setwd(path_files)
 
 
 ```{r setup, echo=FALSE, eval=FALSE}
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=11,
                       cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                       eval=TRUE,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
-render_2_drop("~/repos/pipelines/manus_rnaseq/report/qc-summary.Rmd",dn)
+render_2_drop("~/repos/pipelines/manus_rnaseq/report/de-summary.Rmd",dn)
 
 ```
-# Overview
+
+# Samples
+
+* WT : HCT01,02,03: MG1655 (ΔendA ΔrecA)
+
+* change_1 : HCT04,05,06: MG1655 (ΔendA ΔrecA ΔaraA::MP6-Ecdxs-Ecidi-EcispD-EcIspF)
+
+* change_2 : HCT07,08,09: MG1655 (ΔendA ΔrecA ΔaraA::MP6-Ecdxs-Ecidi-EcispD-EcIspFΔadhE::FAB46-ScFPPS-L-CtF4aN)
+
+* change_3 : HCT10,11,12: MG1655 (ΔendA ΔrecA ΔaraA::MP6-Ecdxs-Ecidi-EcispD-EcIspFΔadhE::FAB46-ScFPPS-L-CtF4aN ΔldhA::MP6-SrVO-L-SrCPR) = (MB2409) = (MB0009 deletions CtF4aN SrVO MEP)
+
+Genes `recA` and `endA` are annotated and contain a small region that have reads, for this
+reason they will appear as expressed although don't represent the real genes.
 
 ```{r qc-setup}
 library(ggplot2)
@@ -31,12 +49,13 @@ library(edgeR)
 library(CHBUtils)
 library(pheatmap)
 library(dplyr)
+require(gridExtra)
+
 project_summary = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/project-summary.csv"
 
 counts_file = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/combined.counts"
 
 bowtie2_file = "/home/lpantano/orch/scratch/manus-rnaseq/analysis/manus-MB0009_bowtie2/work/htseq-count/combined.counts"
-
 
 xpress_file = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/combined.isoform.express_counts"
 
@@ -44,11 +63,16 @@ xpress_tpm_file = "/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015
 
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 "#0072B2", "#D55E00", "#CC79A7")
+
 summarydata = read.table(project_summary, header=TRUE, sep=",")
 rownames(summarydata) = summarydata$Name
 summarydata = summarydata[order(summarydata$Name),]
 row.names(summarydata) = sub("-",".",row.names(summarydata))
-
+summarydata$group = as.character(summarydata$group)
+summarydata$group[summarydata$group=="M"] = "change_1"
+summarydata$group[summarydata$group=="V"] = "change_2"
+summarydata$group[summarydata$group=="N"] = "change_3"
+summarydata$group = factor(summarydata$group, levels = c("change_1","change_2","change_3","Control"))
 
 counts = read.table(counts_file, header=TRUE, row.names="id")
 colnames(counts) = sub(".counts","", colnames(counts))
@@ -58,7 +82,6 @@ bowtie2 = read.table(bowtie2_file, header=TRUE, row.names="id")
 colnames(bowtie2) = sub(".counts","", colnames(bowtie2))
 bowtie2 = bowtie2[, order(colnames(bowtie2))]
 
-
 xpress = read.table(xpress_file, header=TRUE, row.names="id")
 colnames(xpress) = sub("_eff.counts","", colnames(xpress))
 xpress = xpress[, order(colnames(xpress))]
@@ -67,11 +90,10 @@ xpress_tpm = read.table(xpress_tpm_file, header=TRUE, row.names="id")
 colnames(xpress_tpm) = sub(".tpm","", colnames(xpress_tpm))
 xpress_tpm = xpress_tpm[, order(colnames(xpress_tpm))]
 
-
 gene_map = read.table("/home/lpantano/orch/groups/manus-rnaseq/manus-rnaseq/res/2015-02-04_manus-rnaseq/gene_map.tsv",sep="\t")
 rRNA = gene_map %>% filter(V1=="rRNA")
 
-
+# remove rRNA genes
 xpress_tpm = xpress_tpm[ ! row.names(xpress_tpm) %in% rRNA$V3,]
 xpress = xpress[ ! row.names(xpress) %in% rRNA$V3,]
 counts = counts[ ! row.names(counts) %in% rRNA$V2,]
@@ -80,6 +102,14 @@ bowtie2 = bowtie2[ ! row.names(bowtie2) %in% rRNA$V2,]
 
 
 # Differential expression
+
+We create 2 different types of count matrix. 
+
+* **eXpress** : multimapping reads and inside multiple genes were taken
+* **Counts**: only uniquely mapped reads and inside only one gene were taken
+
+By default we are using **eXpress**, but later we compare with **Counts**.
+
 ```{r de-setup}
 library(DESeq2)
 library(DEGreport)
@@ -88,18 +118,13 @@ design = ~ group
 condition = "group"
 ```
 
-We filter any row with no counts at all
+We filter any gene with no counts in any sample
 
 ```{r deseq2-expression-analysis, results='asis'}
 xpress <- xpress[rowSums(xpress>0)>1,]
 dds = DESeqDataSetFromMatrix(countData=xpress,
     colData=summarydata, design = design)
 dds = DESeq(dds)
-
-xpress_tpm <- xpress_tpm[rowSums(xpress_tpm>0)>1,]
-dds_tpm = DESeqDataSetFromMatrix(countData=round(xpress_tpm,0),
-    colData=summarydata, design = design)
-dds_tpm = DESeq(dds_tpm)
 
 counts <- counts[rowSums(counts>0)>1,]
 dds_c = DESeqDataSetFromMatrix(countData=counts,
@@ -110,14 +135,17 @@ dds_c = DESeq(dds_c)
 
 ```{r deseq-diagnostics, results='asis'}
 rld <- rlog(dds)
-vsd <- varianceStabilizingTransformation(dds)
 rlogMat <- assay(rld)
-vstMat <- assay(vsd)
-normMat = counts(dds, normalized=T)
 
+rld_c <- rlog(dds_c)
+rlogMat_c <- assay(rld_c)
 ```
 
+
 ## Dispersion estimates
+
+Dispersion will show how the mean expression of genes is related to the coefficient of variation.
+Normally is a non-linear shape going down as expression increase.
 
 ```{r dispersion-estimate}
 plotDispEsts(dds)
@@ -125,7 +153,7 @@ plotDispEsts(dds)
 
 ```{r deseq2-handler}
 handle_deseq2 = function(dds, summarydata, column) {
-  all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  all_combs = list(c("change_1","Control"),c("change_2","Control"),c("change_3","Control"))
   all_results = list()
   contrast_strings = list()
   for(comb in all_combs) {
@@ -143,6 +171,8 @@ handle_deseq2 = function(dds, summarydata, column) {
 
 ## MA-plots
   
+### MA-plot for eXpress data
+
 ```{r DESeq-output, results='asis'}
 all_results = handle_deseq2(dds, summarydata, condition)
 all_results = all_results[1:3]
@@ -158,8 +188,17 @@ pheatmap(cor(rlogMat),clustering_method = "ward")
 
 ```
 
+The MAplot are funny, normally it's expected points around the horizontal line, 
+but we see here a weird shape on the left that maybe is related to some artefact. 
+
+The heatmap seems to cluster correctly the samples into groups.
 
 ## check librarysize
+
+The way DESeq2 normalized is using the ratio of all genes by the mean expression 
+among all samples. It's expected a distribution with a peak that will indicates the 
+factor to be used for each sample to normalize it. In an ideal experiment without
+variation, the peak should be at 1.
 
 ```{r check-librarysize}
 sizeFactors(dds)
@@ -170,10 +209,37 @@ ggplot(melt(ratio_by_gene), aes(value) ) +
     facet_wrap(~variable, nrow = 4)
 ```
 
+The distributions are different but there is no two peaks in any of them, meaning
+that the factor seems correct. 
+Some times there are two peaks because a general deregulation of a big subset of genes.
+In this cases the factor may be wrong and affect the DE, but it's not the case.
 
-### removing variation
+### MA-plot for Counts data
 
-with express data
+```{r maplot-counts}
+
+all_results_c = handle_deseq2(dds_c, summarydata, condition)
+all_results_c = all_results_c[1:3]
+par(mfrow=c(1,3))
+for(i in seq(length(all_results_c))) {
+  plotMA(all_results_c[[i]])
+  title(paste("MAplot ", names(all_results_c)[i]))
+  idx = match(row.names(all_results_c[[i]]),gene_map$V2)
+  all_results_c[[i]] = as.data.frame(all_results_c[[i]]) %>% mutate(gene=gene_map[idx,"V4"])
+}
+
+pheatmap(cor(rlogMat_c),clustering_method = "ward")
+
+```
+
+The effect is the same, and the heatmap is a little noiser here. 
+
+## removing variation
+
+We applied a method to remove noise due to experimental procedures to both 
+data set, **eXpress** and **Counts** matrix. 
+
+### with eXpress data
 
 ```{r ruv-seq}
 library(RUVSeq)
@@ -191,8 +257,8 @@ ruv_normalization = function(dds_obj){
     dds_ruv
 }
 
-digest_de = function(dds_obj,id_col=3){
-    all_results_ruv = handle_deseq2(dds_obj, summarydata, condition)
+digest_de = function(dds_obj,summary,id_col=3, prefix){
+    all_results_ruv = handle_deseq2(dds_obj, summary, condition)
     all_results_ruv = all_results_ruv[1:3]
     mapped_res = vector("list")
     par(mfrow=c(1,3))
@@ -203,7 +269,7 @@ digest_de = function(dds_obj,id_col=3){
         out_df = as.data.frame(all_results_ruv[[i]]) %>% mutate(gene=gene_map[idx,"V4"])
         mapped_res[[i]] = out_df
         knitr::kable(head(out_df %>% filter(abs(log2FoldChange)>1 & padj<0.01),10))
-        write.table(out_df, file=paste(names(all_results_ruv)[i], ".tsv", sep=""),
+        write.table(out_df, file=paste0(prefix,names(all_results_ruv)[i], ".tsv"),
                     quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
         
     }
@@ -212,50 +278,34 @@ digest_de = function(dds_obj,id_col=3){
 }
 
 xpress_ruv = ruv_normalization(dds)
-xpress_res = digest_de(xpress_ruv)
+xpress_res = digest_de(xpress_ruv,summarydata,id_col=3,"express_")
 
 rlog_xpress_ruv = assay(rlog(xpress_ruv))
 pheatmap(cor(rlog_xpress_ruv),clustering_method = "ward")
 ```
 
-with featureCount data
+
+The MA-plot seems quite better now, and the heatmap is the same. 
+
+### with Counts data
 
 ```{r ruv-counts}
 counts_ruv = ruv_normalization(dds_c)
-counts_res = digest_de(counts_ruv,2)
+counts_res = digest_de(counts_ruv,summarydata,2, "counts_")
 
 rlog_counts_ruv = assay(rlog(counts_ruv))
 pheatmap(cor(rlog_counts_ruv),clustering_method = "ward")
 
 ```
 
-
-### correlation among express and count data
-
-```{r cor-xpress-count}
-new_names = paste0("T",row.names(counts))
-dd = rbind( melt(xpress %>% mutate( id= row.names(xpress) ) ) %>% mutate(method="eXpress"),
-            melt(counts %>% mutate( id=new_names ) ) %>% mutate(method="counts") )
-dd_wide = reshape(dd, direction = "wide" ,timevar = "method", idvar = c("id","variable"))
-
-ggplot(dd_wide, aes(x=log2(value.eXpress+1),y=log2(value.counts+1)) ) +
-    geom_point(alpha=0.5) +
-    facet_wrap(~variable,nrow=4)
-```
+The MA-plots are better, but the heatmap keeps the noise.
 
 
-## Volcano-plots
+## QC of DE analysis
 
-```{r DESeq-volcano}
-par(mfrow=c(1,3))
-for(i in seq(length(xpress_res))) {
-  stats = as.data.frame(xpress_res[[i]][,c(2,6)])
-  p = volcano_density_plot(stats, title=names(xpress_res)[i], lfc.cutoff=1)
-  print(p)
-}
-```
-
-## DEGreport
+The relation between the mean expression and the variation can show any bias due to 
+abundance or variability. In this case, everything seems correct. In red, are the 
+genes with corrected p-value < 0.01
 
 ```{r get-groups}
 get_groups <- function(d, comp, condition)
@@ -267,95 +317,127 @@ get_groups <- function(d, comp, condition)
 }
 ```
 
-### Pvalues-vs-Mean
-We plot some information about how p-values is correlated with the average mean or
-the standard desviation. We should see the same distribution for each p-value bin.
+### Mean-vs-SD in corrected eXpress
 
-```{r DEGreport-M}
+```{r DEGreport-M-xpress}
+
+plot = list()
 for(i in seq(length(xpress_res))) {
-  print(degMean(xpress_res[[i]]$pvalue, rlog_xpress_ruv) + 
-  ggtitle(paste0("Pvalues-vs-Mean for ", names(xpress_res)[i])))
+  g=get_groups(summarydata,names(xpress_res)[i],condition)
+  g1 = sub("-",".",g[[1]])
+  g2 = sub("-",".",g[[2]])
+  plot[[i]] = degMV(g1,g2,xpress_res[[i]]$pvalue, counts(xpress_ruv, normalized=TRUE) ) + 
+  ggtitle(paste0("Pvalues-vs-Mean for ", names(xpress_res)[i]))
+  
 }
-```
-
-## markers
-
-### eXpress data
-
-```{r markers-xpress}
-genes = c(row.names(xpress)[!grepl("^Tb",row.names(xpress))],"Tb2945","Tb2699",
-          "Tb3368", "Tb2536", "Tb4265", "Tb0912")
-dd = melt(rlogMat[genes,])
-dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
-dd$X1 = as.character(dd$X1)
-
-tids= c("Tb2945","Tb2699","Tb3368", "Tb2536", "Tb4265", "Tb0912")
-names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
-
-for (tid in names(tids)){
-    dd$X1[dd$X1==tids[tid]] = tid
-}
-
-
-dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
-
-
-ggplot(dd, aes(y=value, x=X2, color=group)) +
-    geom_point() +
-    facet_wrap(~X1)
-```
-
-### count data
-
-```{r markers-count}
-rld_c <- rlog(dds_c)
-rlogMat_c <- assay(rld_c)
-
-genes = c(row.names(counts)[!grepl("^b",row.names(counts))],"b2945","b2699", "b3368", "b2536", "b4265", "b0912")
-dd = melt(rlogMat_c[genes,])
-dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
-
-dd$X1 = as.character(dd$X1)
-tids= c("b2945","b2699","b3368", "b2536", "b4265", "b0912")
-names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
-
-for (tid in names(tids)){
-    dd$X1[dd$X1==tids[tid]] = tid
-}
-
-dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","TBs.idi","Ec.dxs","ispDF","Sc.FPPS","CtF4aN.CDS","Sr.VO.F219L.T487N","t69.Sr.CPR"))
-ggplot(dd, aes(y=value, x=X2, color=group)) +
-    geom_point() +
-    facet_wrap(~X1) +
-    scale_color_brewer(palette = "Set1")
-```
-
-### eXpress after noise reduction
-
-
-```{r markers-xpress-ruv}
-genes = c(row.names(xpress)[!grepl("^Tb",row.names(xpress))],"Tb2945","Tb2699",
-          "Tb3368", "Tb2536", "Tb4265", "Tb0912")
-dd = melt(rlog_xpress_ruv[genes,])
-dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
-dd$X1 = as.character(dd$X1)
-
-tids= c("Tb2945","Tb2699","Tb3368", "Tb2536", "Tb4265", "Tb0912")
-names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
-
-for (tid in names(tids)){
-    dd$X1[dd$X1==tids[tid]] = tid
-}
-
-dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
-
-ggplot(dd, aes(y=value, x=X2, color=group)) +
-    geom_point() +
-    facet_wrap(~X1)
+grid.arrange(plot[[1]], plot[[2]], plot[[3]], nrow=3)
 ```
 
 
-## Comparison with Rockhopper
+### Mean-vs-SD in corrected Counts
+
+```{r DEGreport-M-counts}
+
+for(i in seq(length(counts_res))) {
+  g=get_groups(summarydata,names(counts_res)[i],condition)
+  g1 = sub("-",".",g[[1]])
+  g2 = sub("-",".",g[[2]])
+  plot[[i]] = degMV(g1,g2,counts_res[[i]]$pvalue, counts(counts_ruv, normalized=TRUE) ) + 
+  ggtitle(paste0("Pvalues-vs-Mean for ", names(counts_res)[i]))
+}
+grid.arrange(plot[[1]], plot[[2]], plot[[3]], nrow=3)
+```
+
+
+Something happens with some samples, there are like two set of genes.
+
+### weird samples
+
+Expression density of all samples
+
+```{r density}
+plot1 = ggplot(melt(rlogMat), aes(x=value,colour=X2)) +
+    geom_density()
+
+plot2 = ggplot(melt(rlogMat[,7:12]), aes(x=value,colour=X2)) +
+    geom_density()
+
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+I reduced the problem to V and WT samples, since the weird samples are in these groups.
+
+
+```{r sample-detection}
+library("GGally")
+cl = c(7:9,10:12)
+# ggpairs(log2(counts(xpress_ruv,normalized=T)+1)[,cl],alpha=0.2)
+ggpairs(log2(counts(dds_c,normalized=T)+1)[,cl],alpha=0.2)
+
+# dd = as.data.frame(log2(counts(dds_c,normalized=T)+1)[,c(11,12)])
+# idx = match(row.names(dd),gene_map$V2)
+# dd$type = gene_map[idx,1]
+# ggplot(dd,aes(x=WT.3,y=WT.2,colour=type)) +
+#     geom_point(alpha=0.3)
+```
+
+
+Samples WT-3 and V-3 are quite weird, like two subtype of population,something
+that doesn't happen in the replicates. Maybe something wrong happened?
+
+### Removing weird samples
+
+If we remove both samples from the analysis and repeat MA-plot and heatmap, everything looks good.
+
+```{r xpress-clean-wrong-samples}
+
+dds_xpress_red = DESeqDataSetFromMatrix(countData=xpress[,c(1:8,10:11)],
+    colData=summarydata[c(1:8,10:11),], design = design)
+dds_xpress_red = DESeq(dds_xpress_red)
+
+
+xpress_clean_res = digest_de(dds_xpress_red,summarydata[c(1:8,10:11),],id_col=3,"express_clean_")
+
+rld_xpress_clean <- rlog(dds_xpress_red)
+rlogMat_xpress_clean <- assay(rld_xpress_clean)
+
+pheatmap(cor(rlogMat_xpress_clean),clustering_method = "ward")
+
+```
+
+The MA-plot are similar to the ones after noise reduction, and heatmap is much clean now.
+
+The overlap of eXpress data without those 2 samples (eXpress_clean) and eXpress
+data after noise reduction (eXpress_red) are similar. We detect more genes after
+removing the weird samples because the variation is lower, but we reducing the number
+of replicates and this can lead to false positives.
+
+
+```{r common-xpress-clean}
+par(mfrow=c(1,3), cex=1.3)
+xpress_c_M = xpress_clean_res[[1]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+xpress_r_M = xpress_res[[1]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+venn(list(xpress_clean=xpress_c_M[,1], xpress_red=xpress_r_M[,1]))
+title("change_1 vs Control")
+xpress_c_M = xpress_clean_res[[2]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+xpress_r_M = xpress_res[[2]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+venn(list(xpress_clean=xpress_c_M[,1], xpress_red=xpress_r_M[,1]))
+title("change_2 vs Control")
+xpress_c_M = xpress_clean_res[[3]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+xpress_r_M = xpress_res[[3]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+venn(list(xpress_clean=xpress_c_M[,1], xpress_red=xpress_r_M[,1]))
+title("change_3 vs Control")
+
+```
+
+
+
+# Comparison with Rockhopper
+
+We used Rockhopper to get DE genes as well. The MA-plot for this data shows as well
+weird shape. In this case all genes inside this weird shape are called as DE.
+
+## MA-plot
 
 ```{r read-rh}
 rockh = read.table(paste0(path_files,"/MB0009_counts.txt"),header=1,sep="\t")
@@ -371,53 +453,225 @@ ma_plot = function(num,den,qv, name=""){
 }
 
 par(mfrow=c(1,3))
-ma_plot(9,10,13,"ControlvsM")
-ma_plot(9,12,15,"ControlvsN")
-ma_plot(9,11,14,"ControlvsV")
+ma_plot(9,10,13,"ControlvsChange_1")
+ma_plot(9,11,14,"ControlvsChange_2")
+ma_plot(9,12,15,"ControlvsChange_3")
 
 ```
 
-### controlvsM
+We selected only genes with 
+an absolute log2FC > 1 and a corrected p-value < 0.01. 
+The Rockhopper results contains rRNA, but we removed those in our data
+since is a source of noise in this case.
 
-```{r three-method-venn}
+
+## eXpress, Count and Rockhopper
+
+```{r three-method-venn, fig.width=15}
 rockh$tx = paste0("T",rockh$Name)
 
 
 xpress_r_M = all_results[[1]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
-xpress_r_N = all_results[[2]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
-xpress_r_V = all_results[[3]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+xpress_r_V = all_results[[2]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+xpress_r_N = all_results[[3]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
 
 xpress_M = xpress_res[[1]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
-xpress_N = xpress_res[[2]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
-xpress_V = xpress_res[[3]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+xpress_V = xpress_res[[2]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+xpress_N = xpress_res[[3]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
 
 counts_M = counts_res[[1]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
-counts_N = counts_res[[2]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
-counts_V = counts_res[[3]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+counts_V = counts_res[[2]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
+counts_N = counts_res[[3]] %>% filter( abs(log2FoldChange)>1 & padj<0.01 ) %>% select(gene)
 
-rockh_M = rockh   %>% filter( abs(log2(Expression.WT/exp.M))>1 & qValue.WT.vs.A<0.01 ) %>% select(Name)
-rockh_N = rockh   %>% filter( abs(log2(Expression.WT/exp.N))>1 & qValue.WT.vs.B<0.01 ) %>% select(Name)
-rockh_V = rockh   %>% filter( abs(log2(Expression.WT/exp.V))>1 & qValue.WT.vs.C<0.01 ) %>% select(Name)
+rockh_M = rockh %>% filter( abs(log2(Expression.WT/exp.M))>1 & qValue.WT.vs.A<0.01 ) %>% select(Name)
+rockh_N = rockh %>% filter( abs(log2(Expression.WT/exp.N))>1 & qValue.WT.vs.C<0.01 ) %>% select(Name)
+rockh_V = rockh %>% filter( abs(log2(Expression.WT/exp.V))>1 & qValue.WT.vs.B<0.01 ) %>% select(Name)
 
-par(mfrow=c(1,3))
+par(mfrow=c(1,3), cex=1.3)
 venn(list(xpress=xpress_M[,1],counts=counts_M[,1],rockhopper=rockh_M[,1]))
-title("Control vs M")
-venn(list(xpress=xpress_N[,1],counts=counts_N[,1],rockhopper=rockh_N[,1]))
-title("Control vs N")
+title("Control vs Change_1")
 venn(list(xpress=xpress_V[,1],counts=counts_V[,1],rockhopper=rockh_V[,1]))
-title("Control vs V")
+title("Control vs Change_2")
+venn(list(xpress=xpress_N[,1],counts=counts_N[,1],rockhopper=rockh_N[,1]))
+title("Control vs Change_3")
 
 ```
 
+There is a big difference with Rockhopper method. The difference is smaller among 
+eXpress and Count data. It makes sense that the condition with more DE genes is 
+the one with all changes in the genome (strain change_3, here)
 
-```{r xpress-venn}
-par(mfrow=c(1,3))
+## eXpress, corrected  eXpress and rockhopper
+
+Finally, to make sure how data changes after noise reduction, we compared *eXpress* data, *eXpress data after noise reduction* and *rockhopper*.
+
+```{r xpress-venn, fig.width=15}
+par(mfrow=c(1,3), cex=1.3)
 venn(list(xpress=xpress_M[,1],xpress_raw=xpress_r_M[,1],rockhopper=rockh_M[,1]))
-title("Control vs M")
-venn(list(xpress=xpress_N[,1],xpress_raw=xpress_r_N[,1],rockhopper=rockh_N[,1]))
-title("Control vs N")
+title("Control vs Change_1")
 venn(list(xpress=xpress_V[,1],xpress_raw=xpress_r_V[,1],rockhopper=rockh_V[,1]))
-title("Control vs V")
-
+title("Control vs Change_2")
+venn(list(xpress=xpress_N[,1],xpress_raw=xpress_r_N[,1],rockhopper=rockh_N[,1]))
+title("Control vs Change_3")
 ```
 
+There are some new genes after noise reduction, but the difference is small, meaning
+data is consistent. 
+
+
+# Files
+
+## differential expression 
+
+### eXpress after WT.3 and V.3 removal
+
+[Change_1 vs Control]( `r get_report_links(paste0(path_files,"/express_clean_change_1vsControl.tsv"))`)
+[Change_2 vs Control]( `r get_report_links(paste0(path_files,"/express_clean_change_2vsControl.tsv"))`)
+[Change_3 vs Control]( `r get_report_links(paste0(path_files,"/express_clean_change_3vsControl.tsv"))`)
+
+
+### eXpress after noise reduction
+
+[Change_1 vs Control]( `r get_report_links(paste0(path_files,"/express_change_1vsControl.tsv"))`)
+[Change_2 vs Control]( `r get_report_links(paste0(path_files,"/express_change_2vsControl.tsv"))`)
+[Change_3 vs Control]( `r get_report_links(paste0(path_files,"/express_change_3vsControl.tsv"))`)
+
+### Counts after noise reduction
+
+[Change_1 vs Control]( `r get_report_links(paste0(path_files,"/counts_change_1vsControl.tsv"))`)
+[Change_2 vs Control]( `r get_report_links(paste0(path_files,"/counts_change_2vsControl.tsv"))`)
+[Change_3 vs Control]( `r get_report_links(paste0(path_files,"/counts_change_3vsControl.tsv"))`)
+
+### Rockhopper
+
+[Rockhopper]( `r get_report_links(paste0(path_files,"/MB0009_counts.txt"))`)
+
+# Appendix
+
+# correlation among express and count data
+
+```{r cor-xpress-count}
+new_names = paste0("T",row.names(counts))
+dd = rbind( melt(xpress %>% mutate( id= row.names(xpress) ) ) %>% mutate(method="eXpress"),
+            melt(counts %>% mutate( id=new_names ) ) %>% mutate(method="counts") )
+dd_wide = reshape(dd, direction = "wide" ,timevar = "method", idvar = c("id","variable"))
+
+ggplot(dd_wide, aes(x=log2(value.eXpress+1),y=log2(value.counts+1)) ) +
+    geom_point(alpha=0.5) +
+    facet_wrap(~variable,nrow=4)
+```
+
+## Volcano-plots
+
+```{r DESeq-volcano}
+par(mfrow=c(1,3))
+for(i in seq(length(xpress_res))) {
+  stats = as.data.frame(xpress_res[[i]][,c(2,6)])
+  p = volcano_density_plot(stats, title=names(xpress_res)[i], lfc.cutoff=1)
+  print(p)
+}
+```
+
+# markers
+
+* red: positive controls genes
+* green: deleted genes
+* blue: inserted genes
+
+## eXpress data
+
+```{r markers-xpress}
+genes = c(row.names(xpress)[!grepl("^Tb",row.names(xpress))],"Tb2945","Tb2699",
+          "Tb3368", "Tb2536", "Tb4265", "Tb0912")
+dd = melt(rlogMat[genes,])
+dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
+dd$X1 = as.character(dd$X1)
+
+tids= c("Tb2945","Tb2699","Tb3368", "Tb2536", "Tb4265", "Tb0912")
+names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
+
+for (tid in names(tids)){
+    dd$X1[dd$X1==tids[tid]] = tid
+}
+
+type = c("control","control","control","control",
+         "del","del","modified","modified","modified","modified","modified","modified","modified")
+names(type) = c("cysG", "hcaT", "idnT", "ihfB",
+                "endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR")
+dd$type = type[dd$X1]
+
+dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
+
+
+ggplot(dd, aes(y=value, x=X2, color=group)) +
+    geom_rect(aes(fill = type),xmin = -Inf,xmax = Inf,
+        ymin = -Inf,ymax = Inf,alpha = 0.02) +
+    geom_point() +
+    facet_wrap(~X1)+
+    scale_color_brewer(palette = "Set1")
+```
+
+## count data
+
+```{r markers-count}
+require(scales)
+genes = c(row.names(counts)[!grepl("^b",row.names(counts))],"b2945","b2699", "b3368", "b2536", "b4265", "b0912")
+
+dd = melt(rlogMat_c[genes,])
+dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
+
+dd$X1 = as.character(dd$X1)
+tids= c("b2945","b2699","b3368", "b2536", "b4265", "b0912")
+names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
+
+for (tid in names(tids)){
+    dd$X1[dd$X1==tids[tid]] = tid
+}
+
+type = c("control","control","control","control",
+         "del","del","modified","modified","modified","modified","modified","modified","modified")
+names(type) = c("cysG", "hcaT", "idnT", "ihfB",
+                "endA","recA","Bs.idi","Ec.dxs","ispDF","Sc.FPPS","CtF4aN.CDS","Sr.VO.F219L.T487N","t69.Sr.CPR")
+dd$type = type[dd$X1]
+
+dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","Bs.idi","Ec.dxs","ispDF","Sc.FPPS","CtF4aN.CDS","Sr.VO.F219L.T487N","t69.Sr.CPR"))
+ggplot(dd, aes(y=value, x=X2, color=group)) +
+    geom_rect(aes(fill = type),xmin = -Inf,xmax = Inf,
+            ymin = -Inf,ymax = Inf,alpha = 0.02) +
+    geom_point() +
+    facet_wrap(~X1) +
+    scale_color_brewer(palette = "Set1")
+```
+
+## eXpress after noise reduction
+
+```{r markers-xpress-ruv}
+genes = c(row.names(xpress)[!grepl("^Tb",row.names(xpress))],"Tb2945","Tb2699",
+          "Tb3368", "Tb2536", "Tb4265", "Tb0912")
+dd = melt(rlog_xpress_ruv[genes,])
+dd$group = summarydata[match(dd$X2,row.names(summarydata)),"group"]
+dd$X1 = as.character(dd$X1)
+
+tids= c("Tb2945","Tb2699","Tb3368", "Tb2536", "Tb4265", "Tb0912")
+names(tids) = c("endA", "recA", "cysG", "hcaT", "idnT", "ihfB" )
+
+for (tid in names(tids)){
+    dd$X1[dd$X1==tids[tid]] = tid
+}
+
+type = c("control","control","control","control",
+         "del","del","modified","modified","modified","modified","modified","modified","modified")
+names(type) = c("cysG", "hcaT", "idnT", "ihfB",
+                "endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR")
+dd$type = type[dd$X1]
+
+dd$X1 = factor(dd$X1, levels=c("cysG", "hcaT", "idnT", "ihfB","endA","recA","TBs.idi","TEc.dxs","TispDF","TSc.FPPS","TCtF4aN.CDS","TSr.VO.F219L.T487N","Tt69.Sr.CPR"))
+
+
+ggplot(dd, aes(y=value, x=X2, color=group)) +
+    geom_rect(aes(fill = type),xmin = -Inf,xmax = Inf,
+        ymin = -Inf,ymax = Inf,alpha = 0.02) +
+    geom_point() +
+    facet_wrap(~X1)+
+    scale_color_brewer(palette = "Set1")
+```
