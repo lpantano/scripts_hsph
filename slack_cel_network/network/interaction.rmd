@@ -142,7 +142,7 @@ ko_de<-read.table("~/repos/pipelines/slack_cel_network/reports/ko_de_genes.txt",
 ko_deg_mirna<-read.table("~/repos/pipelines/slack_cel_network/reports/new_smallrna/mirna_ko_de_genes_perfect.txt",header=T,row.names=1)
 row.names(ko_deg_mirna)<-sub(".ref.0.0.0.0","",row.names(ko_deg_mirna))
 ko_res = getTargets(as.character(ko_de$id), mrna[, ko_labels], mirna[, ko_labels],getcor_gene)
-ko_mir_res = getTargets(as.character(row.names(ko_deg_mirna)), mrna[, n2_labels], mirna[, n2_labels],getcor_mirna)
+ko_mir_res = getTargets(as.character(row.names(ko_deg_mirna)), mrna[, ko_labels], mirna[, ko_labels],getcor_mirna)
 ko_both_res = getTargets(as.character(row.names(ko_deg_mirna)), mrna[ko_de$id, ko_labels], mirna[, ko_labels],getcor_mirna)
 ko_res_sign = ko_res %>% filter(adj<0.1 & rho< -.7)
 ko_mir_res_sign = ko_mir_res %>% filter(adj<0.1 & rho< -.7)
