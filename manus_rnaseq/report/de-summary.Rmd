@@ -145,7 +145,7 @@ rlogMat_c <- assay(rld_c)
 ## Dispersion estimates
 
 Dispersion will show how the mean expression of genes is related to the coefficient of variation.
-Normally is a non-linear shape going down as expression increase.
+Normally is a non-linear shape going down as expression increases.
 
 ```{r dispersion-estimate}
 plotDispEsts(dds)
@@ -153,7 +153,8 @@ plotDispEsts(dds)
 
 ```{r deseq2-handler}
 handle_deseq2 = function(dds, summarydata, column) {
-  all_combs = list(c("change_1","Control"),c("change_2","Control"),c("change_3","Control"))
+  all_combs = list(c("change_1","Control"),c("change_2","Control"),c("change_3","Control"),
+                   c("change_3","change_2"),c("change_3","change_1"),c("change_2","change_1"))
   all_results = list()
   contrast_strings = list()
   for(comb in all_combs) {
@@ -189,7 +190,7 @@ pheatmap(cor(rlogMat),clustering_method = "ward")
 ```
 
 The MAplot are funny, normally it's expected points around the horizontal line, 
-but we see here a weird shape on the left that maybe is related to some artefact. 
+but we see here a weird shape on the middle that maybe is related to some artefact. 
 
 The heatmap seems to cluster correctly the samples into groups.
 
@@ -212,7 +213,7 @@ ggplot(melt(ratio_by_gene), aes(value) ) +
 The distributions are different but there is no two peaks in any of them, meaning
 that the factor seems correct. 
 Some times there are two peaks because a general deregulation of a big subset of genes.
-In this cases the factor may be wrong and affect the DE, but it's not the case.
+In these cases the factors may be wrong and affect the DE, but it's not the case.
 
 ### MA-plot for Counts data
 
@@ -257,9 +258,9 @@ ruv_normalization = function(dds_obj){
     dds_ruv
 }
 
-digest_de = function(dds_obj,summary,id_col=3, prefix){
+digest_de = function(dds_obj,summary,id_col=3, prefix, start=1, end=3){
     all_results_ruv = handle_deseq2(dds_obj, summary, condition)
-    all_results_ruv = all_results_ruv[1:3]
+    all_results_ruv = all_results_ruv[start:end]
     mapped_res = vector("list")
     par(mfrow=c(1,3))
     for(i in seq(length(all_results_ruv))) {
@@ -319,7 +320,7 @@ get_groups <- function(d, comp, condition)
 
 ### Mean-vs-SD in corrected eXpress
 
-```{r DEGreport-M-xpress}
+```{r DEGreport-M-xpress,fig.height=11}
 
 plot = list()
 for(i in seq(length(xpress_res))) {
@@ -336,7 +337,7 @@ grid.arrange(plot[[1]], plot[[2]], plot[[3]], nrow=3)
 
 ### Mean-vs-SD in corrected Counts
 
-```{r DEGreport-M-counts}
+```{r DEGreport-M-counts,fig.height=11}
 
 for(i in seq(length(counts_res))) {
   g=get_groups(summarydata,names(counts_res)[i],condition)
@@ -518,6 +519,14 @@ title("Control vs Change_3")
 There are some new genes after noise reduction, but the difference is small, meaning
 data is consistent. 
 
+# DE between groups
+
+```{r}
+
+xpress_clean_between_groups_res = digest_de(dds_xpress_red,summarydata[c(1:8,10:11),],id_col=3,"express_clean_",start=4,end=6)
+
+```
+
 
 # Files
 
@@ -528,6 +537,9 @@ data is consistent.
 [Change_1 vs Control]( `r get_report_links(paste0(path_files,"/express_clean_change_1vsControl.tsv"))`)
 [Change_2 vs Control]( `r get_report_links(paste0(path_files,"/express_clean_change_2vsControl.tsv"))`)
 [Change_3 vs Control]( `r get_report_links(paste0(path_files,"/express_clean_change_3vsControl.tsv"))`)
+[Change_3 vs Change_1]( `r get_report_links(paste0(path_files,"/express_clean_change_3vschange_1.tsv"))`)
+[Change_3 vs Change_2]( `r get_report_links(paste0(path_files,"/express_clean_change_3vschange_2.tsv"))`)
+[Change_2 vs Change_1]( `r get_report_links(paste0(path_files,"/express_clean_change_2vschange_1.tsv"))`)
 
 
 ### eXpress after noise reduction
@@ -545,6 +557,7 @@ data is consistent.
 ### Rockhopper
 
 [Rockhopper]( `r get_report_links(paste0(path_files,"/MB0009_counts.txt"))`)
+
 
 # Appendix
 
