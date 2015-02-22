@@ -48,7 +48,27 @@ summarydata = summarydata[order(summarydata$Name),]
 counts = read.table(counts_file, header=TRUE, row.names="id")
 counts = counts[, order(colnames(counts))]
 colnames(counts) = sub(".counts","",colnames(counts))
-#fpkm_file = read.table("/home/lpantano/orch/scratch/yellen_singlecell_neuron/gaba/work/htseq-count/combined.fpkm",header=T)
+# counts = counts[rowSums(counts)>1,]
+
+# fpkm_file = read.table("/home/lpantano/orch/scratch/yellen_singlecell_neuron/gaba/work/htseq-count/combined.fpkm",header=T)
+```
+
+```{r biotype-fn}
+get_biotyope = function(v)
+{
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id","gene_biotype") , filters=
+                    "ensembl_gene_id"    , values =as.character(v) ,mart=mart)
+    row.names(g) = g[,1]
+    g
+}
+
+biotype = get_biotyope(row.names(counts))
+biotype$gene_biotype[grepl("pseudo", biotype[,2])] = "pseudogene"
+biotype$gene_biotype[grepl("IG", biotype[,2])] = "IG"
+biotype$gene_biotype[grepl("TR", biotype[,2])] = "TR"
+biotype$gene_biotype[grepl("sense", biotype[,2])] = "sense"
 ```
 
 # Quality control metrics
@@ -149,12 +169,13 @@ y = calcNormFactors(y)
 log2_normalized_counts = cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
 
 normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
-melted = melt(normalized_counts)
+melted = melt(log2_normalized_counts)
+#melted = melt(normalized_counts)
 colnames(melted) = c("gene", "sample", "count")
 melted$sample = factor(melted$sample)
 melted$sample = reorder(melted$sample, colnames(counts))
-melted$count = log(melted$count)
-ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+#melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_violin() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +
     theme_bw(base_size=12) +
     theme(panel.grid.major = element_line(size = .5, color = "grey"))
@@ -162,21 +183,26 @@ ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
 
 ## Density of log10 TMM-normalized counts
 ```{r density-normalized}
-ggplot(melted, aes(x=count,group=sample)) +
-    geom_density()
+idx = match(melted$gene,biotype$ensembl_gene_id)
+melted$biotype = biotype[idx,2]
+melted=melted[!is.infinite(melted$count),]
+ggplot(melted[is.numeric(melted$count),], aes(x=count,group=sample)) +
+    geom_density(adjust=1)+
+    facet_wrap(~biotype)
 ```
 
 ## Density of log10 TMM-normalized counts of samples > 3000
 ```{r density-normalized-filter}
 ggplot(melted %>% filter(sample %in% keep ), aes(x=count,group=sample)) +
     geom_density() +
-    ggtitle("genes>3000")
+    ggtitle("genes>3000")+
+    facet_wrap(~biotype)
+
 ggplot(melted %>% filter(sample %in% keep6000 ), aes(x=count,group=sample)) +
     geom_density() +
-    ggtitle("genes>6000")
-
+    ggtitle("genes>6000")+
+    facet_wrap(~biotype)
 ```
-
 
 
 ## Correlation heatmap of TMM-normalized counts
@@ -204,6 +230,11 @@ pheatmap(cor(normalized_counts[select,],method="spearman"),annotation = summaryd
 ```{r ensembl-converter}
 library(org.Mm.eg.db)
 cols <- c("ENSEMBL", "SYMBOL")
+name2ensembl_ma = function(x){
+    symbol = AnnotationDbi::select(org.Mm.eg.db, as.character(x), cols, keytype="SYMBOL")
+    symbol = symbol %>% distinct(ENSEMBL)
+    symbol
+}
 name2ensembl = function(x){
     symbol = AnnotationDbi::select(org.Mm.eg.db, as.character(x), cols, keytype="SYMBOL")
     symbol = symbol %>% distinct(ENSEMBL)
@@ -214,11 +245,26 @@ ensembl2name = function(x){
     symbol = symbol %>% distinct(SYMBOL)
     symbol$SYMBOL
 }
+ensembl2name_ma = function(x){
+    symbol = AnnotationDbi::select(org.Mm.eg.db, as.character(x), cols, keytype="ENSEMBL")
+    symbol = symbol %>% distinct(SYMBOL)
+    symbol
+}
 get_description = function(v)
 {
     require(biomaRt)
     mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
     g <- getBM( attributes=c("ensembl_gene_id","external_gene_name","description") , filters=
+                    "ensembl_gene_id"    , values =as.character(v) ,mart=mart)
+    row.names(g) = g[,1]
+    g
+}
+
+get_biotyope = function(v)
+{
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id","gene_biotype") , filters=
                     "ensembl_gene_id"    , values =as.character(v) ,mart=mart)
     row.names(g) = g[,1]
     g
@@ -295,7 +341,7 @@ winsorize <- function (x, fraction=0.05) {
 }
 
 # winsorize to remove 2 most extreme cells (from each side)
-wed <- t(apply(ed, 1, winsorize, fraction=0.2))
+wed <- t(apply(ed, 1, winsorize, fraction=0.1))
 ```
 
 ## Heatmap of genes list after filtering low coverage samples
@@ -324,6 +370,8 @@ write.table(ed[receptors,],fn_receptors)
 [get hlh table](`r get_report_links(fn_hlh)`)
 
 [get receptors table](`r get_report_links(fn_receptors)`)
+
+
 
 ### Clustering using the most variable genes
 
@@ -371,3 +419,22 @@ pheatmap(as.matrix(oed_ruv[1:50,]),annotation = summarydata[,c("rRNA.rate","Gene
 
 ```
 
+
+```{r custom-tables, echo=F,eval=F}
+ichannel_fn = read.table("~/repos/pipelines/yellen_scneuron/report/ionchannel.txt")
+ichannel_ma = name2ensembl_ma(ichannel_fn$V1)
+ichannel_ma = ichannel_ma[!is.na(ichannel_ma$ENSEMBL),]
+idx = match(ichannel_ma$ENSEMBL,rownames(wed))
+ann_wed = cbind(ichannel_ma,wed[idx,])
+fn_ichannel = paste0(files_path, "ichannel_log2_norm_counts.txt")
+write.table(ann_wed,fn_ichannel,row.names=F,quote=F,sep="\t")
+
+
+all_ma = ensembl2name_ma(row.names(wed))
+all_ma = all_ma[!is.na(all_ma$ENSEMBL),]
+idx = match(all_ma$ENSEMBL,rownames(wed))
+ann_wed = cbind(all_ma,wed[idx,])
+fn_ann = paste0(files_path, "ann_log2_norm_counts.txt")
+write.table(ann_wed,fn_ann,row.names=F,quote=F,sep="\t")
+
+```
