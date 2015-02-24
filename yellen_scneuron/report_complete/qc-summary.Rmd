@@ -169,13 +169,13 @@ y = calcNormFactors(y)
 log2_normalized_counts = cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
 
 normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
-melted = melt(log2_normalized_counts)
-#melted = melt(normalized_counts)
+#melted = melt(log2_normalized_counts)
+melted = melt(normalized_counts)
 colnames(melted) = c("gene", "sample", "count")
 melted$sample = factor(melted$sample)
 melted$sample = reorder(melted$sample, colnames(counts))
-#melted$count = log(melted$count)
-ggplot(melted, aes(x=sample, y=count)) + geom_violin() +
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +
     theme_bw(base_size=12) +
     theme(panel.grid.major = element_line(size = .5, color = "grey"))
@@ -202,6 +202,24 @@ ggplot(melted %>% filter(sample %in% keep6000 ), aes(x=count,group=sample)) +
     geom_density() +
     ggtitle("genes>6000")+
     facet_wrap(~biotype)
+```
+
+
+## Density of log10 TMM-normalized counts of samples > 3000
+```{r density-normalized-filter-protein}
+ggplot(melted %>% filter(sample %in% keep & biotype=="protein_coding" ), aes(x=count,group=sample)) +
+    geom_density() +
+    ggtitle("genes>3000")+
+    facet_wrap(~sample)
+
+ggplot(melted %>% filter(biotype=="protein_coding" & sample=="SSF339.C5_R"), aes(x=count,y=gene)) +
+    geom_point()  +
+    ggtitle("bad sample example")
+
+ggplot(melted %>% filter(biotype=="protein_coding" & sample=="SSF339.F7_R"), aes(x=count,y=gene)) +
+    geom_point() +
+    ggtitle("good sample example")
+
 ```
 
 
@@ -430,11 +448,17 @@ fn_ichannel = paste0(files_path, "ichannel_log2_norm_counts.txt")
 write.table(ann_wed,fn_ichannel,row.names=F,quote=F,sep="\t")
 
 
-all_ma = ensembl2name_ma(row.names(wed))
+all_ma = ensembl2name_ma(row.names(ed))
+biotype = get_biotyope(row.names(ed))
 all_ma = all_ma[!is.na(all_ma$ENSEMBL),]
-idx = match(all_ma$ENSEMBL,rownames(wed))
-ann_wed = cbind(all_ma,wed[idx,])
+
+idx = match(all_ma$ENSEMBL,rownames(ed))
+ann_ed = cbind(all_ma,ed[idx,])
+
+idx = match(ann_ed$ENSEMBL,biotype$ensembl_gene_id)
+ann_ed$biotype = biotype[idx,2]
+
 fn_ann = paste0(files_path, "ann_log2_norm_counts.txt")
-write.table(ann_wed,fn_ann,row.names=F,quote=F,sep="\t")
+write.table(ann_ed[,c(1,2,75,3:74)],fn_ann,row.names=F,quote=F,sep="\t")
 
 ```
