@@ -379,7 +379,7 @@ do.call(grid.arrange,plots)
 for(i in seq(length(all_results))) {
   cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
   out_df = all_results[[i]]
-  knitr::kable(head(out_df))
+  print(knitr::kable(head(out_df)))
   write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
@@ -402,26 +402,28 @@ get_description = function(v)
 
 ann_results = list()
 for(i in seq(length(all_results))) {
+    cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
     res = as.data.frame(all_results[[i]]) 
     res$gene = row.names(res)
     res_anno = get_description(res$gene)
     tab_anno = cbind(res, res_anno[res$gene,])
     ann_results[[names(all_results)[i]]] = tab_anno
     tab_anno = tab_anno %>% filter(padj<0.1)
-    knitr::kable(head(tab_anno[ ,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description") ]))
+    print(knitr::kable(head(tab_anno[ ,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description") ])))
+    cat("\n")
 }
 ```
 
 
 ## MRPP genes
-No significant MRPP genes
 
 ```{r mrpp-tables,results='asis'}
 for(i in seq(length(ann_results))) {
     cat(names(ann_results)[i])
-    knitr::kable(ann_results[[i]] %>% filter(grepl("HSD17B10",external_gene_name) | 
+    print(knitr::kable(ann_results[[i]] %>% filter(grepl("HSD17B10",external_gene_name) | 
                                      grepl("TRMT10C",external_gene_name) |
-                                     grepl("KIAA0391",external_gene_name) ))
+                                     grepl("KIAA0391",external_gene_name) )))
+    cat("\n")
 }
 ```
 
@@ -439,7 +441,8 @@ for(i in seq(length(ann_results))) {
         ggtitle(names(ann_results)[i]) +
         geom_hline(yintercept=0.1)
     
-    knitr::kable( tab_anno[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter(chromosome_name=="MT") )
+    print(knitr::kable( tab_anno[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter(chromosome_name=="MT") ))
+    cat("\n")
 }
 ```
 
@@ -496,7 +499,7 @@ for(i in seq(length(ann_results))) {
     pvalue = ggplot(mit_gr, aes(fill = cut(pvalue,breaks=c(-1,0.001,0.01,0.05,1.1)) ) ) + geom_rect() + scale_fill_manual("pvalue",values = c(colfuncRed(3),"Grey50"))
     padj = ggplot(mit_gr, aes(fill = padj_break ) ) + geom_rect() + scale_fill_manual("padj",values = padj_color)
     
-    tracks(type,pvalue,padj)
+    print(tracks(type,pvalue,padj))
 }
 
 ```
@@ -521,8 +524,8 @@ coverage_dat = data.frame()
 
 read_cov = function(in_file){
     samples = c("con1-ready","con2-ready","con3-ready",
-            "unt1_1-ready","unt1_2-ready","unt1_3-ready",
-            "unt2_1-ready","unt2_2-ready","unt2_3-ready")
+            "treat1_1-ready","treat1_2-ready","treat1_3-ready",
+            "treat2_1-ready","treat2_2-ready","treat2_3-ready")
     names(size_factor) = samples
     for (sample in samples){
         d = read.table(paste0(merged_path,"/coverage_region/",sample,in_file))
