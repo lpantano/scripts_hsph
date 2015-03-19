@@ -1,0 +1,76 @@
+---
+title: "Untitled"
+author: "lorena pantano"
+date: "3/18/2015"
+output: html_document
+---
+
+```{r load}
+mat = read.table("~/orch/scratch/gregory_pca/extracted_data/mir-lusc.counts.txt", header=T, check.names = T, row.names=1)
+meta = read.table("~/orch/scratch/gregory_pca/extracted_data/mir-lusc.metadata.txt", header=T, check.names = T, row.names=1)
+mrna = read.table("~/isy1_17-92.txt", header=T, row.names=1,sep="\t")
+
+voom_m = voom(mat, model.matrix(~ 0 + meta$status ) )
+
+mirs = c("hsa-mir-92a-1","hsa-mir-92a-2","hsa-mir-92b","hsa-mir-17",
+         "hsa-mir-18a","hsa-mir-18b","hsa-mir-20a","hsa-mir-20b")
+sub=voom_m$E[mirs,]
+colnames(sub) = rownames(meta)
+pheatmap(sub, clustering_distance_rows = "correlation", clustering_distance_cols = "correlation", clustering_method = "ward", annotation = meta, show_rownames = T, show_colnames = F)
+
+```
+
+
+```{r cor 92/17}
+dd = data.frame(t(sub[mirs,]),check.names = T)
+dd$class = meta[rownames(dd),"status"]
+ggplot(dd,aes(x=hsa.mir.92a.1,y=hsa.mir.17,colour=class)) +
+    geom_point()+
+    geom_smooth()
+
+ggplot(dd) +
+    geom_point(aes(x=hsa.mir.92a.1,y=hsa.mir.20a,colour=class))
+
+ggplot(dd) +
+    geom_point(aes(x=hsa.mir.92a.1,y=hsa.mir.18a,colour=class))
+
+library(GGally)
+# ggpairs(dd[,1:8])
+```
+
+## showing ratio
+
+```{r ratio}
+ratio_mat = data.frame(ratio = dd$hsa.mir.17-dd$hsa.mir.92a.1,
+                       class = dd$class )
+ggplot(ratio_mat) + 
+    geom_boxplot(aes(x=class, y=ratio)) +
+    geom_jitter(aes(x=class, y=ratio)) +
+    ggtitle("log2FC of mir17/mir92")
+```
+
+```{r isy}
+dd$isy = mrna[as.character(row.names(dd)),"isy1"]
+
+
+ggplot(dd) +
+    geom_point(aes(x=hsa.mir.17-hsa.mir.92a.1,y=log2(isy),colour="92.a-isy1")) +
+    facet_wrap(~class)
+
+ggplot(dd) +
+    geom_point(aes(x=hsa.mir.17-hsa.mir.92a.1,y=log2(isy),colour="92.a-isy1")) +
+    geom_smooth(aes(x=hsa.mir.17-hsa.mir.92a.1,y=log2(isy),colour="92.a-isy1"))
+
+
+ggplot(mrna) +
+    geom_point(aes(y=miR.92a.1/miR.17,x=(isy1),colour="92.a-isy1")) +
+    geom_smooth(aes(y=miR.92a.1/miR.17,x=(isy1),colour="92.a-isy1"))
+
+ggplot(mrna) +
+    geom_point(aes(y=miR.17/miR.92a.2,x=(isy1),colour="92.a-isy1")) +
+    geom_smooth(aes(y=miR.17/miR.92a.2,x=(isy1),colour="92.a-isy1"))
+
+plot(mrna$miR.17/mrna$miR.92a.2,mrna$isy1,pch=20)
+cor.test(mrna$miR.17/(mrna$miR.92a.2+mrna$miR.92a.1),mrna$isy1)
+```
+
