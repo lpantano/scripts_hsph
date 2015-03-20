@@ -60,6 +60,13 @@ colfuncGreen <- colorRampPalette(c("green4", "green"))
 colfuncRed <- colorRampPalette(c("red4", "red"))
 colfuncBlue <- colorRampPalette(c("blue4", "blue"))
 
+gtf_file = read.table("~/orch/scratch/harper_mitrna_2/raw-merged/final/merge/mt_good.gtf", sep="\t")
+mit_genes = sapply(as.character(gtf_file$V9), function(x){
+    #print(x)
+    #print(strsplit(x,";")[[1]][1])
+    sub("gene_id ","", strsplit(x,";")[[1]][1])
+    #sub("gene_id ", )
+})
 ```
 
 ```{r heatmap-function}
@@ -166,6 +173,19 @@ ggplot(summarydata, aes(x=Name, y=rRNA.rate)) +
           axis.text.x = element_text(angle=90)) +
     ylab("rRNA rate") + xlab("")
 ```
+
+
+## Mapped reads to mit
+```{r reads-mit}
+dd = data.frame(Name=names(counts), Unique=colSums(counts[mit_genes,]), total=summarydata[,"Mapped"])
+ggplot(dd, aes(x=Name, y=Unique)) +
+    geom_bar(stat="identity") +
+    ylab("mit reads") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
 
 ## Estimated fragment length of paired-end reads
 ```{r fragment-length-plot}
@@ -408,6 +428,8 @@ for(i in seq(length(all_results))) {
     res_anno = get_description(res$gene)
     tab_anno = cbind(res, res_anno[res$gene,])
     ann_results[[names(all_results)[i]]] = tab_anno
+    write.table(tab_anno, file=paste(names(all_results)[i], "_anno.tsv", sep=""),
+                         quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
     tab_anno = tab_anno %>% filter(padj<0.1)
     print(knitr::kable(head(tab_anno[ ,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description") ])))
     cat("\n")
@@ -584,3 +606,19 @@ for ( gene_name in regions$V6 ) {
 
 ```
 
+# Files
+
+```{r fpkm, cache=TRUE}
+
+fpkm = read.table("~/orch/scratch/harper_mitrna_2/raw-merged/final/2015-03-12_raw-merged/combined.fpkm",row.names=1, header=T)
+
+res_anno = get_description(rownames(fpkm))
+tab_anno = cbind(fpkm, res_anno[as.character(rownames(fpkm)),])
+
+write.table(tab_anno, paste0(path_files,"/fpkm_ann.tsv"),sep="\t",quote=F)
+```
+
+[convstreat1](`r get_report_links(paste0(path_files,'/convstreat1_anno.tsv'))`)
+[convstreat2](`r get_report_links(paste0(path_files,'/convstreat2_anno.tsv'))`)
+[treat2vstreat2](`r get_report_links(paste0(path_files,'/treat1vstreat2_anno.tsv'))`)
+[fpkm](`r get_report_links(paste0(path_files,'/fpkm_ann.tsv'))`)
