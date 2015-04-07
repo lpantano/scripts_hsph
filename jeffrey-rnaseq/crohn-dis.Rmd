@@ -393,9 +393,28 @@ It seems, the genes that are DE have high variation in patients but not in contr
 
 Download differential expression results [here](`r get_report_links("CDvswildtype.tsv")`)
 
+### GSEA inputs
+
+```{r gsea-inputs}
+gsea_list = as.data.frame(out_df) %>% mutate(gene=rownames(out_df)) %>% dplyr::filter( padj<0.1 & abs(log2FoldChange)>0.4 ) %>% arrange(desc(log2FoldChange)) %>% dplyr::select(gene, log2FoldChange)
+symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(gsea_list$gene), "SYMBOL", keytype="ENSEMBL")
+rownames(gsea_list) = gsea_list$gene
+gsea_list[symbol$ENSEMBL, "symbol"] = symbol$SYMBOL
+
+write.table(gsea_list[!is.na(gsea_list$symbol),c(3,2)], "de_gsea_list.rnk", row.names=F, col.names=F, sep="\t", quote=F)
+
+gsea_list = as.data.frame(out_df) %>% mutate(gene=rownames(out_df), padj=-log10(padj)) %>% filter(baseMean > 5) %>% arrange(desc(padj)) %>% dplyr::select(gene, padj)
+symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(gsea_list$gene), "SYMBOL", keytype="ENSEMBL")
+rownames(gsea_list) = gsea_list$gene
+gsea_list[symbol$ENSEMBL, "symbol"] = symbol$SYMBOL
+
+write.table(gsea_list[!is.na(gsea_list$symbol),c(3,2)], "all_gsea_list.rnk", row.names=F, col.names=F, sep="\t", quote=F)
+```
+
+
 ### Go enrichment
 
-Using less stringent thresholds we can do enrichment analysis. This time we set up FDR < 10% and abs(log2FC) > 0.8
+Using less stringent thresholds we can do enrichment analysis. This time we set up FDR < 10% and abs(log2FC) > 0.4
 
 This web-tool can help to spot more pathways: http://amp.pharm.mssm.edu/rubik/rubik_r57d7h9f6r.html. 
 
@@ -404,7 +423,7 @@ If the page doesn't show results, you can repeat it. Just need to copy the gene 
 ```{r gosummary, cache=TRUE}
 library(GOsummaries)
 library(vegan)
-diff_genes_10 = as.data.frame(out_df) %>% mutate(gene=rownames(out_df)) %>% dplyr::filter( padj<0.1 & abs(log2FoldChange>0.8))
+diff_genes_10 = as.data.frame(out_df) %>% mutate(gene=rownames(out_df)) %>% dplyr::filter( padj<0.1 & abs(log2FoldChange)>0.4 )
 
 gs = gosummaries(list(diff_genes_10$gene))
 plot(gs, fontsize = 8)
@@ -413,6 +432,11 @@ diff_names = ensembl2name(diff_genes$gene)
 diff_names = diff_names[!is.na(diff_names)]
 write.table(diff_names,"diff_genes_symbol.txt",row.names = F, quote = FALSE, col.names = FALSE)
 
+write.table(ensembl2name(diff_genes_10$gene),"diff_genes_symbol_large.txt",row.names = F, quote = FALSE, col.names = FALSE)
+
+# pcr = prcomp(t(rlogMat))
+# gs_pca = gosummaries(pcr, annotation = summarydata[,"group",drop=F], components = 1:4)
+# plot(gs_pca, classes = "group")
 
 # pcoa = cmdscale(vegdist(t(rlogMat[diff_genes_10$gene,])), k = 4)
 # gs3 = gosummaries(pcoa,components = 1:2, exp = rlogMat[diff_genes_10$gene,], annotation = summarydata[,"group",drop=F], show_genes = T, gconvert_target = NULL, n_genes = 30)
@@ -420,6 +444,31 @@ write.table(diff_names,"diff_genes_symbol.txt",row.names = F, quote = FALSE, col
 
 # plot(gs3, class = "group", fontsize = 8)
 ```
+
+```{r gprofile, cache=TRUE}
+library(gProfileR)
+    # Run g:Profiler analysis 
+    user_agent = sprintf("gProfileR/%s", 
+                            packageVersion("gProfileR"))
+    gProfileR::set_user_agent(ua = user_agent, append = FALSE)
+    # gProfileR::set_base_url(url = "http://biit.cs.ut.ee/gprofiler_archive/r1227_e72_eg19/web/")
+    
+    gpr = gProfileR::gprofiler(query = ensembl2name(diff_genes_10$gene),
+                               organism = "hsapiens", 
+                               ordered_query = T, 
+                               hier_filtering = "none", 
+                               max_p_value = 1)
+    write.table(gpr[grep("GO",gpr$term.id),c("term.id","p.value")],
+                "gprofiler.txt", row.names=F,col.names=F,sep="\t",quote=F)
+    
+```
+
+```{r go-custom}
+# set <- universeGO(org.Hs.egGO,"Homo Sapiens")
+# rwa <- runGO(,set,"MF",as.list(GOMFCHILDREN))
+```
+
+
 
 ```{r,echo=FALSE,eval=FALSE}
 table = diff_genes_10 %>% mutate(logFC=log2FoldChange, adj.P.Val=padj)
@@ -440,7 +489,99 @@ ggplot(dd, aes(x=samples, y=exp, colour=group)) +
 ```{r specific-genes}
 select_genes = read.table("list_genes.txt", header=T)
 heatmap_fn(rlogMat[select_genes$ENSEMBLID,])
-write.table(cbind(rlogMat[select_genes$ENSEMBLID,], name=select_genes$Genesymbol), "selected_genes.tsv")
+write.table(cbind(rlogMat[select_genes$ENSEMBLID,], name=as.character(select_genes$Genesymbol)), "selected_genes.tsv")
 ```
 
-Download the [file](`r get_report_links("selected_genes.tsv")`)
+sorted genes by FoldChange and suppress clustering of samples and genes.
+
+```{r sorted-specific-genes}
+select_genes = read.table("list_genes.txt", header=T)
+idx = match(select_genes$ENSEMBLID, row.names(all_results[[1]]))
+idxna = idx[!is.na(idx)]
+out_sort = as.data.frame(out_df[idxna, ]) %>% mutate(symbol=select_genes$Genesymbol[!is.na(idx)]) %>% arrange(desc(log2FoldChange)) %>% mutate(genes=row.names(out_df)[idxna])
+
+# pheatmap(rlogMat[out_sort$genes,], cluster_rows = F, cluster_cols = F) 
+
+pvalue = as.character(cut(out_sort$padj, breaks=c(0,0.01,0.05,1), labels=c("black", "grey","white")))
+pvalue[is.na(pvalue)] = "white"
+
+# par(mar=c(8,8,4,4))
+rdylbl <- colorRampPalette(c("blue", "yellow", "red"))(n = 100)
+pdf("custom_heatmap_scale.pdf",width = 11, height = 11)
+
+heatmap.2(rlogMat[out_sort$genes,], Rowv = NULL, Colv = NULL, scale = 'row', dendrogram = 'none', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=T)
+          # breaks = seq(-1,14,(14+1)/100))
+legend("top",c("<0.01","<0.05","No-Sign"), fill=c("black", "grey","white"), horiz = T, bty = 'n', title = "adjusted p-value")
+
+dev.off()
+
+pdf("custom_heatmap_log2.pdf",width = 11, height = 11)
+
+heatmap.2(rlogMat[out_sort$genes,], Rowv = NULL, Colv = NULL, scale = 'none', dendrogram = 'none', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=F, breaks = seq(-1,14,(14+1)/100))
+legend("top",c("<0.01","<0.05","No-Sign"), fill=c("black", "grey","white"), horiz = T, bty = 'n', title = "adjusted p-value")
+
+dev.off()
+
+pdf("custom_heatmap_log2_clusrows.pdf",width = 11, height = 11)
+
+hr = hclust(as.dist(1-cor(t(rlogMat[out_sort$genes,]))), method = "ward.D2")
+heatmap.2(rlogMat[out_sort$genes,], Rowv = as.dendrogram(hr), Colv = NULL, scale = 'none', dendrogram = 'row', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=F, breaks = seq(-1,14,(14+1)/100))
+legend("top",c("<0.01","<0.05","No-Sign"), fill=c("black", "grey","white"), horiz = T, bty = 'n', title = "adjusted p-value")
+
+dev.off()
+
+write.table(out_sort, "stats_selected_genes.tsv", row.names=F, sep="\t")
+
+```
+
+
+Download the [selected genes expression](`r get_report_links("selected_genes.tsv")`)
+Download the [selected genes stats](`r get_report_links("stats_selected_genes.tsv")`)
+
+```{r other-heatmaps}
+
+symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(diff_genes_10$gene), "SYMBOL", keytype="ENSEMBL")
+symbol = symbol %>% distinct(SYMBOL)
+idx = match(diff_genes_10$gene, symbol$ENSEMBL)
+idxna = idx[!is.na(idx)]
+gene_labs = diff_genes_10$gene
+gene_labs[!is.na(idx)] = symbol$SYMBOL[idx][!is.na(idx)]
+gene_labs[is.na(gene_labs)] = diff_genes_10$gene[is.na(gene_labs)]
+
+hr = hclust(as.dist(1-cor(t(rlogMat[diff_genes_10$gene,]))), method = "ward.D2")
+
+pdf("custom_heatmap_de_FDR10_FC04.pdf",width = 11, height = 11)
+
+heatmap.2(rlogMat[diff_genes_10$gene,], Rowv = as.dendrogram(hr), Colv = NULL, scale = 'none', dendrogram = 'row', labRow = "", key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8,  col = rdylbl, key.title = "log2(norm counts)", symkey=T)
+          # breaks = seq(-1,14,(14+1)/100))
+# legend("top",c("<0.01","<0.05","No-Sign"), fill=c("black", "grey","white"), horiz = T, bty = 'n', title = "adjusted p-value")
+
+dev.off()
+
+```
+
+
+# Files
+
+## gsea
+
+GSEA tools will calculate if there is any enrichment from top to down of any gene set included in the database.
+
+There are two approaches with ranked gene list. 
+
+1) To see if there is any enrichment comparing up-regulated genes against down-regulated genes. I am using all genes with a FDR < 10% and an absolute FC > 0.4 (That just to avoid very small changes that normally are difficult to asses the biolofical importance). In this case you need to use this file sorted by FC:
+
+Download the [de gsea list](`r get_report_links("de_gsea_list.rnk")`)
+
+2) To see if there is any enrichment comparing de-regulated genes against the rest of expressed genes. In this case you need the complete list of genes sorted by -log10(padj). In this case you only can trust the results where the last gene in the enriched rank is below 200. That is because, in this case, 200 is the last gene with adjusted-pvalue < 0.1 (or FDR < 10%). That is because you list is so big (17000 genes) that it can be an enrichment of some gene sets that may go through position 1 to 5000 in your list. Of course, you are not interested in this, because the genes in those position are not significant de-regulated. You are interested in any enrichment from position 1 to 200 (or at least, that the majority of the genes in the set are there), that are the de-regulated ones. The only filtering I did here was to remove very low expressed genes to consider only relevant genes in the analysis (mean  < 5 counts).
+
+Download the [all gsea list](`r get_report_links("all_gsea_list.rnk")`)
+
+## de-regulated genes
+
+Download the [de-regulated genes](`r get_report_links("diff_genes_symbol_large.txt")`)
+
+## Go terms from gprofile using previous list
+
+Download the [GO terms with p-value](`r get_report_links("gprofiler.txt")`)
+
