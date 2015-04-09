@@ -10,6 +10,8 @@ output:
     highlight: zenburn
 ---
 
+Last updated: `r date()`
+
 
 ```{r custom}
 source("~/repos/myRfunctions/transactions.R")
@@ -219,7 +221,7 @@ design = ~ group
 condition = "group"
 ```
 
-```{r deseq2-expression-analysis, results='asis'}
+```{r deseq2-expression-analysis, results='asis', cache=TRUE}
 counts <- counts[rowSums(counts>0)>1,]
 dds = DESeqDataSetFromMatrix(countData=counts,
     colData=summarydata, design = design)
@@ -228,7 +230,7 @@ dds = DESeq(dds)
 
 ## Effect of variance stabilization
 
-```{r deseq-diagnostics, results='asis'}
+```{r deseq-diagnostics, results='asis', cache=TRUE}
 par(mfrow=c(1,3))
 notAllZero <- (rowSums(counts(dds))>0)
 rld <- rlog(dds)
@@ -275,7 +277,7 @@ nr = ceiling( len / 3 )
 nc = ceiling( len / nr )
 par(mfrow=c(nr,nc))
 for(i in seq(length(all_results))) {
-  DESeq2::plotMA(all_results[[i]])
+  DESeq2::plotMA(all_results[[i]], alpha=0.05 )
   title(paste("MA plot for contrast", names(all_results)[i]))
 }
 ```
@@ -285,7 +287,7 @@ for(i in seq(length(all_results))) {
 ```{r DESeq-volcano}
 for(i in seq(length(all_results))) {
   stats = as.data.frame(all_results[[i]][,c(2,6)])
-  p = volcano_density_plot(stats, title=names(all_results)[i], lfc.cutoff=1.5)
+  p = volcano_density_plot(stats, title=names(all_results)[i], lfc.cutoff=1, pval.cutoff = 0.05)
   print(p)
 }
 ```
@@ -395,6 +397,9 @@ Download differential expression results [here](`r get_report_links("CDvswildtyp
 
 ### GSEA inputs
 
+Using less stringent thresholds we can do enrichment analysis. This time we set up FDR < 10% and abs(log2FC) > 0.4
+
+
 ```{r gsea-inputs}
 gsea_list = as.data.frame(out_df) %>% mutate(gene=rownames(out_df)) %>% dplyr::filter( padj<0.1 & abs(log2FoldChange)>0.4 ) %>% arrange(desc(log2FoldChange)) %>% dplyr::select(gene, log2FoldChange)
 symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(gsea_list$gene), "SYMBOL", keytype="ENSEMBL")
@@ -410,7 +415,6 @@ gsea_list[symbol$ENSEMBL, "symbol"] = symbol$SYMBOL
 
 write.table(gsea_list[!is.na(gsea_list$symbol),c(3,2)], "all_gsea_list.rnk", row.names=F, col.names=F, sep="\t", quote=F)
 ```
-
 
 ### Go enrichment
 
@@ -507,9 +511,12 @@ pvalue[is.na(pvalue)] = "white"
 
 # par(mar=c(8,8,4,4))
 rdylbl <- colorRampPalette(c("blue", "yellow", "red"))(n = 100)
+
+col_order = c(4:6,1:3)
+
 pdf("custom_heatmap_scale.pdf",width = 11, height = 11)
 
-heatmap.2(rlogMat[out_sort$genes,], Rowv = NULL, Colv = NULL, scale = 'row', dendrogram = 'none', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=T)
+heatmap.2(rlogMat[out_sort$genes,col_order], Rowv = NULL, Colv = NULL, scale = 'row', dendrogram = 'none', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=T)
           # breaks = seq(-1,14,(14+1)/100))
 legend("top",c("<0.01","<0.05","No-Sign"), fill=c("black", "grey","white"), horiz = T, bty = 'n', title = "adjusted p-value")
 
@@ -517,7 +524,7 @@ dev.off()
 
 pdf("custom_heatmap_log2.pdf",width = 11, height = 11)
 
-heatmap.2(rlogMat[out_sort$genes,], Rowv = NULL, Colv = NULL, scale = 'none', dendrogram = 'none', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=F, breaks = seq(-1,14,(14+1)/100))
+heatmap.2(rlogMat[out_sort$genes, col_order], Rowv = NULL, Colv = NULL, scale = 'none', dendrogram = 'none', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=F, breaks = seq(-1,14,(14+1)/100))
 legend("top",c("<0.01","<0.05","No-Sign"), fill=c("black", "grey","white"), horiz = T, bty = 'n', title = "adjusted p-value")
 
 dev.off()
@@ -525,7 +532,7 @@ dev.off()
 pdf("custom_heatmap_log2_clusrows.pdf",width = 11, height = 11)
 
 hr = hclust(as.dist(1-cor(t(rlogMat[out_sort$genes,]))), method = "ward.D2")
-heatmap.2(rlogMat[out_sort$genes,], Rowv = as.dendrogram(hr), Colv = NULL, scale = 'none', dendrogram = 'row', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=F, breaks = seq(-1,14,(14+1)/100))
+heatmap.2(rlogMat[out_sort$genes,col_order], Rowv = as.dendrogram(hr), Colv = NULL, scale = 'none', dendrogram = 'row', labRow = out_sort$symbol, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8, RowSideColors = pvalue, col = rdylbl, key.title = "log2(norm counts)", symkey=F, breaks = seq(-1,14,(14+1)/100))
 legend("top",c("<0.01","<0.05","No-Sign"), fill=c("black", "grey","white"), horiz = T, bty = 'n', title = "adjusted p-value")
 
 dev.off()
@@ -540,23 +547,47 @@ Download the [selected genes stats](`r get_report_links("stats_selected_genes.ts
 
 ```{r other-heatmaps}
 
-symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(diff_genes_10$gene), "SYMBOL", keytype="ENSEMBL")
-symbol = symbol %>% distinct(SYMBOL)
-idx = match(diff_genes_10$gene, symbol$ENSEMBL)
+up25 = as.data.frame(out_df) %>% mutate(gene=rownames(out_df)) %>% dplyr::filter( padj<0.05 & log2FoldChange>0.4 ) %>% dplyr::arrange(desc(log2FoldChange))
+down25 = as.data.frame(out_df) %>% mutate(gene=rownames(out_df)) %>% dplyr::filter( padj<0.05 & log2FoldChange< -0.4 ) %>% dplyr::arrange(desc(log2FoldChange))
+
+diff_genes_top = c(up25[1:25,"gene"])
+
+symbol = get_description(diff_genes_top)
+
+idx = match(diff_genes_top, symbol$ensembl_gene_id)
 idxna = idx[!is.na(idx)]
-gene_labs = diff_genes_10$gene
-gene_labs[!is.na(idx)] = symbol$SYMBOL[idx][!is.na(idx)]
-gene_labs[is.na(gene_labs)] = diff_genes_10$gene[is.na(gene_labs)]
+gene_labs = diff_genes_top
+gene_labs[!is.na(idx)] = symbol$external_gene_name[idx][!is.na(idx)]
+gene_labs[is.na(gene_labs)] = diff_genes_top[is.na(gene_labs)]
+gene_labs[gene_labs=="ENSG00000253193"] = "FCGR1C" # not mapped for some reason
 
-hr = hclust(as.dist(1-cor(t(rlogMat[diff_genes_10$gene,]))), method = "ward.D2")
+hr = hclust(as.dist(1-cor(t(rlogMat[diff_genes_top,]))), method = "ward.D2")
 
-pdf("custom_heatmap_de_FDR10_FC04.pdf",width = 11, height = 11)
+pdf("custom_heatmap_de_top_up.pdf",width = 11, height = 11)
 
-heatmap.2(rlogMat[diff_genes_10$gene,], Rowv = as.dendrogram(hr), Colv = NULL, scale = 'none', dendrogram = 'row', labRow = "", key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8,  col = rdylbl, key.title = "log2(norm counts)", symkey=T)
-          # breaks = seq(-1,14,(14+1)/100))
-# legend("top",c("<0.01","<0.05","No-Sign"), fill=c("black", "grey","white"), horiz = T, bty = 'n', title = "adjusted p-value")
+heatmap.2(rlogMat[diff_genes_top, col_order], Rowv = as.dendrogram(hr), Colv = NULL, scale = 'row', dendrogram = 'row', labRow = gene_labs, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8,  col = rdylbl, key.title = "log2(norm counts)", symkey=T, margins = c(8,8))
 
 dev.off()
+
+diff_genes_top = c(down25[1:22,"gene"])
+
+symbol = get_description(diff_genes_top)
+
+idx = match(diff_genes_top, symbol$ensembl_gene_id)
+idxna = idx[!is.na(idx)]
+gene_labs = diff_genes_top
+gene_labs[!is.na(idx)] = symbol$external_gene_name[idx][!is.na(idx)]
+gene_labs[is.na(gene_labs)] = diff_genes_top[is.na(gene_labs)]
+gene_labs[gene_labs=="ENSG00000253193"] = "FCGR1C" # not mapped for some reason
+
+hr = hclust(as.dist(1-cor(t(rlogMat[diff_genes_top,]))), method = "ward.D2")
+
+pdf("custom_heatmap_de_top_down.pdf",width = 11, height = 11)
+
+heatmap.2(rlogMat[diff_genes_top, col_order], Rowv = as.dendrogram(hr), Colv = NULL, scale = 'row', dendrogram = 'row', labRow = gene_labs, key=TRUE, density.info="none", trace="none", main= "", keysize = 0.8,  col = rdylbl, key.title = "log2(norm counts)", symkey=T, margins = c(8,8))
+
+dev.off()
+
 
 ```
 
@@ -569,7 +600,7 @@ GSEA tools will calculate if there is any enrichment from top to down of any gen
 
 There are two approaches with ranked gene list. 
 
-1) To see if there is any enrichment comparing up-regulated genes against down-regulated genes. I am using all genes with a FDR < 10% and an absolute FC > 0.4 (That just to avoid very small changes that normally are difficult to asses the biolofical importance). In this case you need to use this file sorted by FC:
+1) To see if there is any enrichment comparing up-regulated genes against down-regulated genes. I am using all genes with a FDR < 10% and an absolute log2FC > 0.4 (That just to avoid very small changes that normally are difficult to asses the biolofical importance). In this case you need to use this file sorted by FC:
 
 Download the [de gsea list](`r get_report_links("de_gsea_list.rnk")`)
 
@@ -578,10 +609,10 @@ Download the [de gsea list](`r get_report_links("de_gsea_list.rnk")`)
 Download the [all gsea list](`r get_report_links("all_gsea_list.rnk")`)
 
 ## de-regulated genes
-
+* correct cutof used: absolute logFC > 0.4 and FDR < 10%
 Download the [de-regulated genes](`r get_report_links("diff_genes_symbol_large.txt")`)
 
 ## Go terms from gprofile using previous list
-
+* correct cutof used: absolute logFC > 0.4 and FDR < 10%
 Download the [GO terms with p-value](`r get_report_links("gprofiler.txt")`)
 
