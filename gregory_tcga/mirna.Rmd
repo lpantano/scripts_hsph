@@ -1,10 +1,5 @@
 ---
 output:
-  knitrBootstrap::bootstrap_document:
-    theme: readable
-    highlight: zenburn
-    theme.chooser: TRUE
-    highlight.chooser: TRUE
   html_document:
     toc: true
     highlight: zenburn
@@ -14,15 +9,69 @@ source("~/repos/myRfunctions/transactions.R")
 dn <- "gregory_mirna"
 library(rmarkdown)
 library(knitrBootstrap)
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=9,fig.heigh=9,
+library(knitr)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=9,fig.heigh=9, echo=FALSE,
                cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
-render_2_drop("~/repos/pipelines/gregory_tcga/mirna.Rmd",dn)
+# render_2_drop("~/repos/pipelines/gregory_tcga/mirna.Rmd",dn)
+render("~/repos/pipelines/gregory_tcga/mirna.Rmd")
 ```
 
 ```{r libraries}
+library(rmarkdown)
+library(knitrBootstrap)
+library(knitr)
 library(ggplot2)
 library(pheatmap)
+library(limma)
+library("dplyr")
+library("tidyr")
+library("magrittr")
+```
+
+```{r db}
+mirdb = read.table("~/repos/pcbc_c4_analysis/data/targets/hsa_miRDB_v5.0_prediction_result.txt")
+mirs = c("hsa-mir-92a-1","hsa-mir-92a-2","hsa-mir-92b","hsa-mir-17",
+         "hsa-mir-18a","hsa-mir-18b","hsa-mir-20a","hsa-mir-20b","hsa-mir-19a")
+mirdb$precursor = gsub("-[35]p","",mirdb$V1)
+mirdb_red = mirdb[mirdb$precursor %in% gsub("mir","miR",mirs), ]
+library(org.Hs.eg.db)
+library(AnnotationDbi)
+symbol = AnnotationDbi::select(org.Hs.eg.db, unique(as.character(unlist(mirdb_red[,2]))), "ENTREZID", keytype="REFSEQ")
+idx = match(mirdb_red$V2,symbol$REFSEQ)
+mirdb_red$entrezid = symbol[idx,2]
+```
+
+```{r cor-function}
+cor_w_ratio = function(v,mir){
+    f = cor.test(v,mir)
+    c(f$p.value,f$estimate)
+}
+
+find_protein = function(mirs, mrna, mirna, mirdb_red){
+    common = intersect(colnames(mrna), rownames(dd))
+    res = data.frame()
+    for (mir in mirs){
+        cor_mrna = t(apply(mrna[,common],1,cor_w_ratio,mirna[common,mir]-mirna[common,"hsa.mir.92a.1"]))
+        cor_mrna = as.data.frame(cor_mrna)
+        cor_mrna$fdr = p.adjust(cor_mrna$V1)
+        # create useful columns and filter significants
+        sign = cor_mrna %>% mutate(ratio=paste0(mir,"_vs_hsa.mir.92a.1"),gene=rownames(mrna), mir=mir)  %>%
+            dplyr::select(mir,ratio,gene,pvalue=V1,cor,fdr) %>%
+            separate(gene, into=c("symbol", "entrezid"), sep="\\|", extra="drop") %>%
+            filter(fdr < 0.1, abs(cor)>0.7)
+        
+        if (nrow(sign)>0){
+            targets = mirdb_red %>% 
+                filter(precursor==c(gsub("[::.::]","-",gsub("mir","miR",mir)),"hsa-miR-92a-1")) %>% 
+                filter(entrezid %in% sign$entrezid)
+            idx = match(targets$entrezid, sign$entrezid)
+            sign[idx,"is_target"] = "YES"
+            res = rbind(sign, res)
+        }
+    }
+    res
+}
 ```
 
 # LUSC
@@ -43,6 +92,8 @@ clean_id_cols = function(x){
     paste0(id[1], id[2], id[3], id[4])
 }
 
+ggplot <- function(...) ggplot2::ggplot(...) + scale_color_brewer(palette="Set1") + theme_bw()
+
 mat = read.table("~/orch/scratch/gregory_pca/extracted_data/mir-lusc.counts.txt", header=T, check.names = F, row.names=1)
 colnames(mat) = sapply(colnames(mat),clean_id_cols)
 
@@ -56,10 +107,8 @@ isy1 = grepl("ISY1", rownames(mrna))
 
 voom_m = voom(mat, model.matrix(~ 0 + meta$status ) )
 
-mirs = c("hsa-mir-92a-1","hsa-mir-92a-2","hsa-mir-92b","hsa-mir-17",
-         "hsa-mir-18a","hsa-mir-18b","hsa-mir-20a","hsa-mir-20b","hsa-mir-19a")
 sub=voom_m$E[mirs,]
-colnames(sub) = rownames(meta)
+#colnames(sub) = rownames(meta)
 pheatmap(sub, clustering_distance_rows = "correlation", clustering_distance_cols = "correlation", clustering_method = "ward", annotation = meta, show_rownames = T, show_colnames = F)
 ```
 
@@ -112,6 +161,20 @@ ggplot(dd,aes(x=class, y=hsa.mir.19a-hsa.mir.92a.1)) +
     ggtitle("log2FC of mir19/mir92")
 ```
 
+### ISY1 expression
+
+```{r isy1-exp}
+common = intersect(colnames(mrna), rownames(meta))
+
+exp = data.frame(isy1=unlist(mrna[isy1,common]),class=meta[common,"status"])
+ggplot(exp,aes(x=class, y=isy1)) + 
+    geom_boxplot() +
+    geom_jitter() +
+    ggtitle("isy1")
+
+```
+
+
 ### mir-18/mir-92 ratio vs ISY1, log2
 
 ```{r lusc-cor-mir18-log2}
@@ -120,27 +183,31 @@ common = intersect(colnames(mrna), rownames(dd))
 dd[common, "isy1"] = unlist(mrna[isy1,common])
 
 ggplot(dd) +
-    geom_point(aes(x=hsa.mir.18a-hsa.mir.92a.1,y=log2(isy1),colour="18-isy1")) +
+    geom_point(aes(x=hsa.mir.18a-hsa.mir.92a.1,y=log2(isy1))) +
     facet_wrap(~class, nrow=2)
 
-r = dd$hsa.mir.18a - dd$hsa.mir.92a.1
 
+r = dd$hsa.mir.18a - dd$hsa.mir.92a.1
 cor.test(r, log2(dd$isy1))
+
+ggplot(dd) +
+    geom_point(aes(x=hsa.mir.17-hsa.mir.92a.1,y=log2(isy1))) +
+    facet_wrap(~class, nrow=2)
+
+r = dd$hsa.mir.17 - dd$hsa.mir.92a.1
+cor.test(r, log2(dd$isy1))
+
 ```
 
 ### mir-18/mir-92 ratio vs ISY1, no-transformation
 
 ```{r lusc-cor-mir18}
-common = intersect(colnames(mrna), rownames(dd))
-
-dd[common, "isy1"] = unlist(mrna[isy1,common])
 
 ggplot(dd) +
-    geom_point(aes(y=exp(hsa.mir.18a)/exp(hsa.mir.92a.1),x=isy1,colour="18-isy1")) +
+    geom_point(aes(y=2^(hsa.mir.18a)/2^(hsa.mir.92a.1),x=isy1)) +
     facet_wrap(~class, nrow=2)
 
-r = exp(dd$hsa.mir.18a)/exp(dd$hsa.mir.92a.1)
-
+r = 2^(dd$hsa.mir.18a)/2^(dd$hsa.mir.92a.1)
 cor.test(r, dd$isy1)
 ```
 
@@ -174,18 +241,23 @@ ggplot(lusc_mrna, aes(y=log2(miR.92a.1), x=log2(miR.20a))) +
 
 ```{r lusc-with-protein}
 ggplot(lusc_mrna) +
-    geom_point(aes(y=miR.92a.1/miR.17,x=(isy1),colour="92.a-isy1")) +
-    stat_smooth(aes(y=miR.92a.1/miR.17,x=(isy1),colour="92.a-isy1"), method='lm')
+    geom_point(aes(y=miR.17/miR.92a.1,x=(isy1),colour="92.a-isy1")) +
+    stat_smooth(aes(y=miR.17/miR.92a.1,x=(isy1),colour="92.a-isy1"), method='lm')
 
 ggplot(lusc_mrna) +
     geom_point(aes(y=miR.18/miR.92a.1,x=(isy1),colour="92.a-isy1")) +
     stat_smooth(aes(y=miR.18/miR.92a.1,x=(isy1),colour="92.a-isy1"), method='lm')
+
+r = 2^(lusc_mrna$miR.18)/2^(lusc_mrna$miR.92a.1)
+cor.test(r, lusc_mrna$isy1)
+
 ```
 
 ## missing samples in raw data
 
 ```{r missing}
 sum(is.na(meta[sapply(row.names(lusc_mrna), clean_id),1]))
+setdiff(sapply(row.names(lusc_mrna), clean_id),rownames(meta))
 ```
 
 ```{r check,echo=F,eval=F}
@@ -193,18 +265,25 @@ samples = gsub("[::.::]","-",colnames(mat))
 plot(mrna[samples,"miR.92a.2"],mat["hsa-mir-92a-2",])
 ```
 
+## protein correlation with ratio
+
+```{r lusc-table-proteins, results='asis'}
+res_lusc = find_protein(c("hsa.mir.17","hsa.mir.18a","hsa.mir.20a","hsa.mir.19a"),mrna,dd,mirdb_red)
+res_lusc
+```
+
 # COAD
 
 ## Processing all data
 
 ```{r load-coad}
-mat = read.table("~/orch/scratch/gregory_pca/extracted_data/mir-coad.counts.txt", header=T, check.names = F, row.names=1)
-uniques = as.character((data.frame(name=colnames(mat), clean=sapply(colnames(mat),clean_id_cols) ) %>% distinct(clean))[,1])
-mat = mat[, uniques]
-colnames(mat) = sapply(colnames(mat),clean_id_cols)
+mat = read.table("~/orch/scratch/gregory_pca/extracted_data/mir-hg18-coad.counts.txt", header=T, check.names = F, row.names=1)
+#uniques = as.character((data.frame(name=colnames(mat), clean=sapply(colnames(mat),clean_id_cols) ) %>% distinct(clean))[,1])
+#mat = mat[, uniques]
+colnames(mat) = sapply(colnames(mat),clean_id)
 
-meta = read.table("~/orch/scratch/gregory_pca/extracted_data/mir-coad.metadata.txt", header=T, check.names = F, row.names=1)
-meta = meta[gsub("[::.::]", "-", uniques),]
+meta = read.table("~/orch/scratch/gregory_pca/extracted_data/mir-hg18-coad.metadata.txt", header=T, check.names = F, row.names=1)
+#meta = meta[gsub("[::.::]", "-", uniques),]
 rownames(meta) = sapply(row.names(meta),clean_id)
 
 mrna = read.table("~/orch/scratch/gregory_pca/extracted_data/mrna-coad.norm.txt", header=T, check.names = F, row.names=1)
@@ -272,6 +351,19 @@ ggplot(dd,aes(x=class, y=hsa.mir.19a-hsa.mir.92a.1)) +
 
 ```
 
+### ISY1 expression
+
+```{r coad-isy1-exp}
+common = intersect(colnames(mrna), rownames(meta))
+
+exp = data.frame(isy1=unlist(mrna[isy1,common]),class=meta[common,"status"])
+ggplot(exp,aes(x=class, y=isy1)) + 
+    geom_boxplot() +
+    geom_jitter() +
+    ggtitle("isy1")
+
+```
+
 ### mir-17/mir-92 ratio vs ISY1, log2
 
 ```{r coad-cor-mir17-log2}
@@ -334,11 +426,18 @@ ggplot(coad_mrna, aes(y=log2(mIR92a.1), x=log2(miR20a))) +
 
 ```{r coad-with-protein}
 ggplot(coad_mrna) +
-    geom_point(aes(y=mIR92a.1/miR17,x=(X),colour="92.a-isy1")) +
-    geom_smooth(aes(y=mIR92a.1/miR17,x=(X),colour="92.a-isy1"))
+    geom_point(aes(y=miR17/mIR92a.1,x=(X),colour="92.a-isy1")) +
+    geom_smooth(aes(y=miR17/mIR92a.1,x=(X),colour="92.a-isy1"))
 
 ggplot(coad_mrna) +
     geom_point(aes(y=miR18a/mIR92a.1,x=(X),colour="92.a-isy1")) +
     geom_smooth(aes(y=miR18a/mIR92a.1,x=(X),colour="92.a-isy1"))
+```
+
+## protein correlation with ratio
+
+```{r coad-table-proteins, results='asis'}
+res_coad = find_protein(c("hsa.mir.17","hsa.mir.18a","hsa.mir.20a","hsa.mir.19a"),mrna,dd,mirdb_red)
+kable(res_coad, digits = 4)
 ```
 
