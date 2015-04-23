@@ -369,10 +369,28 @@ do.call(grid.arrange,plots)
 
 ## Differentially expressed genes
 
+```{r desc-function}
+get_description = function(v)
+{
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id","external_gene_name","description") , 
+                filters="ensembl_gene_id", values =as.character(v) ,mart=mart)
+    row.names(g) = g[,1]
+    g
+}
+
+```
+
 ```{r DESeq-tables, results='asis'}
 for(i in seq(length(all_results))) {
   cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
   out_df = all_results[[i]]
+  
+  symbol = get_description(row.names(out_df))
+  out_df[as.character(symbol$ensembl_gene_id), "symbol"] = symbol$external_gene_name
+  out_df[as.character(symbol$ensembl_gene_id), "description"] = symbol$description
+
   print(knitr::kable(head(out_df)))
   cat("\n")
   write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
