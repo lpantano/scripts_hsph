@@ -1,0 +1,391 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    title: "Noga RNAseq"
+    theme: readable
+    highlight: zenburn
+    theme.chooser: FALSE
+    highlight.chooser: FALSE
+---
+```{r knitr,echo=F}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "noga_tcell_rnaseq"
+library(rmarkdown)
+library(knitrBootstrap)
+library(knitr)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=9,fig.heigh=9, echo=TRUE,
+               cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+```{r render, eval=FALSE, echo=FALSE}
+render_2_drop("~/repos/pipelines/noga_rnaseq/qc-summary.Rmd",dn)
+#render("~/repos/pipelines/gregory_tcga/mirna.Rmd")
+
+```
+
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+project_summary = "/home/lpantano/orch/scratch/noga_rnaseq/tcell/final/2015-04-22_tcell/project-summary.csv"
+counts_file = "/home/lpantano/orch/scratch/noga_rnaseq/tcell/final/2015-04-22_tcell/combined.counts"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
+summarydata$Name = rownames(summarydata)
+summarydata = summarydata[order(summarydata$Name),]
+counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE)
+counts = counts[, order(colnames(counts))]
+names(counts) = gsub(".counts","",names(counts))
+# this is a list of all non user-supplied metadata columns that could appear
+known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.quality",
+    "rRNA.rate", "Fragment.Length.Mean", "Intronic.Rate", "Intergenic.Rate",
+    "Mapping.Rate", "Quality.format", "Duplication.Rate.of.Mapped",
+    "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
+    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "complexity", "X5.3.bias")
+
+summarydata$condition = gsub("[12]","",summarydata$condition)
+summarydata$subject = paste0("s", gsub("[AN]","",summarydata$Name))
+# summarydata$Name = gsub("[A]","At24",summarydata$Name)
+# names(counts) = summarydata$Name = gsub("[A]","At24",names(counts))
+
+```
+
+naive samples are the samples starting with N
+
+24 time point samples are the samples starting with A
+
+```{r heatmap-function}
+get_heatmap_fn = function(summarydata) {
+    # return the pheatmap function with or without metadata
+    metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
+    if(ncol(metadata) == 0) {
+       return(pheatmap)
+    }
+    else {
+    # rownames(metadata) = summarydata$Name
+    heatmap_fn = function(data, ...) {
+        pheatmap(data, annotation=metadata, ...)
+    }
+    return(heatmap_fn)
+}}
+heatmap_fn = get_heatmap_fn(summarydata)
+```
+
+# Quality control metrics
+
+## Mapped reads
+```{r mapped-plot}
+ggplot(summarydata, aes(x=Name, y=Mapped)) +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    geom_bar(stat="identity") +
+    ylab("mapped reads") + xlab("")
+```
+
+The depth is low, normally better to have > 10 mill reads.
+
+## Genomic mapping rate
+```{r mapping-rate-plot}
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) +
+    geom_bar(stat="identity") +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Unique mapping rate
+```{r unique-rate-plot}
+dd = data.frame(Name=names(counts), Unique=colSums(counts), Mapped=summarydata[,"Mapped"])
+ggplot(dd, aes(x=Name, y=Unique/Mapped)) +
+    geom_bar(stat="identity") +
+    ylab("unique mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Number of genes detected
+```{r genes-detected-plot}
+dd = data.frame(Name=names(counts), Genes.Detected = colSums(counts > 0))
+ggplot(dd, aes(x=Name, y=Genes.Detected)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("genes detected") + xlab("")
+```
+
+## Exonic mapping rate
+```{r exonic-mapping-plot}
+ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("exonic mapping rate") + xlab("")
+```
+
+It is a little low, normally the value is above 75%.
+
+## rRNA mapping rate
+```{r rRNA-rate-plot}
+ggplot(summarydata, aes(x=Name, y=rRNA.rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("rRNA rate") + xlab("")
+```
+
+## Boxplot of log10 counts per gene
+```{r boxplot-raw}
+melted = melt(counts)
+colnames(melted) = c("sample", "count")
+melted$sample = factor(melted$sample)
+melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Boxplot of log10 TMM-normalized counts per gene
+Trimmed mean of M-values (TMM) normalization is described
+[here](http://genomebiology.com/2010/11/3/R25)
+
+Robinson, M. D., & Oshlack, A. (2010). A scaling normalization method for differential expression analysis of RNA-seq data. Genome Biology, 11(3). doi:10.1186/gb-2010-11-3-r25
+
+```{r boxplot-normalized}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample)
+melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Density of log10 TMM-normalized counts
+```{r density-normalized}
+melted2 = merge(melted[,c(2,1,3)], summarydata[,c("Name","time")],by=1)
+ggplot(melted2, aes(x=count, group=sample, color=time)) +
+    geom_density() +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Correlation (Pearson) heatmap of TMM-normalized counts
+```{r pearson-heatmap-normalized}
+heatmap_fn(cor(normalized_counts, method="pearson"))
+```
+
+## Correlation (Spearman) heatmap of TMM-normalized counts
+```{r spearman-heatmap-normalized}
+heatmap_fn(cor(normalized_counts, method="spearman"))
+```
+
+## MDS plot of TMM-normalized counts
+```{r mds-normalized}
+mds(normalized_counts, k=length(colnames(normalized_counts)) - 1)
+```
+
+## Heatmap of top 30 most expressed genes
+```{r top-count-genes, results='asis'}
+select = order(rowMeans(normalized_counts),decreasing=TRUE)[1:30]
+heatmap_fn(normalized_counts[select,])
+```
+
+# Differential expression
+
+```{r de-setup}
+library(DESeq2)
+library(DEGreport)
+library(vsn)
+summarydata$group = as.factor(paste0(summarydata$condition,summarydata$time))
+design_condition = ~ group
+design_time = ~ group + subject
+condition = "group"
+```
+
+```{r deseq2-expression-analysis, results='asis'}
+counts <- counts[rowMeans(counts)>5,]
+
+dds = DESeqDataSetFromMatrix(countData=counts,
+    colData=summarydata, design = design_condition)
+dds = DESeq(dds)
+
+dds_condition = DESeqDataSetFromMatrix(countData=counts,
+    colData=summarydata, design = design_condition)
+dds_condition = DESeq(dds_condition)
+
+dds_wt_time = DESeqDataSetFromMatrix(countData=counts[summarydata$Name[summarydata$condition=="WT"]],
+    colData=summarydata[summarydata$condition=="WT",], design = design_time)
+dds_wt_time = DESeq(dds_wt_time)
+
+dds_ko_time = DESeqDataSetFromMatrix(countData=counts[summarydata$Name[summarydata$condition=="Pgc"]],
+    colData=summarydata[summarydata$condition=="Pgc",], design = design_time)
+dds_ko_time = DESeq(dds_ko_time)
+
+```
+
+## Effect of variance stabilization
+
+```{r deseq-diagnostics, results='asis'}
+par(mfrow=c(1,3))
+notAllZero <- (rowSums(counts(dds))>0)
+rld <- rlog(dds)
+vsd <- varianceStabilizingTransformation(dds)
+rlogMat <- assay(rld)
+vstMat <- assay(vsd)
+
+meanSdPlot(log2(counts(dds,normalized=TRUE)[notAllZero,] + 1),
+           ylim = c(0,2.5))
+meanSdPlot(assay(rld[notAllZero,]), ylim = c(0,2.5))
+meanSdPlot(assay(vsd[notAllZero,]), ylim = c(0,2.5))
+```
+
+## Dispersion estimates
+
+```{r dispersion-estimate}
+plotDispEsts(dds)
+```
+
+```{r deseq2-handler}
+handle_deseq2 = function(dds, summarydata, column, all_combs) {
+  # all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="vs")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+```
+
+## MA-plots
+
+```{r DESeq-output, results='asis'}
+all_results = handle_deseq2(dds_condition, summarydata, condition,list(c("PgcN","WTN"),c("Pgc24","WT24")))
+all_results = c(all_results, handle_deseq2(dds_wt_time, summarydata[summarydata$condition=="WT",], condition, list(c("WT24","WTN"))))
+all_results = c(all_results, handle_deseq2(dds_ko_time, summarydata[summarydata$condition=="Pgc",], condition, list(c("Pgc24","PgcN"))))
+
+len = length(all_results)
+nr = ceiling( len / 3 )
+nc = ceiling( len / nr )
+par(mfrow=c(nr,nc))
+for(i in seq(length(all_results))) {
+  plotMA(all_results[[i]])
+  title(paste("MA plot for contrast", names(all_results)[i]))
+}
+```
+
+## Volcano-plots
+
+```{r DESeq-volcano}
+for(i in seq(length(all_results))) {
+  stats = as.data.frame(all_results[[i]][,c(2,6)])
+  p = volcano_density_plot(stats, title=names(all_results)[i], lfc.cutoff=1.5)
+  print(p)
+}
+```
+
+## DEGreport
+
+```{r get-groups}
+get_groups <- function(d, comp, condition)
+{
+  g <- unlist(strsplit(comp,"vs"))
+  g1 <- d$Name[d[, (names(d)==condition)]==g[1]]
+  g2 <- d$Name[d[, (names(d)==condition)]==g[2]]
+  list(g1,g2)
+}
+```
+
+### Pvalues-vs-Mean
+
+We plot some information about how p-values is correlated with the average mean or
+the standard desviation. We should see the same distribution for each p-value bin.
+
+```{r DEGreport-M}
+plots = list()
+scale_factor = round(1/nr * 14)
+for(i in seq(length(all_results))) {
+  plots[[i]] = degMean(all_results[[i]]$pvalue, rlogMat) +
+  theme_bw(base_size = scale_factor) +
+  ggtitle(paste0("Pvalues-vs-Mean for ", names(all_results)[i]))
+}
+do.call(grid.arrange,plots)
+```
+
+### Pvalues-vs-Variation
+
+```{r DEGreport-V}
+plots = list()
+for(i in seq(length(all_results))) {
+  plots[[i]] = degVar(all_results[[i]]$pvalue, rlogMat) +
+  theme_bw(base_size = scale_factor) +
+  ggtitle(paste0("Pvalues-vs-Variation for ", names(all_results)[i]))
+}
+do.call(grid.arrange,plots)
+```
+
+### Mean-vs-Variation
+
+```{r DEGreport-MV}
+plots = list()
+for(i in seq(length(all_results))) {
+  g <- get_groups(summarydata, names(all_results)[i], condition)
+  plots[[i]] = degMV(g[[1]], g[[2]], all_results[[i]]$pvalue, counts(dds,normalized=TRUE)) +
+  theme_bw(base_size = scale_factor) +
+  ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i]))
+}
+do.call(grid.arrange,plots)
+```
+
+## Differentially expressed genes
+
+```{r DESeq-tables, results='asis'}
+for(i in seq(length(all_results))) {
+  cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
+  out_df = all_results[[i]]
+  print(knitr::kable(head(out_df)))
+  cat("\n")
+  write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
+                         quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+  cat("\n")
+}
+```
+
+
+# Files
+
+* [WT 24 vs WT N ](`r get_report_links('WT24vsWTN.tsv')`)
+* [Pgc 24 vs Pgc N ](`r get_report_links('Pgc24vsPgcN.tsv')`)
+* [Pgc 24 vs WT 24 ](`r get_report_links('Pgc24vsWT24.tsv')`)
+* [Pgc N vs WT N ](`r get_report_links('PgcNvsWTN.tsv')`)
+
