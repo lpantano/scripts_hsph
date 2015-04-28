@@ -7,12 +7,14 @@ output:
     theme.chooser: FALSE
     highlight.chooser: FALSE
 ---
+
 ```{r knitr,echo=F}
 source("~/repos/myRfunctions/transactions.R")
 dn <- "noga_tcell_rnaseq"
 library(rmarkdown)
 library(knitrBootstrap)
 library(knitr)
+setwd("~/repos/pipelines/noga_rnaseq")
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=9,fig.heigh=9, echo=TRUE,
                cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
@@ -214,6 +216,31 @@ select = order(rowMeans(normalized_counts),decreasing=TRUE)[1:30]
 heatmap_fn(normalized_counts[select,])
 ```
 
+# Normalization
+
+## Difference genes mean
+
+```{r norm-check}
+no_zero = rowSums(counts)>1
+
+naive = summarydata[summarydata$time=="N", "Name"]
+t24 = summarydata[summarydata$time=="24", "Name"]
+
+y_naive = DGEList(counts=counts[no_zero,naive])
+y_naive = calcNormFactors(y_naive)
+y_24 = DGEList(counts=counts[no_zero,t24])
+y_24 = calcNormFactors(y_24)
+
+norm_naive = cpm(y_naive, normalized.lib.sizes=TRUE, log = TRUE)
+norm_24 = cpm(y_24, normalized.lib.sizes=TRUE, log = TRUE)
+
+ratio = rowMeans(norm_24)-rowMeans(norm_naive)
+hist(ratio)
+```
+
+If we normalize naive and 24h samples separatly and calculate the ratio of the average mean expression
+among the two groups, the value is center on 0, meaning that the big majority is not changing, so any standard normalization will be ok.
+
 # Differential expression
 
 ```{r de-setup}
@@ -393,11 +420,173 @@ for(i in seq(length(all_results))) {
 
   print(knitr::kable(head(out_df)))
   cat("\n")
-  write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
-                         quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+  #write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
+  #                       quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+  save_file(out_df, paste0(names(all_results)[i], ".tsv"))
   cat("\n")
 }
 ```
+
+## Selected genes
+
+```{r candidates}
+
+genes=c("CD69","IL2Ra","MKI67")
+
+mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
+g <- getBM( attributes=c("ensembl_gene_id","external_gene_name") , 
+            filters="external_gene_name", values =genes ,mart=mart)
+mat = rlogMat[g$ensembl_gene_id,]
+row.names(mat) = g$external_gene_name
+heatmap_fn(mat)
+```
+
+# Pgc vs WT at 24 h
+
+## Density of log10 TMM-normalized counts of 24h samples
+```{r density-normalized-time}
+melted2 = merge(melted[,c(2,1,3)], summarydata[,c("Name","time","condition")],by=1) %>%
+          filter(time==24)
+ggplot(melted2, aes(x=count, group=sample, color=condition)) +
+    geom_density() +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Correlation among 24h samples
+```{r ruvseq, results='asis'}
+library(RUVSeq)
+dds_time = DESeqDataSetFromMatrix(countData=counts[summarydata$Name[summarydata$time==24]],
+    colData=summarydata[summarydata$time==24,], design = design_condition)
+dds_time = DESeq(dds_time)
+
+raw = counts(dds_time)
+norm = counts(dds_time, normalized=T)
+
+rlog_time = rlog(dds_time)
+heatmap_fn(cor(assay(rlog_time)))
+```
+
+## Differential expression
+
+We'll remove A10 sample because seems different from the rest. As well, we'll normalize
+with RUVSeq a package that try to get all replicate samples the most similar as possible.
+
+```{r remove-de}
+keep = c("A12","A14","A4","A6","A8","A9","A1")
+mat = as.matrix(round(norm))[rowSums(as.matrix(round(norm)))>1,keep]
+set <- newSeqExpressionSet(mat,phenoData =
+                               as.data.frame(colData(dds_time)[keep,"group",drop=F]))
+differences <- matrix(data=c(1:4, 5:7, -1), byrow=TRUE, nrow=2)
+after_ruv <- RUVs(set, row.names(mat), k=1, differences)
+    
+dds_ruv = DESeqDataSetFromMatrix(countData=raw[row.names(mat),keep],
+                                 colData=pData(after_ruv), design = ~ W_1 + group)
+dds_ruv = DESeq(dds_ruv)
+plotMA(dds_ruv)
+```
+
+## table
+```{r time24-table, results='asis'}
+res = results(dds_ruv, contrast = c("group", "Pgc24", "WT24"))
+res = res[order(res$padj),]
+
+cat(paste("Lowest adjusted p-value hits for", "Pgc24" ,"vs" ,"WT24"))
+
+out_df = res
+symbol = get_description(row.names(out_df))
+out_df[as.character(symbol$ensembl_gene_id), "symbol"] = symbol$external_gene_name
+out_df[as.character(symbol$ensembl_gene_id), "description"] = symbol$description
+
+cat("Number of significant genes: ")
+print(kable(as.data.frame(table(out_df$padj<0.1))))
+cat("\n")
+print(knitr::kable(head(out_df)))
+cat("\n")
+# write.table(out_df, file=paste("Pgc24vsWT24_clean", ".tsv", sep=""),
+#            quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+save_file(out_df, paste0("Pgc24vsWT24_clean", ".tsv"))
+cat("\n")
+
+```
+
+# time and condition interaction
+
+## Correlation among 24h samples
+```{r time_condition-ruvseq, results='asis'}
+library(RUVSeq)
+keep = setdiff(summarydata$Name, "A10")
+
+dds_int = DESeqDataSetFromMatrix(countData=counts[rowSums(counts)>1, keep],
+    colData=summarydata[keep,], design = ~ time*condition)
+dds_int = DESeq(dds_int)
+
+raw = counts(dds_int)
+norm = counts(dds_int, normalized=T)
+```
+
+## Differential expression
+
+We'll remove A10 sample because seems different from the rest. As well, we'll normalize
+with RUVSeq a package that try to get all replicate samples the most similar as possible.
+
+```{r time_conditon-de}
+set <- newSeqExpressionSet(raw,phenoData =
+                               as.data.frame(colData(dds_int)[,c("condition", "time"),drop=F]))
+differences <- matrix(data=c(1,6,7,-1,2:5,8,9,14,15,10:13), byrow=TRUE, nrow=4)
+after_ruv <- RUVs(set, row.names(raw), k=1, differences)
+    
+dds_ruv = DESeqDataSetFromMatrix(countData=raw,
+                                 colData=pData(after_ruv), design = ~ W_1 + condition*time)
+dds_ruv = DESeq(dds_ruv)
+
+res = results(dds_ruv,name = resultsNames(dds_ruv)[5])
+res = res[order(res$padj),]
+plotMA(res)
+```
+
+## table
+```{r time-condition-table, results='asis'}
+cat(paste("Lowest adjusted p-value hits for", "Pgc24" ,"vs" ,"WT24" ,"over time"))
+
+out_df = res
+symbol = get_description(row.names(out_df))
+out_df[as.character(symbol$ensembl_gene_id), "symbol"] = symbol$external_gene_name
+out_df[as.character(symbol$ensembl_gene_id), "description"] = symbol$description
+
+cat("Number of significant genes: ")
+print(kable(as.data.frame(table(out_df$padj<0.1))))
+cat("\n")
+print(knitr::kable(head(out_df)))
+cat("\n")
+# write.table(out_df, file=paste("condition_time_interaction", ".tsv", sep=""),
+#            quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+save_file(out_df, paste0("condition_time_interaction", ".tsv"))
+cat("\n")
+
+```
+
+## figures
+
+Top 20 genes
+
+```{r plot-top, fig.width=10, fig.width=10}
+library(reshape)
+top20 = row.names(out_df)[1:20]
+mat = get_description(top20)
+dd = melt(as.data.frame(cbind(rlogMat[top20,],protein=mat[top20,"external_gene_name"])), id.vars="protein")
+dd$time = factor(summarydata[dd$variable, "time"], levels=c("N","24"))
+dd$condition = summarydata[dd$variable, "condition"]
+dd$value = as.numeric(as.character(dd$value))
+
+ggplot(dd, aes(x=time,y=value,colour=condition)) +
+    geom_point() +
+    theme_bw() +
+    scale_color_brewer(palette = "Set1")+
+    facet_wrap(~protein, scales = "free")
+```
+
 
 
 # Files
@@ -407,3 +596,5 @@ for(i in seq(length(all_results))) {
 * [Pgc 24 vs WT 24 ](`r get_report_links('Pgc24vsWT24.tsv')`)
 * [Pgc N vs WT N ](`r get_report_links('PgcNvsWTN.tsv')`)
 
+* removing one sample: [Pgc 24 vs WT 24 ](`r get_report_links('Pgc24vsWT24_clean.tsv')`)
+* [condition*time interaction](r get_report_links('condition_time_interaction.tsv'))
