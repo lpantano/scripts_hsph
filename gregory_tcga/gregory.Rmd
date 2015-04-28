@@ -77,6 +77,21 @@ concat.miRNA <- function(filedir, files, rstring=".mirna.quantification.txt"){
     return(list(counts=counts, rpm=rpm))
 }
 
+concat.easy.miRNA <- function(filedir, files, rstring=".mirna.quantification.txt" ){
+    counts <- vector()
+    ids <- vector()
+    for (file in files){
+        tmp <- read_tsv(file.path(filedir, file))
+        counts<-cbind(counts, tmp$read_count)
+        ids <- c(ids, gsub(rstring, "", file))
+        
+    }
+    rownames(counts) <- tmp$miRNA_ID
+    # ids <- gsub(rstring, "", files)
+    colnames(counts) <- ids
+    return(counts)
+}
+
 concat.mRNA <- function(filedir, files, fileconv, column){
   counts <- vector()
   for (file in files){
@@ -168,6 +183,8 @@ mrna.coad.tumor.dir <-"/Users/andreassjodin/hbc-projects/orchestra/gregory_pca/p
 lusc.healthy.dir <- "/Users/andreassjodin/hbc-projects/orchestra/gregory_pca/patient/LUSC/miRNA/health/953f718e-a2f5-48f9-9292-a0a9c02f347d/miRNASeq/BCGSC__IlluminaHiSeq_miRNASeq/Level_3/"
 lusc.tumor.dir <-"/Users/andreassjodin/hbc-projects/orchestra/gregory_pca/patient/LUSC/miRNA/tumor/9c22ddce-e628-4c3e-8116-ec58f155c62b/miRNASeq/BCGSC__IlluminaHiSeq_miRNASeq/Level_3/"
 
+lusc.all.dir <- "~/orch/scratch/gregory_pca/rawdata/LUSC/miRNA/illumina_hiseq/input/"
+
 mrna.lusc.healthy.dir <- "/Users/andreassjodin/hbc-projects/orchestra/gregory_pca/patient/LUSC/RNA-seq/health/576b67c4-157f-429d-8727-86534a9c0935/RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/Level_3/" 
 mrna.lusc.tumor.dir <-"/Users/andreassjodin/hbc-projects/orchestra/gregory_pca/patient/LUSC/RNA-seq/tumor/14617e7e-4f91-4ba5-a2bd-a0d76b3ad009/RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/Level_3/"
 
@@ -191,6 +208,8 @@ coad.tumor2.hg19.files <- grep("hg19.mirna.quantification.txt", dir(coad.tumor2.
 
 lusc.healthy.files <- grep("mirna.quantification.txt", dir(lusc.healthy.dir), value=T)
 lusc.tumor.files <- grep("mirna.quantification.txt", dir(lusc.tumor.dir), value=T)
+
+lusc.all.files <- grep("mirna.quantification.txt", dir(lusc.all.dir), value=T)
 
 #mRNA
 mrna.coad.healthy.files.raw <- grep("rsem.genes.results", dir(mrna.coad.healthy.dir), value=T)
@@ -231,6 +250,8 @@ coad.tumor2.hg19 <- concat.miRNA (coad.tumor2.dir, coad.tumor2.hg19.files)
 
 lusc.healthy <- concat.miRNA (lusc.healthy.dir, lusc.healthy.files,rstring=".mirna.quantification.txt")
 lusc.tumor <- concat.miRNA (lusc.tumor.dir, lusc.tumor.files, rstring=".mirna.quantification.txt")
+
+lusc.all <- concat.easy.miRNA(lusc.all.dir, lusc.all.files)
 
 #mRNA
 lusc.healthy.mrna.raw <- concat.mRNA (mrna.lusc.healthy.dir, mrna.lusc.healthy.files.raw, lusc.healthy.nameconv, "raw_count" )
@@ -303,7 +324,7 @@ p2 <- plot.pca(pca.coad.fig , type="loadings", text=T, title="COAD - tumor")
 
 
 
-### All coad miRNA
+### hg18 coad miRNA
 ```{r}
 idx = intersect(row.names(coad.healthy$counts), row.names(coad.tumor$counts))
 ma = cbind(coad.healthy$counts[idx,], coad.tumor$counts[idx,])
@@ -464,8 +485,15 @@ grid.arrange( p1,p2, ncol=2)
 ```{r writefiles-mir-lusc}
 write.table(data.frame(mir=rownames(lusc.rpm), lusc.rpm), file = "files/mir-lusc.rpm.txt", append = FALSE, quote = FALSE, sep = "\t", row.names = F)
 write.table(data.frame(mir=rownames(lusc.counts), lusc.counts), file = "files/mir-lusc.counts.txt", append = FALSE, quote = FALSE, sep = "\t", row.names = F)
+
 write.table(metadata.lusc, file = "files/mir-lusc.metadata.txt", append = FALSE, quote = FALSE, sep = "\t", row.names = F)
 
+```
+
+### new data: April,28
+
+```{r}
+write.table(lusc.all, "~/orch/scratch/gregory_pca/extracted_data/mir-hg18-lusc.counts.txt",sep="\t", quote=F)
 ```
 
 __LUSC data export__
