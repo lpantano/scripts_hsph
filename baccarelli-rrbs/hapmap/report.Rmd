@@ -1,0 +1,214 @@
+---
+title: "rrbs"
+author: "lorena pantano"
+date: "5/19/2015"
+output: html_document
+---
+
+```{r custom-code-2}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "rrbs/"
+root_path<-"~/orch/scratch/rrbs/NA12878/"
+path_files = "~/repos/pipelines/baccarelli-rrbs/"
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, 
+                    cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
+                    error=FALSE,
+                    eval=TRUE,fig.height=9, fig.width=11,
+                    message=FALSE, prompt=TRUE, comment='', fig.cap='', 
+                    bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+```{r setup, echo=FALSE,eval=F}
+render_2_drop("~/repos/pipelines/baccarelli-rrbs/hapmap/report.Rmd",dn)
+```
+
+```{r packages}
+library(VariantAnnotation)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(reshape)
+library(yaml)
+library(rmarkdown)
+library(knitr)
+library(GenomicRanges)
+ggplot <- function(...) ggplot2::ggplot(...) + theme_bw() + scale_fill_brewer(palette = "Set1")
+```
+
+Two replicates of NA12878 hapmap sample were analyzed with bissnp to compare between them and to the truth set of SNP from GiaB.
+
+```{r load, cache=T}
+read_geno = function(x){
+    snpmatrix = genotypeToSnpMatrix(x)
+    ab_gen = as.data.frame(t(as(snpmatrix$genotype, "character")))
+    ab_gen$name = rownames(ab_gen)
+    geno = apply(ab_gen, 1, function(x){
+        nt = strsplit(x[2], "_")[[1]][2]
+        paste0(nt,"\n",x[1])
+    })
+    geno
+}
+
+
+read_vcf = function(s,s2){
+    sum = unlist(yaml.load_file(paste0("~/orch/scratch/rrbs/NA12878/noXinactivation/compare/",s,"/out/bcbio.variation",s2,"-grading.yaml")))
+    fn = paste0("~/orch/scratch/rrbs/NA12878/noXinactivation/compare/",s,"/out/NA12878-contestant-reference-discordance-annotate.vcf")
+    param = ScanVcfParam(
+        info=c("DP","GradeCat","CS"),
+        geno=c("GT","GQ","CU","CM"))
+    
+    joint = readVcf(fn, "hg19", param=param)
+    keep = filt(joint) == "PASS"
+    geno = read_geno(joint)
+    dd = data.frame(
+        depth = unlist(joint@info$DP),
+        type = unlist(joint@info$GradeCat),
+        strand = unlist(joint@info$CS),
+        gen = geno
+    )
+    list(stat=sum, table=dd[keep,])
+}
+
+read_conc_vcf = function(s){
+    fn = paste0("~/orch/scratch/rrbs/NA12878/noXinactivation/compare/",s,"/out/NA12878-contestant-reference-concordance.vcf")
+    param = ScanVcfParam(
+        info=c("DP","CS"),
+        geno=c("GT","GQ"))
+    
+    readVcf(fn, "hg19", param=param)
+}
+
+read_disc_vcf = function(s){
+    fn = paste0("~/orch/scratch/rrbs/NA12878/noXinactivation/compare/",s,"/out/NA12878-contestant-reference-discordance-annotate.vcf")
+    param = ScanVcfParam(
+        info=c("DP","GradeCat","CS"),
+        geno=c("GT","GQ"))
+    
+    readVcf(fn, "hg19", param=param)
+}
+
+r1 = read_vcf("NA12878_r1","_r1")
+r2 = read_vcf("NA12878_r2","_r2")
+```
+
+Only in regions with any read in the BAM file.
+
+```{r summary}
+dd =  data.frame(counts=r1$stat[c(2,6,7,8,9)]) 
+kable(dd)
+
+dd =  data.frame(counts=r2$stat[c(2,6,7,8,9)]) 
+kable(dd)
+
+```
+
+Extra SNP seems to be product of bisulfite treatment. A/G in the minus strand so T/C in the +.
+
+```{r extra}
+dd = r1$table %>% filter(!grepl("NA",gen),!grepl("gl",gen))
+dd$low.coverage = "other"
+dd$low.coverage[dd$depth < 15] = "low-coverage"
+ggplot(dd %>% filter(type!="discordant-missing"), aes(x=gen, fill=low.coverage)) + 
+    geom_bar(position = 'dodge') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    ggtitle("Extra in replicate 1")
+
+dd2 = r2$table %>% filter(!grepl("NA",gen),!grepl("gl",gen))
+dd2$low.coverage = "other"
+dd2$low.coverage[dd$depth < 15] = "low-coverage"
+ggplot(dd2 %>% filter(type!="discordant-missing"), aes(x=gen, fill=low.coverage)) + 
+    geom_bar(position = 'dodge') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    ggtitle("Extra in replicate 2")
+```
+
+Extra missing are enriched in low-coverage bases. And there are all possible genotypes that are missing.
+
+```{r missing}
+dd_sum = table(dd[,c("type","gen")])
+keep = names(tail(sort(colSums(dd_sum)),8))
+ggplot( melt(dd_sum[,keep]), aes(x=gen, y=value, fill=type)) +
+    geom_bar(stat='identity', position='dodge') +
+    ggtitle("Extra in replicate 1")
+
+dd_sum = table(dd2[,c("type","gen")])
+keep = names(tail(sort(colSums(dd_sum)),8))
+ggplot( melt(dd_sum[,keep]), aes(x=gen, y=value, fill=type)) +
+    geom_bar(stat='identity', position='dodge') +
+    ggtitle("Extra in replicate 2")
+
+```
+
+The proportion of different genotypes is similar than for extra SNPs.
+SNPs that change A->G, and always finding a G but in the - strand, so 
+reads have C really. 
+
+```{r concordant}
+r1$conc = read_conc_vcf("NA12878_r1")
+dd = data.frame(geno = read_geno(r1$conc),
+                strand = unlist(info(r1$conc)$CS))
+ggplot(dd, aes(x=geno)) + 
+    geom_bar(position = 'dodge') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+r2$conc = read_conc_vcf("NA12878_r2")
+dd = data.frame(geno = read_geno(r2$conc),
+                strand = unlist(info(r2$conc)$CS)) +
+    ggtitle("Extra in replicate 1")
+
+ggplot(dd, aes(x=geno)) + 
+    geom_bar(position = 'dodge') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    ggtitle("Extra in replicate 2")
+
+```
+
+Maybe these type of SNPs not seen in the true set are real.
+
+The SNPs related to CpG meth/unmeth sites are mainly gains of a G nt that methylated the previous C.
+
+```{r ass-snps, results='asis'}
+r1$assc = read.table("~/orch/scratch/rrbs/NA12878/noXinactivation/link/NA12878_r1_pairs.tsv", sep="\t")
+assc = GRanges(seqnames=Rle(r1$assc$V1),
+               ranges=IRanges(r1$assc$V4-2, end=r1$assc$V4+2, names=paste0(r1$assc$V1,r1$assc$V4) ),
+               strand=Rle(rep("*",nrow(r1$assc)) )
+              )
+
+kable(as.data.frame(assc))
+
+```
+
+1 out of 2 are found in the GiaB vcf. Non-standard chrom are not in the true set.
+
+```{r ass-conc, results='asis'}
+
+assc_conc = GenomicRanges::findOverlaps(rowRanges(r1$conc), assc)
+
+kable(r1$assc[assc_conc@subjectHits,])
+
+```
+
+
+Replication with replicate2:
+
+```{r ass-snps-r2, results='asis'}
+r2$assc = read.table("~/orch/scratch/rrbs/NA12878/noXinactivation/link/NA12878_r2_pairs.tsv", sep="\t")
+r2.assc = GRanges(seqnames=Rle(r2$assc$V1),
+               ranges=IRanges(r2$assc$V4-2, end=r2$assc$V4+2, names=paste0(r2$assc$V1,r2$assc$V4) ),
+               strand=Rle(rep("*",nrow(r2$assc)) )
+              )
+
+kable(r2$assc)
+
+```
+
+1 as overlap, the one in chrom 14. The chrom12 position only has 1 read supporting the G/C SNP/methylation and it could be an error. The one in chrom16 looks like this: 
+
+CTTTTTTTTccccccccccccc
+GAAAAGAAAaaagagaagagag
+
+The second G is not related to the methylate C, but to the non-methylated C. It could be an error, but that's the reason why is not in the first replicate.
+
+
+
