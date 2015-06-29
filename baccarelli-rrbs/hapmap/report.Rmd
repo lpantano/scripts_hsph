@@ -7,12 +7,12 @@ output: html_document
 
 ```{r custom-code-2}
 source("~/repos/myRfunctions/transactions.R")
-dn <- "rrbs/"
+dn <- "rrbs"
 root_path<-"~/orch/scratch/rrbs/NA12878/"
-path_files = "~/repos/pipelines/baccarelli-rrbs/"
+path_files = "~/repos/pipelines/baccarelli-rrbs/hapmap/"
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, 
                     cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
-                    error=FALSE,
+                    error=FALSE,echo=FALSE,
                     eval=TRUE,fig.height=9, fig.width=11,
                     message=FALSE, prompt=TRUE, comment='', fig.cap='', 
                     bootstrap.show.code=FALSE)
@@ -36,7 +36,7 @@ library(GenomicRanges)
 ggplot <- function(...) ggplot2::ggplot(...) + theme_bw() + scale_fill_brewer(palette = "Set1")
 ```
 
-Two replicates of NA12878 hapmap sample were analyzed with bissnp to compare between them and to the truth set of SNP from GiaB.
+# comparison of two replicates of NA12878
 
 ```{r load, cache=T}
 read_geno = function(x){
@@ -92,6 +92,8 @@ r1 = read_vcf("NA12878_r1","_r1")
 r2 = read_vcf("NA12878_r2","_r2")
 ```
 
+## SNPs comparison with the true set of GiaB
+
 Only in regions with any read in the BAM file.
 
 ```{r summary}
@@ -103,7 +105,9 @@ kable(dd)
 
 ```
 
-Extra SNP seems to be product of bisulfite treatment. A/G in the minus strand so T/C in the +.
+Extra SNP seems to be homozygous for C/G variants. 
+
+First pair means the ref/alt nucleotide of the variant, A/B = het, A/A= hom ref, B/B hom alt.
 
 ```{r extra}
 dd = r1$table %>% filter(!grepl("NA",gen),!grepl("gl",gen))
@@ -130,13 +134,13 @@ dd_sum = table(dd[,c("type","gen")])
 keep = names(tail(sort(colSums(dd_sum)),8))
 ggplot( melt(dd_sum[,keep]), aes(x=gen, y=value, fill=type)) +
     geom_bar(stat='identity', position='dodge') +
-    ggtitle("Extra in replicate 1")
+    ggtitle("Discordant in replicate 1")
 
 dd_sum = table(dd2[,c("type","gen")])
 keep = names(tail(sort(colSums(dd_sum)),8))
 ggplot( melt(dd_sum[,keep]), aes(x=gen, y=value, fill=type)) +
     geom_bar(stat='identity', position='dodge') +
-    ggtitle("Extra in replicate 2")
+    ggtitle("Discordant in replicate 2")
 
 ```
 
@@ -150,17 +154,16 @@ dd = data.frame(geno = read_geno(r1$conc),
                 strand = unlist(info(r1$conc)$CS))
 ggplot(dd, aes(x=geno)) + 
     geom_bar(position = 'dodge') +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+    ggtitle("Concordant in replicate 1")
 
 r2$conc = read_conc_vcf("NA12878_r2")
 dd = data.frame(geno = read_geno(r2$conc),
-                strand = unlist(info(r2$conc)$CS)) +
-    ggtitle("Extra in replicate 1")
-
+                strand = unlist(info(r2$conc)$CS)) 
 ggplot(dd, aes(x=geno)) + 
     geom_bar(position = 'dodge') +
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-    ggtitle("Extra in replicate 2")
+    ggtitle("Concordant in replicate 2")
 
 ```
 
@@ -210,5 +213,46 @@ GAAAAGAAAaaagagaagagag
 
 The second G is not related to the methylate C, but to the non-methylated C. It could be an error, but that's the reason why is not in the first replicate.
 
+# Stats from pilot samples
+
+Number of SNPs that changed CpG methylation sites:
+
+samples                 # of SNPs
+--------------------  -----------
+B1846_GCCAAT_L006_R1           11
+B359_CTTGTA_L006_R1            96
+B1796_CAGATC_L006_R1           22
+B1587_ACTTGA_L006_R1            9
+B5113_TAGCTT_L006_R1           41
+B1850_ATCACG_L006_R1           42
+B632_CGATGT_L006_R1            37
+B1369_GATCAG_L006_R1           10
+B462_ACAGTG_L006_R1            16
+
+
+Number of SNPs shared among samples.
+
+  # samples    # of SNPs
+-----------  -----------
+          1          204
+          2           24
+          3            6
+          4            1
+          5            2
+          
+
+Number of totals CpGs ~ 7 mill, where 0.05% overlaps with SNPs detected.
+
+ 
+Report from Bismark
+
+```{r links, results='asis'}
+fns = list_files_with_exts("/home/lpantano/repos/pipelines/baccarelli-rrbs/pilot", "html")
+
+for (fn in fns){
+   cat(paste0("[",basename(fn),"](",get_report_html(fn),")\n"))
+}
+
+```
 
 
