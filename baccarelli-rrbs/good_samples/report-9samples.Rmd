@@ -1,0 +1,86 @@
+---
+title: "rrbs"
+author: "lorena pantano"
+date: "5/19/2015"
+output: html_document
+---
+
+```{r custom-code-2}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "rrbs"
+root_path<-"~/orch/scratch/rrbs/good_samples/work/"
+path_files = "~/repos/pipeline/baccarelli-rrbs/good_samples"
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, 
+                    cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
+                    error=FALSE,echo=FALSE,
+                    eval=TRUE,fig.height=9, fig.width=11,
+                    message=FALSE, prompt=TRUE, comment='', fig.cap='', 
+                    bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+```{r setup, echo=FALSE,eval=F}
+render_2_drop("~/repos/pipelines/baccarelli-rrbs/hapmap/report.Rmd",dn)
+```
+
+```{r packages}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(reshape)
+library(rmarkdown)
+library(knitr)
+ggplot <- function(...) ggplot2::ggplot(...) + theme_bw() + scale_fill_brewer(palette = "Set1")
+```
+
+
+# Stats from pilot samples
+
+Number of SNPs that changed CpG methylation sites:
+
+```{r single-sample}
+dd = read.table(file.path(root_path, "link", "link_stat.tsv"), header=F, skip=2)
+names(dd) = c('# of samples', '# of snps')
+kable(dd)
+
+```
+
+
+Number of SNPs shared among samples.
+
+```{r shared-sample}
+dd = read.table(file.path(root_path, "link", "link_shared_stat.tsv"), header=F, skip=2)
+names(dd) = c('# of samples', '# of common snps')
+kable(dd)
+
+```
+
+# example
+
+```{r example}
+dd = read.table(file.path(root_path, 'chr4_190641217_190641180.align'))
+names(dd) = c(190641180:190641218, 'sample')
+dd = dd[order(dd$sample, dd$`190641180`),]
+dd$idx = 1:nrow(dd)
+dd_m = melt(dd, id.vars = c('sample', 'idx'))
+
+ggplot(dd_m, aes(x=variable, y=idx, fill=value)) + geom_tile() +facet_wrap(~sample, scales = 'free_y') +
+  scale_fill_manual(values = c("red3","green3","grey80","yellow3","orange3"))  + 
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank())
+
+```
+
+ 
+Report from Bismark
+
+```{r links, results='asis'}
+fns = list_files_with_exts("/home/lpantano/repos/pipeline/baccarelli-rrbs/pilot", "html")
+
+for (fn in fns){
+   cat(paste0("[",basename(fn),"](",get_report_html(fn),")\n"))
+}
+
+```
+
+
