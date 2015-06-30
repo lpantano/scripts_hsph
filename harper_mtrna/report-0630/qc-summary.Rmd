@@ -1,0 +1,629 @@
+---
+output:
+    knitrBootstrap::bootstrap_document:
+        theme: readable
+        highlight: zenburn
+        theme.chooser: TRUE
+        highlight.chooser: TRUE
+    html_document:
+        toc: true
+        highlight: zenburn
+
+---
+```{r custom-code-2}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "harper_mtrna_0630/"
+root_path<-"~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/"
+merged_path<-"~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/merge"
+path_files = "~/repos/pipelines/harper_mtrna/report-0630/"
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, 
+                    cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
+                    error=FALSE,
+                    eval=TRUE,fig.height=9, fig.width=11,
+                    message=FALSE, prompt=TRUE, comment='', fig.cap='', 
+                    bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+```{r setup, echo=FALSE,eval=F}
+render_2_drop("~/repos/pipelines/harper_mtrna/report-0505/qc-summary.Rmd",dn)
+
+```
+
+# Overview
+
+3 groups with 3 samples each:
+
+* controls (con): c1 c2 c3
+* treatment 1 (t1): t1-t1 t2-t1 t3-t1
+* treatment 2 (t2): t1-t2, t2-t2, t3-t2
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(dplyr)
+library(GenomicRanges)
+library(gridExtra)
+project_summary = "~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/2015-06-22_mitrna/project-summary.csv"
+counts_file = "~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/2015-06-22_mitrna/combined.counts"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
+summarydata$Name = factor(rownames(summarydata),levels=c("c1","c2","c3",
+                                                         "s1t1","s2t1","s3t1",
+                                                         "s1t2","s2t2","s3t2"))
+summarydata = summarydata[order(summarydata$Name),]
+counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE, sep="\t")
+counts = counts[, order(colnames(counts))]
+colnames(counts) = gsub(".counts", "", colnames(counts))
+
+# this is a list of all non user-supplied metadata columns that could appear
+known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.quality",
+    "rRNA.rate", "Fragment.Length.Mean", "Intergenic.Rate",
+    "Mapping.Rate", "Quality.format", "Mapped",
+    "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
+    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "complexity", "X5.3.bias")
+
+colfuncGreen <- colorRampPalette(c("green4", "green"))
+colfuncRed <- colorRampPalette(c("red4", "red"))
+colfuncBlue <- colorRampPalette(c("blue4", "blue"))
+
+gtf_file = read.table("~/orch/scratch/harper_mitrna_2/raw-merged/final/merge/mt_good.gtf", sep="\t")
+mit_genes = sapply(as.character(gtf_file$V9), function(x){
+    #print(x)
+    #print(strsplit(x,";")[[1]][1])
+    sub("gene_id ","", strsplit(x,";")[[1]][1])
+    #sub("gene_id ", )
+})
+```
+
+```{r heatmap-function}
+get_heatmap_fn = function(summarydata) {
+    # return the pheatmap function with or without metadata
+    metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
+    if(ncol(metadata) == 0) {
+       return(pheatmap)
+    }
+    else {
+    #rownames(metadata) = summarydata$Name
+    heatmap_fn = function(data, ...) {
+        pheatmap(data, annotation=metadata, ...)
+    }
+    return(heatmap_fn)
+}}
+heatmap_fn = get_heatmap_fn(summarydata)
+```
+
+# Quality control metrics
+
+## Mapped reads
+```{r mapped-plot}
+ggplot(summarydata, aes(x=Name, y=Mapped)) +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    geom_bar(stat="identity") +
+    ylab("mapped reads") + xlab("")
+```
+
+## Genomic mapping rate
+```{r mapping-rate-plot}
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) +
+    geom_bar(stat="identity") +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Duplication mapping rate
+```{r non-unique-rate-plot}
+ggplot(summarydata, aes(x=Name, y=Duplication.Rate.of.Mapped)) +
+    geom_bar(stat="identity") +
+    ylab("duplication rate") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Unique mapping reads
+```{r unique-rate-plot}
+dd = data.frame(Name=factor(names(counts),levels=levels(summarydata$Name)), Unique=colSums(counts), total=summarydata[,"Mapped"])
+ggplot(dd, aes(x=Name, y=Unique)) +
+    geom_bar(stat="identity") +
+    ylab("unique reads") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Number of genes detected
+```{r genes-detected-plot}
+dd = data.frame(Name=factor(names(counts),levels=levels(summarydata$Name)), Genes.Detected = colSums(counts > 0))
+ggplot(dd, aes(x=Name, y=Genes.Detected)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("genes detected") + xlab("")
+```
+
+## Exonic mapping rate
+```{r exonic-mapping-plot}
+ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("exonic mapping rate") + xlab("")
+```
+
+## Intronic mapping rate
+
+Is higher than the average. Normally less than 10%, but better than the last report.
+
+```{r intronic-mapping-plot}
+ggplot(summarydata, aes(x=Name, y=Intronic.Rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("intronic mapping rate") + xlab("")
+```
+
+## rRNA mapping rate
+```{r rRNA-rate-plot}
+ggplot(summarydata, aes(x=Name, y=rRNA.rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("rRNA rate") + xlab("")
+```
+
+## Mapped reads to mit
+```{r reads-mit}
+dd = data.frame(Name=factor(names(counts),levels=levels(summarydata$Name)), Unique=colSums(counts[mit_genes,]), total=summarydata[,"Mapped"])
+ggplot(dd, aes(x=Name, y=Unique)) +
+    geom_bar(stat="identity") +
+    ylab("mit reads") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Estimated fragment length of paired-end reads
+```{r fragment-length-plot}
+ggplot(summarydata, aes(x=Name, y=Fragment.Length.Mean)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("fragment length") + xlab("")
+```
+
+## Boxplot of log10 counts per gene
+```{r boxplot-raw}
+melted = melt(counts)
+colnames(melted) = c("sample", "count")
+melted$sample = factor(melted$sample)
+melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Boxplot of log10 TMM-normalized counts per gene
+Trimmed mean of M-values (TMM) normalization is described
+[here](http://genomebiology.com/2010/11/3/R25)
+
+Robinson, M. D., & Oshlack, A. (2010). A scaling normalization method for differential expression analysis of RNA-seq data. Genome Biology, 11(3). doi:10.1186/gb-2010-11-3-r25
+
+```{r boxplot-normalized}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample)
+melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log2(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Density of log10 TMM-normalized counts
+```{r density-normalized}
+melted$sample = factor(melted$sample, levels=levels(summarydata$Name))
+ggplot(melted %>% filter(count>0), aes(x=count, group=sample, colour=sample)) +
+    geom_density() +
+    scale_color_manual(values=c(colfuncGreen(3), colfuncRed(3), colfuncBlue(3))) + 
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Correlation (Spearman) heatmap of TMM-normalized counts
+```{r spearman-heatmap-normalized}
+heatmap_fn(cor(normalized_counts, method="spearman"),clustering_method="ward")
+```
+
+## MDS plot of TMM-normalized counts
+```{r mds-normalized}
+mds(log2(normalized_counts+2), k=length(colnames(normalized_counts+2)) - 1, condition = summarydata$Duplication.Rate.of.Mapped) + ggtitle("colored by Duplication rate")
+mds(log2(normalized_counts+2), k=length(colnames(normalized_counts+2)) - 1, condition = summarydata$Intronic.Rate) + ggtitle("colored by Intronic rate")
+```
+
+## Heatmap of top 1000 most expressed genes
+```{r top-count-genes, results='asis'}
+select = order(rowMeans(counts),decreasing=TRUE)[1:1000]
+heatmap_fn(log2(counts[select,]+2),clustering_method="ward",clustering_distance_rows="correlation",clustering_distance_cols="correlation")
+```
+
+# Differential expression
+
+I removed sample 2 of treatment 1 (t2-t1) because It's clear there was some problem with that one.
+
+```{r de-setup}
+library(DESeq2)
+library(DEGreport)
+library(vsn)
+design = ~ group
+condition = "group"
+```
+
+```{r deseq2-expression-analysis, results='asis'}
+keep = as.character(summarydata$Name)
+
+counts <- counts[rowSums(counts>0)>1, keep]
+dds = DESeqDataSetFromMatrix(countData=counts,
+    colData=summarydata, design = design)
+dds = DESeq(dds)
+size_factor = sizeFactors(dds)
+```
+
+## Effect of variance stabilization
+
+```{r deseq-diagnostics, results='asis'}
+par(mfrow=c(1,3))
+notAllZero <- (rowSums(counts(dds))>0)
+rld <- rlog(dds)
+vsd <- varianceStabilizingTransformation(dds)
+rlogMat <- assay(rld)
+vstMat <- assay(vsd)
+
+meanSdPlot(log2(counts(dds,normalized=TRUE)[notAllZero,] + 1),
+           ylim = c(0,2.5))
+meanSdPlot(assay(rld[notAllZero,]), ylim = c(0,2.5))
+meanSdPlot(assay(vsd[notAllZero,]), ylim = c(0,2.5))
+```
+
+## Dispersion estimates
+
+```{r dispersion-estimate}
+plotDispEsts(dds)
+```
+
+```{r deseq2-handler}
+handle_deseq2 = function(dds, summarydata, column) {
+  all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="vs")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+```
+
+## MA-plots
+
+```{r DESeq-output, results='asis'}
+all_results = handle_deseq2(dds, summarydata, condition)
+len = length(all_results)
+nr = ceiling( len / 3 )
+nc = ceiling( len / nr )
+par(mfrow=c(nr,nc))
+for(i in seq(length(all_results))) {
+  plotMA(all_results[[i]])
+  title(paste("MA plot for contrast", names(all_results)[i]))
+}
+```
+
+## Volcano-plots
+
+```{r DESeq-volcano}
+for(i in seq(length(all_results))) {
+  stats = as.data.frame(all_results[[i]][,c(2,6)])
+  p = volcano_density_plot(stats, title=names(all_results)[i], lfc.cutoff=1.5)
+  print(p)
+}
+```
+
+## DEGreport
+
+```{r get-groups}
+get_groups <- function(d, comp, condition)
+{
+  g <- unlist(strsplit(comp,"vs"))
+  g1 <- as.character(d$Name[d[, (names(d)==condition)]==g[1]])
+  g2 <- as.character(d$Name[d[, (names(d)==condition)]==g[2]])
+  list(g1,g2)
+}
+```
+
+### Pvalues-vs-Mean
+
+We plot some information about how p-values is correlated with the average mean or
+the standard desviation. We should see the same distribution for each p-value bin.
+
+```{r DEGreport-M}
+plots = list()
+scale_factor = round(1/nr * 14)
+for(i in seq(length(all_results))) {
+  plots[[i]] = degMean(all_results[[i]]$pvalue, rlogMat) +
+  theme_bw(base_size = scale_factor) +
+  ggtitle(paste0("Pvalues-vs-Mean for ", names(all_results)[i]))
+}
+do.call(grid.arrange,plots)
+```
+
+### Pvalues-vs-Variation
+
+```{r DEGreport-V}
+plots = list()
+for(i in seq(length(all_results))) {
+  plots[[i]] = degVar(all_results[[i]]$pvalue, rlogMat) +
+  theme_bw(base_size = scale_factor) +
+  ggtitle(paste0("Pvalues-vs-Variation for ", names(all_results)[i]))
+}
+do.call(grid.arrange,plots)
+```
+
+### Mean-vs-Variation
+
+```{r DEGreport-MV}
+plots = list()
+for(i in seq(length(all_results))) {
+  g <- get_groups(summarydata[keep,], names(all_results)[i], condition)
+  plots[[i]] = degMV(g[[1]], g[[2]], all_results[[i]]$pvalue, counts(dds,normalized=TRUE)) +
+  theme_bw(base_size = scale_factor) +
+  ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i]))
+}
+do.call(grid.arrange,plots)
+```
+
+## Differentially expressed genes
+
+```{r DESeq-tables, results='asis'}
+for(i in seq(length(all_results))) {
+  cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
+  out_df = all_results[[i]]
+  print(knitr::kable(head(out_df)))
+  write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
+                         quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+  cat("\n")
+}
+```
+
+
+## DEG by chr
+
+```{r DESeq-type, results='asis', cache=TRUE}
+get_description = function(v)
+{
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id","external_gene_name","description","chromosome_name") , filters=
+                    "ensembl_gene_id"    , values =as.character(v) ,mart=mart)
+    row.names(g) = g[,1]
+    g
+}
+
+ann_results = list()
+for(i in seq(length(all_results))) {
+    cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
+    res = as.data.frame(all_results[[i]]) 
+    res$gene = row.names(res)
+    res_anno = get_description(res$gene)
+    tab_anno = cbind(res, res_anno[res$gene,])
+    ann_results[[names(all_results)[i]]] = tab_anno
+    write.table(tab_anno, file=paste(names(all_results)[i], "_anno.tsv", sep=""),
+                         quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+    tab_anno = tab_anno %>% filter(padj<0.1)
+    print(knitr::kable(head(tab_anno[ ,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description") ])))
+    cat("\n")
+}
+```
+
+
+## MRPP genes
+
+```{r mrpp-tables,results='asis'}
+for(i in seq(length(ann_results))) {
+    cat(names(ann_results)[i])
+    print(knitr::kable(ann_results[[i]] %>% filter(grepl("HSD17B10",external_gene_name) | 
+                                     grepl("TRMT10C",external_gene_name) |
+                                     grepl("KIAA0391",external_gene_name) )))
+    cat("\n")
+}
+```
+
+## Mitochondrial genes
+
+```{r mit-tables,results='asis'}
+for(i in seq(length(ann_results))) {
+    cat(names(ann_results)[i])
+    tab_anno = ann_results[[i]]
+    tab_anno$class = "non-tRNA"
+    tab_anno$class[grepl("tRNA",tab_anno$description)] = "tRNA"
+    
+    ggplot(tab_anno %>% filter(chromosome_name=="MT"))+
+        geom_point(aes(log2FoldChange,padj,colour=class)) +
+        ggtitle(names(ann_results)[i]) +
+        geom_hline(yintercept=0.1)
+    
+    print(knitr::kable( tab_anno[,c("baseMean","log2FoldChange","pvalue","padj","chromosome_name","external_gene_name","description")] %>% filter(chromosome_name=="MT") ))
+    cat("\n")
+}
+```
+
+
+## heatmap of tRNA genes
+
+Just with the idea to see the general pattern of these genes in the samples
+
+```{r trna-heatmap} 
+    mtrna_genes = ann_results[[1]] %>% filter( grepl("MT-T",external_gene_name) & !is.na(pvalue)  ) %>% dplyr::select(gene,external_gene_name)
+    ma = rlogMat[mtrna_genes[,1],]
+    row.names(ma) = mtrna_genes[,2]
+    pheatmap(ma, clustering_distance_rows = "correlation", clustering_distance_cols = "correlation", clustering_method = "ward")
+
+```
+
+
+## Mitochondrial chromosome map
+
+Each segment represent a gene colored by type, pvalue or adjusted-pvalue for the analysis.
+
+```{r de-mit-map-pvalue}
+library(ggbio)
+colfuncRed <- colorRampPalette(c("red4", "red"))
+get_type = function(g){
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+    dd <- getBM( attributes=c("ensembl_gene_id","gene_biotype") , filters=
+                    "ensembl_gene_id"    , values =as.character(g) ,mart=mart)
+    row.names(dd) = dd[,1]
+    dd[g,2]
+
+}
+library(GenomicFeatures)
+
+mit_gtf = makeTranscriptDbFromGFF(paste0( merged_path,"/mt_good.gtf" ),format = "gtf")
+
+mit_gr <- GenomicFeatures::genes(mit_gtf)
+
+for(i in seq(length(ann_results))) {
+    cat(names(ann_results)[i])
+    tab_anno = ann_results[[i]]
+
+    mcols(mit_gr)$pvalue = tab_anno[ unlist(mcols(mit_gr)$gene_id) , "pvalue" ]
+    mcols(mit_gr)$padj = tab_anno[ unlist(mcols(mit_gr)$gene_id) , "padj" ]
+    mcols(mit_gr)$type = get_type(unlist(mcols(mit_gr)$gene_id))
+    mcols(mit_gr)$padj_break = cut(mcols(mit_gr)$padj,breaks=c(-1,0.001,0.01,0.1,1.1))
+    
+    
+    len_breaks = sum( !is.na( unique(mcols(mit_gr)$padj_break) )) 
+    padj_color =  c(colfuncRed(len_breaks-1),"Grey50")
+    
+    type = ggplot(mit_gr, aes(fill = type ) ) + geom_rect() + scale_fill_brewer(palette = "Set1")
+    pvalue = ggplot(mit_gr, aes(fill = cut(pvalue,breaks=c(-1,0.001,0.01,0.05,1.1)) ) ) + geom_rect() + scale_fill_manual("pvalue",values = c(colfuncRed(3),"Grey50"))
+    padj = ggplot(mit_gr, aes(fill = padj_break ) ) + geom_rect() + scale_fill_manual("padj",values = padj_color)
+    
+    print(tracks(type,pvalue,padj))
+}
+
+```
+
+# Coverage 
+
+MT-TM is the Met-tRNA. 
+
+
+# All profiles
+
+```{r all-trna}
+dds = DESeqDataSetFromMatrix(countData=counts,
+    colData=summarydata[keep,], design = design)
+dds = estimateSizeFactors(dds)
+size_factor=sizeFactors(dds)
+size_factor = 1/(summarydata$Mapped/mean(summarydata$Mapped))
+
+mt = read.table(paste0( merged_path,"/mit_genes.tab" ),sep="\t")
+regions = read.table(paste0( merged_path,"/region.tab" ),sep="\t")
+
+coverage_dat = data.frame()
+
+read_cov = function(in_file){
+    samples = summarydata$Name
+    names(size_factor) = samples
+    for (sample in samples){
+        d = read.table(paste0(merged_path,"/coverage_region/",sample,in_file))
+        d = d %>% mutate(norm=V3/size_factor[sample])
+        coverage_dat = rbind(coverage_dat,d %>% mutate(sample=sample))
+    }
+    coverage_dat$sample = factor(coverage_dat$sample)
+    levels(coverage_dat$sample) = summarydata$Name
+    coverage_dat
+}
+
+write_wig = function(d, name){
+    fn = paste0(path_files,"/",name,'.wig')
+    fn_table = paste0(path_files,"/",name,'.tsv')
+    write.table(d %>% dplyr::select(chr=V1, pos=V2, counts=V3, norm, sample), fn_table, row.names=F, quote=F)
+    unlink(fn)
+    for (s in as.character(unique(d$sample))) {
+        d_s = d %>% filter(sample==s) %>% dplyr::arrange(V2)
+        #print(head(d_s))
+        write(paste0('track type=wiggle_0 name="',s,'" description="',s,'" visibility=full\nvariableStep chrom=chrM'),fn,append = T)
+        d_s[,2] = d_s[,2] + 1
+        write.table(d_s[,c(2,4)] ,fn, append=T, row.names=F, col.names=F, quote=F, sep="\t")
+    }
+    return(fn)
+}
+
+
+for ( gene_name in regions$V6 ) {
+    #paste0(merged_path,"/coverage",)
+
+    fn = paste0("_coverage_",gene_name,".dat")
+    dd = read_cov(fn)
+    # write_wig(dd, gene_name )
+    coor = regions %>% filter(V6 == gene_name)
+    min_pos = coor$V4-100
+    max_pos = coor$V5+100
+    max_trn = max(sort(dd[dd$V2>coor$V4+50 & dd$V2<coor$V5-50,"norm"], decreasing=TRUE)[1:5]) + 20
+
+    gplot_cov = ggplot( dd, aes(y=norm,x=V2, colour=sample) ) +
+        geom_line() +
+        scale_color_manual(values = c(colfuncGreen(3),colfuncRed(3),colfuncBlue(3))) 
+    
+    mttm = mt %>% filter( V5>min_pos & V4<max_pos ) 
+    mttm = mttm %>% mutate(y=runif(nrow(mttm),min = 0.8,max = 1.2))
+    gr <- GRanges(seqnames =mttm$V1,
+    ranges = IRanges(start=mttm$V4, end=mttm$V5),
+    strand = strand(mttm$V6),
+    type = mttm$V2,
+    names= mttm$V7,
+    y=mttm$y)
+
+    genes = ggplot(gr, aes(fill = type)) + geom_rect() + scale_fill_brewer() +
+    geom_text(aes(label=names,x=start+2,y=y),size=3,hjust=0 )
+
+    p=tracks(genes+ xlim(min_pos,max_pos) ,gplot_cov + xlim(min_pos,max_pos) + ylim(0,max_trn) )
+    print(p)
+    
+}
+
+```
+
+
+[convstreat1](`r get_report_links(paste0(path_files,'/convst1_anno.tsv'))`)
+[convstreat2](`r get_report_links(paste0(path_files,'/convst2_anno.tsv'))`)
+[treat2vstreat2](`r get_report_links(paste0(path_files,'/t1vst2_anno.tsv'))`)
