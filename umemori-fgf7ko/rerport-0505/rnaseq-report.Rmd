@@ -455,3 +455,7 @@ kable(rlogMat["ENSMUSG00000086503",])
 
 ```
 
+# Files
+
+[ko vs wt](`r get_report_links('kovswt.tsv')`)
+

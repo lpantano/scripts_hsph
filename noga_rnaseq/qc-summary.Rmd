@@ -23,8 +23,7 @@ options(bitmapType = 'cairo')
 
 ```{r render, eval=FALSE, echo=FALSE}
 render_2_drop("~/repos/pipelines/noga_rnaseq/qc-summary.Rmd",dn)
-#render("~/repos/pipelines/gregory_tcga/mirna.Rmd")
-
+# render("~/repos/pipelines/noga_rnaseq/qc-summary.Rmd")
 ```
 
 
@@ -37,6 +36,7 @@ library(gplots)
 library(edgeR)
 library(CHBUtils)
 library(pheatmap)
+library(dplyr)
 project_summary = "/home/lpantano/orch/scratch/noga_rnaseq/tcell/final/2015-04-22_tcell/project-summary.csv"
 counts_file = "/home/lpantano/orch/scratch/noga_rnaseq/tcell/final/2015-04-22_tcell/combined.counts"
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
@@ -471,7 +471,7 @@ heatmap_fn(cor(assay(rlog_time)))
 ## Differential expression
 
 We'll remove A10 sample because seems different from the rest. As well, we'll normalize
-with RUVSeq a package that try to get all replicate samples the most similar as possible.
+with RUVSeq, a package that tries to get that all replicate samples are the most similar as possible.
 
 ```{r remove-de}
 keep = c("A12","A14","A4","A6","A8","A9","A1")
@@ -492,28 +492,28 @@ plotMA(dds_ruv)
 res = results(dds_ruv, contrast = c("group", "Pgc24", "WT24"))
 res = res[order(res$padj),]
 
-cat(paste("Lowest adjusted p-value hits for", "Pgc24" ,"vs" ,"WT24"))
-
 out_df = res
 symbol = get_description(row.names(out_df))
 out_df[as.character(symbol$ensembl_gene_id), "symbol"] = symbol$external_gene_name
 out_df[as.character(symbol$ensembl_gene_id), "description"] = symbol$description
-
-cat("Number of significant genes: ")
-print(kable(as.data.frame(table(out_df$padj<0.1))))
-cat("\n")
-print(knitr::kable(head(out_df)))
-cat("\n")
-# write.table(out_df, file=paste("Pgc24vsWT24_clean", ".tsv", sep=""),
-#            quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
 save_file(out_df, paste0("Pgc24vsWT24_clean", ".tsv"))
+
+cat(paste("Lowest adjusted p-value hits for", "Pgc24" ,"vs" ,"WT24","\n"))
+
+cat("Number of significant genes: \n")
+
+kable(as.data.frame(table(out_df$padj<0.1)))
+
 cat("\n")
 
+kable(head(out_df))
+
+cat("\n")
+cat("\n")
 ```
 
 # time and condition interaction
 
-## Correlation among 24h samples
 ```{r time_condition-ruvseq, results='asis'}
 library(RUVSeq)
 keep = setdiff(summarydata$Name, "A10")
@@ -528,8 +528,7 @@ norm = counts(dds_int, normalized=T)
 
 ## Differential expression
 
-We'll remove A10 sample because seems different from the rest. As well, we'll normalize
-with RUVSeq a package that try to get all replicate samples the most similar as possible.
+Without A10 samples again.
 
 ```{r time_conditon-de}
 set <- newSeqExpressionSet(raw,phenoData =
@@ -548,28 +547,29 @@ plotMA(res)
 
 ## table
 ```{r time-condition-table, results='asis'}
-cat(paste("Lowest adjusted p-value hits for", "Pgc24" ,"vs" ,"WT24" ,"over time"))
-
 out_df = res
 symbol = get_description(row.names(out_df))
 out_df[as.character(symbol$ensembl_gene_id), "symbol"] = symbol$external_gene_name
 out_df[as.character(symbol$ensembl_gene_id), "description"] = symbol$description
-
-cat("Number of significant genes: ")
-print(kable(as.data.frame(table(out_df$padj<0.1))))
-cat("\n")
-print(knitr::kable(head(out_df)))
-cat("\n")
-# write.table(out_df, file=paste("condition_time_interaction", ".tsv", sep=""),
-#            quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
 save_file(out_df, paste0("condition_time_interaction", ".tsv"))
+
+cat(paste("Lowest adjusted p-value hits for", "Pgc24" ,"vs" ,"WT24" ,"over time","\n"))
+
+cat("Number of significant genes: \n")
+
+kable(as.data.frame(table(out_df$padj<0.1)))
+
 cat("\n")
 
+kable(head(out_df))
+
+cat("\n")
+cat("\n")
 ```
 
 ## figures
 
-Top 20 genes
+Top 20 significantly deregulated genes with Padj < 0.1
 
 ```{r plot-top, fig.width=10, fig.width=10}
 library(reshape)
@@ -597,4 +597,4 @@ ggplot(dd, aes(x=time,y=value,colour=condition)) +
 * [Pgc N vs WT N ](`r get_report_links('PgcNvsWTN.tsv')`)
 
 * removing one sample: [Pgc 24 vs WT 24 ](`r get_report_links('Pgc24vsWT24_clean.tsv')`)
-* [condition*time interaction](r get_report_links('condition_time_interaction.tsv'))
+* [condition*time interaction](`r get_report_links('condition_time_interaction.tsv')`)

@@ -13,9 +13,9 @@ output:
 
 ```{r custom}
 source("~/repos/myRfunctions/transactions.R")
-dn <- "glasgow_cluster/wgs_1_sample/"
-files_path = "~/repos/pipelines/glasgow_cluster/x1_WGS/"
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+dn <- "glasgow_cluster/aws_wgs_10_samples/"
+files_path = "~/repos/pipelines/glasgow_cluster/aws_10_x30_wgs/"
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", echo=FALSE,
                       cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                       eval=TRUE, fig.width= 9,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
@@ -33,7 +33,7 @@ get_figures = function(p, pattern){
 }
 ```
 
-```{r report,eval=FALSE}
+```{r report,eval=FALSE,echo=FALSE}
 library("Nozzle.R1")
 report <- ""
 report  <-  newCustomReport( "1 sample at 30x WGS" );
@@ -76,12 +76,12 @@ for ( fn in get_figures(files_path,"memory") ){
 cat(section)
 ```
 
-# sda disk stats
+# disk stats
 
 ```{r disk,results='asis'}
 #section = newSection("SDA Disk",class="results")
 section = ""
-for ( fn in get_figures(files_path,"disk") ){
+for ( fn in get_figures(files_path,"disk_io") ){
     name = strsplit(fn,"_")[[1]][1]
     fn = get_report_links( paste0(files_path,fn) )
     section = paste0(section,"### ",name,"\n <img src=",fn,' width=950 height=300>\n\n')
@@ -95,11 +95,10 @@ cat(section)
 ```
 
 
-# lustre disk stats
+# lustre disk stats (terascala only)
 
-Adding the screenshot from the web app to compare.
 
-```{r lustre,results='asis',eval=F}
+```{r lustre,results='asis',eval=FALSE}
 #section = newSection("lustre Disk",class="results")
 section = ""
 for ( fn in get_figures(files_path,"lustre") ){
@@ -107,6 +106,7 @@ for ( fn in get_figures(files_path,"lustre") ){
         name = strsplit(fn,"_")[[1]][1]
         #print( paste0("[",name,"](",get_report_links( paste0(files_path,fn) ),")" ) )
         fn = get_report_links( paste0(files_path,fn) )
+        section = paste0(section,"### ",name,"\n <img src=",fn,' width=950 height=300>\n\n')
         #fg = newFigure( fn, exportId=fn,fileHighRes=fn,name);
         #section  =  addTo( section, fg )
     }

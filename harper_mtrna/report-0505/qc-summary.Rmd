@@ -12,7 +12,7 @@ output:
 ---
 ```{r custom-code-2}
 source("~/repos/myRfunctions/transactions.R")
-dn <- "harper_mtrna_2/"
+dn <- "harper_mtrna_0505/"
 root_path<-"~/orch/scratch/harper_mitrna_2/data_May_01/mitrna/final/"
 merged_path<-"~/orch/scratch/harper_mitrna_2/data_May_01/mitrna/final/merge/"
 path_files = "~/repos/pipelines/harper_mtrna/report-0505/"
@@ -22,6 +22,7 @@ knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE,
                     eval=TRUE,fig.height=9, fig.width=11,
                     message=FALSE, prompt=TRUE, comment='', fig.cap='', 
                     bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
 ```
 
 ```{r setup, echo=FALSE,eval=F}
