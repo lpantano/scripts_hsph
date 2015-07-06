@@ -26,7 +26,7 @@ options(bitmapType = 'cairo')
 ```
 
 ```{r setup, echo=FALSE,eval=F}
-render_2_drop("~/repos/pipelines/harper_mtrna/report-0505/qc-summary.Rmd",dn)
+render_2_drop("~/repos/pipelines/harper_mtrna/report-0630/qc-summary.Rmd",dn)
 
 ```
 
@@ -212,7 +212,7 @@ ggplot(summarydata, aes(x=Name, y=Fragment.Length.Mean)) +
 melted = melt(counts)
 colnames(melted) = c("sample", "count")
 melted$sample = factor(melted$sample)
-melted$sample = reorder(melted$sample, colnames(counts))
+# melted$sample = reorder(melted$sample, colnames(counts))
 melted$count = log(melted$count)
 ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
     theme_bw(base_size=12) +
@@ -233,7 +233,7 @@ normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
 melted = melt(normalized_counts)
 colnames(melted) = c("gene", "sample", "count")
 melted$sample = factor(melted$sample)
-melted$sample = reorder(melted$sample, colnames(counts))
+# melted$sample = reorder(melted$sample, colnames(counts))
 melted$count = log2(melted$count)
 ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
     theme_bw(base_size=12) +
@@ -553,7 +553,6 @@ dds = DESeqDataSetFromMatrix(countData=counts,
     colData=summarydata[keep,], design = design)
 dds = estimateSizeFactors(dds)
 size_factor=sizeFactors(dds)
-size_factor = 1/(summarydata$Mapped/mean(summarydata$Mapped))
 
 mt = read.table(paste0( merged_path,"/mit_genes.tab" ),sep="\t")
 regions = read.table(paste0( merged_path,"/region.tab" ),sep="\t")
