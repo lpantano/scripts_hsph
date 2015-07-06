@@ -1,0 +1,180 @@
+---
+output:
+    knitrBootstrap::bootstrap_document:
+        theme: readable
+        highlight: zenburn
+        theme.chooser: TRUE
+        highlight.chooser: TRUE
+    html_document:
+        toc: true
+        highlight: zenburn
+
+---
+```{r custom-code-2}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "harper_mtrna_meta/"
+path_files = "~/repos/pipelines/harper_mtrna/meta/"
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, 
+                    cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
+                    error=FALSE,
+                    eval=TRUE,fig.height=9, fig.width=11,
+                    message=FALSE, prompt=TRUE, comment='', fig.cap='', 
+                    bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+```{r setup, echo=FALSE,eval=F}
+render_2_drop("~/repos/pipelines/harper_mtrna/",dn)
+
+```
+
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(CHBUtils)
+library(dplyr)
+library(gridExtra)
+
+
+read_projects = function(project_summary, counts_file){
+  summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), check.rows=FALSE)
+  counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE, sep="\t")
+  colnames(counts) = gsub(".counts", "", colnames(counts))
+  counts = counts[,as.character(summarydata$Name)]
+  summarydata$group = gsub("^con$", "control", summarydata$group)
+  summarydata$group = gsub("^t1$", "treat1", summarydata$group)
+  summarydata$group = gsub("^t2$", "treat2", summarydata$group)
+  list(summarydata$group, counts)
+}
+
+pro1 = read_projects("~/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/project-summary.csv",
+"~/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/combined.counts")
+rep_counts = pro1[[2]]
+treat_counts = rep_counts[,3:5] + rep_counts [,8:10]
+control_counts = cbind(rep_counts[,1:2] + rep_counts [,6:7], "3_D2_TTAGGC_R"=rep_counts[,11])
+pro1[[2]] = cbind(treat_counts,control_counts)
+pro1[[1]] = c("treat1", "treat1", "treat1", "control", "control", "control")
+
+
+pro2 = read_projects("~/orch/scratch/harper_mitrna_2/data_May_01/mitrna/final/2015-05-04_mitrna/project-summary.csv",
+"~/orch/scratch/harper_mitrna_2/data_May_01/mitrna/final/2015-05-04_mitrna/combined.counts")
+
+
+pro3 = read_projects("~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/2015-06-22_mitrna/project-summary.csv",
+"~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/2015-06-22_mitrna/combined.counts")
+
+
+counts = do.call(cbind, c(pro1[[2]], pro2[[2]], pro3[[2]]))
+rownames(counts) = rownames(pro1[[2]])
+group = c(pro1[[1]], pro2[[1]], pro3[[1]])
+
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+colfuncGreen <- colorRampPalette(c("green4", "green"))
+colfuncRed <- colorRampPalette(c("red4", "red"))
+colfuncBlue <- colorRampPalette(c("blue4", "blue"))
+
+```
+
+
+# Differential expression
+
+```{r de-setup}
+library(DESeq2)
+library(RUVSeq)
+library(edgeR)
+library(vsn)
+condition = "group"
+```
+
+```{r deseq2-expression-analysis, results='asis'}
+keep = as.character(colnames(counts))
+counts <- counts[rowSums(counts>0)>1, keep]
+
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+rep = matrix(data=c(which(grepl("control",group)), 
+              which(grepl("treat1",group)),
+              c(which(grepl("treat2",group)), rep(-1, 3))
+              ), byrow=TRUE, nrow=3)
+ruv_norm= RUVs(cpm(y, normalized.lib.sizes = TRUE, log = TRUE), rownames(y), k=1, rep)
+
+coldata = data.frame(group=group, experiment=as.factor(c(rep(1,6), rep(2,9), rep(3,9))), ruv=ruv_norm$W)
+
+dds = DESeqDataSetFromMatrix(countData=counts,
+    colData=coldata, design = ~ group + experiment + W_1)
+dds = DESeq(dds)
+size_factor = sizeFactors(dds)
+```
+
+## Dispersion estimates
+
+```{r dispersion-estimate}
+plotDispEsts(dds)
+```
+
+```{r deseq2-handler}
+handle_deseq2 = function(dds, contrast) {
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    res
+}
+```
+
+## MA-plots
+
+```{r DESeq-output, results='asis'}
+all_res = list()
+all_res['treat1_vs_control'] = handle_deseq2(dds, c("group", "treat1", "control"))
+all_res['treat2_vs_control'] = handle_deseq2(dds, c("group", "treat2", "control"))
+all_res['treat1_vs_treat2'] = handle_deseq2(dds, c("group", "treat1", "treat2"))
+
+len = length(all_res)
+nr = ceiling( len / 3 )
+nc = ceiling( len / nr )
+par(mfrow=c(nr,nc))
+for(i in seq(length(all_res))) {
+  DESeq2::plotMA(all_res[[i]])
+  title(paste("MA plot for contrast", names(all_res)[i]))
+}
+```
+
+## Differentially expressed genes
+
+```{r DESeq-tables, results='asis'}
+for(i in seq(length(all_res))) {
+  cat(paste("Lowest adjusted p-value hits for", names(all_res)[i]))
+  out_df = all_res[[i]]
+  print(knitr::kable(head(out_df)))
+  write.table(out_df, file=paste(names(all_res)[i], ".tsv", sep=""),
+                         quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+  cat("\n")
+}
+```
+
+```{r DESeq-tables, results='asis'}
+ann = read.table("/home/lpantano/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/annotated_combined.counts",sep="\t", header=T)
+rldMat <- assay(rlog(dds))
+library(dplyr)
+
+for(i in seq(length(all_res))) {
+  cat(paste("Lowest adjusted p-value hits for", names(all_res)[i]))
+  out_df = cbind( as.data.frame(all_res[[i]]), id=row.names(all_res[[i]]) )
+  ma = as.data.frame( cbind(id=row.names(rldMat), rldMat) )
+  out_df = inner_join(out_df, ma, by = "id")
+  out_df = inner_join(out_df, ann[,c("symbol","id")], by = "id")
+  knitr::kable(head(out_df))
+  write.table(out_df, file=paste0(names(all_res)[i], "_ann.tsv", sep=""),
+                         quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+  cat("\n")
+}
+
+```
+
+
+[convstreat1](`r get_report_links(paste0(path_files,'controlvstreat1_ann.tsv'))`)
+[convstreat2](`r get_report_links(paste0(path_files,'controlvstreat2_ann.tsv'))`)
+[treat2vstreat2](`r get_report_links(paste0(path_files,'treat1vstreat2_ann.tsv'))`)
