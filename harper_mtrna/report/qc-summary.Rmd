@@ -60,7 +60,13 @@ colnames(counts) =
         sub("_R.counts","",x)
     })
 #setwd(root_path)
-
+gtf_file = read.table("~/orch/scratch/harper_mitrna_2/raw-merged/final/merge/mt_good.gtf", sep="\t")
+mit_genes = sapply(as.character(gtf_file$V9), function(x){
+    #print(x)
+    #print(strsplit(x,";")[[1]][1])
+    sub("gene_id ","", strsplit(x,";")[[1]][1])
+    #sub("gene_id ", )
+})
 ```
 
 # Quality control metrics
@@ -142,6 +148,17 @@ ggplot(summarydata, aes(x=Name, y=Intergenic.Rate)) +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
 
+
+## Mapped reads to mit
+```{r reads-mit}
+dd = data.frame(Name=names(counts), Unique=colSums(counts[mit_genes,]), total=summarydata[,"Mapped"])
+ggplot(dd, aes(x=Name, y=Unique)) +
+    geom_bar(stat="identity") +
+    ylab("mit reads") + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
 
 
 ## Estimated fragment length of paired-end reads

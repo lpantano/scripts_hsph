@@ -1,0 +1,326 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+```{r setup}
+library(knitr)
+
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(isomiRs)
+
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heigh=6,
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+
+root_path = "~/orch/scratch/zhiyun-pirna/analysis"
+root_file = paste0(root_path,"/report/")
+
+condition = "condition"
+```
+
+```{r render,eval=FALSE, echo=FALSE}
+library(rmarkdown)
+library(knitrBootstrap)
+# render("report.rmd")
+```
+
+```{r load}
+setwd(root_path)
+files = read.table("summary_re.csv", sep=",",header=T,colClasses = "character")
+
+samples = files[,"sample_id"]
+
+names_stats = files[,"size_stats"]
+names(names_stats) = samples
+
+groups = files[,"group"]
+names(groups) = samples
+
+summarydata = data.frame(row.names=samples,samples=samples,group=groups)
+design <- data.frame(row.names=files$sample_id, condition=files$group)
+
+```
+
+# Exploratory analysis
+
+In this section we will see descriptive figures about quality of the data, 
+reads with adapter, reads mapped to miRNAs, reads mapped to other small RNAs. 
+
+## size distribution
+
+After adapter removal, we can plot the size distribution of the small RNAs.
+
+```{r adapter,fig.width=10}
+tab = data.frame()
+for (sample in samples){
+    d = read.table(names_stats[sample], sep=" ")
+    tab = rbind(tab, d %>% mutate(sample=sample, group=groups[sample]))
+}
+
+
+reads_adapter = tab %>% group_by(sample, group) %>% summarise(total=sum(V2))
+ggplot(reads_adapter, aes(x=sample,y=total,fill=group)) +
+    geom_bar(stat="identity", position = "dodge") +
+    ggtitle("total number of reads with adapter") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+ggplot(tab, aes(x=V1,y=V2,fill=sample)) +
+    geom_bar(stat="identity", position = "dodge") +
+    facet_wrap(~group, ncol=4)+
+    ggtitle("size distribution") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+## miRNA
+
+### total miRNA expression annotated with mirbase
+
+```{r mirna,results='hide'}
+mi_files = files[,"miraligner"]
+row.names(design) = samples
+
+obj <- IsomirDataSeqFromFiles(files = mi_files, design = design ,header = T, cov = 1)
+```
+
+
+```{r mirna-mirbase}
+ggplot( data.frame(sample=colnames(counts(obj)), total=colSums(counts(obj)))) +
+    geom_bar(aes(x=sample,y=total), stat='identity')+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+mirna_step <- as.data.frame(colSums(counts(obj)))
+```
+
+### Distribution of mirna expression
+
+```{r depth}
+ggplot(melt(counts(obj))) +
+    geom_boxplot(aes(x=X2,y=value))+
+    scale_y_log10()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+### cumulative distribution of miRNAs
+
+We can see this time we detect much more miRNAs. The saturation is near to 200.
+
+```{r cum}
+
+cs <- as.data.frame(apply(counts(obj),2,cumsum))
+cs$pos <- 1:nrow(cs)
+
+ggplot((melt(cs,id.vars = "pos")))+
+    geom_point(aes(x=pos,y=value,color=variable))+
+    scale_y_log10()
+```
+
+## Others
+
+### classification
+
+```{r cluster}
+clus <- read.table(files[1,"clusters"],header=T,sep="\t",row.names=1, check.names = F)
+ann <- clus[,1]
+clus_ma <- clus[,2:ncol(clus)]
+clus_ma = clus_ma[,row.names(design)]
+```
+
+The major contribution are repeats and rRNA, with variation in the percentage. 
+
+```{r cluster_type,eval=FALSE}
+rRNA <- colSums(clus_ma[grepl("rRNA",ann) & grepl("miRNA",ann)==F,])
+miRNA <- colSums(clus_ma[grepl("miRNA",ann),])
+piRNA <- colSums(clus_ma[grepl("piRNA",ann),])
+tRNA <- colSums(clus_ma[grepl("tRNA",ann) & grepl("rRNA",ann)==F & grepl("miRNA",ann)==F,])
+rmsk <- colSums(clus_ma[grepl("repeat",ann) & grepl("rRNA",ann)==F & grepl("miRNA",ann)==F &  grepl("piRNA",ann)==F & grepl("tRNA",ann)==F,])
+total <- colSums(clus_ma)
+
+dd <- data.frame(samples=names(rRNA),
+                 rRNA=rRNA,
+                 miRNA=miRNA,
+                 piRNA=piRNA,
+                 tRNA=tRNA,
+                 rmsk=rmsk,
+                total=total)
+ggplot(melt(dd)) +
+    geom_bar(aes(x=samples,y=value,fill=variable),
+             stat='identity',
+             position="dodge")+
+    scale_fill_brewer(palette = "Set1")+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+dd_norm = dd
+dd_norm[,2:5] = sweep(dd[,2:5],1,dd[,6],"/")
+ggplot(melt(dd_norm[,1:5])) +
+    geom_bar(aes(x=samples,y=value,fill=variable),
+             stat='identity',
+             position="dodge")+
+    scale_fill_brewer(palette = "Set1")+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    labs(list(title="relative proportion of small RNAs",y="% reads"))
+```
+
+
+# DE
+
+I did differential expression of all possible comparison using the previous normalization.
+For each DE I tried, I plot Dispersion plot that shows the relationship between
+standard deviation expression and average expression for each miRNA.
+
+
+```{r de-setup}
+library(DESeq2)
+library(DEGreport)
+library(vsn)
+```
+
+```{r deseq2-handler}
+
+filter_handle <- function(res){
+    res_nona <- res[!is.na(res$padj),]
+    keep <- res_nona$padj < 0.1 
+    res_nona[keep,]
+}
+
+handle_deseq2 = function(dds, summarydata, column) {
+  all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="_vs_")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+
+plot_MA = function(res){
+    for(i in seq(length(res))) {
+        plotMA(res[[i]])
+        title(paste("MA plot for contrast", names(res)[i]))
+    }
+}
+
+plot_volcano = function(res){
+    for(i in seq(length(res))) {
+        stats = as.data.frame(res[[i]][,c(2,6)])
+        p = volcano_density_plot(stats, title=names(res)[i], lfc.cutoff=1)
+        print(p)
+    }
+}
+
+do_de = function(raw, summarydata, condition){
+    dss = DESeqDataSetFromMatrix(countData = raw[rowMeans(raw)>3,],
+                       colData = summarydata,
+                       design = ~ condition)
+    dss = DESeq(dss)
+    plotDispEsts(dss)
+    dss
+}
+
+do_norm = function(dss, root_path, prefix){
+    rlog_ma = assay(rlog(dss))
+    count_ma = counts(dss, normalized=TRUE)
+    raw = counts(dss, normalized=FALSE)
+    fn_log = paste0(root_file, prefix, "log_matrix.txt")
+    write.table(rlog_ma,fn_log,sep="\t")
+    fn_count = paste0(root_file, prefix, "count_matrix.txt")
+    write.table(count_ma,fn_count,sep="\t")
+    fn_raw = paste0(root_file, prefix, "raw_matrix.txt")
+    write.table(count_ma,fn_raw,sep="\t")
+}
+
+```
+
+## mirna
+
+```{r de}
+dds = do_de(obj@counts, design, condition)
+```
+
+```{r tables}
+do_norm(dds, root_path, "mirna_")
+```
+
+### MA-plots
+  
+```{r DESeq-output, results='asis'}
+all_results = handle_deseq2(dds, design, condition)
+plot_MA(all_results)
+```
+
+### Volcano-plots
+
+```{r DESeq-volcano}
+plot_volcano(all_results)
+```
+
+## isomir
+
+```{r de-iso}
+dds = do_de(countsIso(obj, ref=T, iso5=T, iso3=T, add=T, mism =T)@counts, design, condition)
+```
+
+```{r tables-iso}
+do_norm(dds, root_path, "isomirs_")
+```
+
+### MA-plots
+  
+```{r DESeq-output-iso, results='asis'}
+all_results = handle_deseq2(dds, design, condition)
+plot_MA(all_results)
+```
+
+### Volcano-plots
+
+```{r DESeq-volcano-iso}
+plot_volcano(all_results)
+```
+
+## clusters
+
+```{r de-c}
+dds = do_de(clus_ma, design, condition)
+```
+
+```{r tables-c}
+do_norm(dds, root_path, "clusters_")
+```
+
+### MA-plots
+  
+```{r DESeq-output-c, results='asis'}
+all_results = handle_deseq2(dds, design, condition)
+plot_MA(all_results)
+```
+
+### Volcano-plots
+
+```{r DESeq-volcano-c}
+plot_volcano(all_results)
+```
+
+
+
+

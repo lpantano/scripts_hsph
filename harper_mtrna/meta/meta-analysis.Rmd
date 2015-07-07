@@ -38,19 +38,22 @@ library(dplyr)
 library(gridExtra)
 
 
-read_projects = function(project_summary, counts_file){
+read_projects = function(project_summary, counts_file, prefix, change=FALSE){
   summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), check.rows=FALSE)
   counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE, sep="\t")
   colnames(counts) = gsub(".counts", "", colnames(counts))
   counts = counts[,as.character(summarydata$Name)]
-  summarydata$group = gsub("^con$", "control", summarydata$group)
-  summarydata$group = gsub("^t1$", "treat1", summarydata$group)
-  summarydata$group = gsub("^t2$", "treat2", summarydata$group)
-  list(summarydata$group, counts)
+  if (change){
+    summarydata$group = gsub("^con$", "control", summarydata$group)
+    summarydata$group = gsub("^t1$", "treat1", summarydata$group)
+    summarydata$group = gsub("^t2$", "treat2", summarydata$group)
+  }
+  colnames(counts) = paste0(prefix, colnames(counts))
+  list(as.character(summarydata$group), counts)
 }
 
 pro1 = read_projects("~/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/project-summary.csv",
-"~/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/combined.counts")
+"~/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/combined.counts", "exp1")
 rep_counts = pro1[[2]]
 treat_counts = rep_counts[,3:5] + rep_counts [,8:10]
 control_counts = cbind(rep_counts[,1:2] + rep_counts [,6:7], "3_D2_TTAGGC_R"=rep_counts[,11])
@@ -59,11 +62,10 @@ pro1[[1]] = c("treat1", "treat1", "treat1", "control", "control", "control")
 
 
 pro2 = read_projects("~/orch/scratch/harper_mitrna_2/data_May_01/mitrna/final/2015-05-04_mitrna/project-summary.csv",
-"~/orch/scratch/harper_mitrna_2/data_May_01/mitrna/final/2015-05-04_mitrna/combined.counts")
-
+"~/orch/scratch/harper_mitrna_2/data_May_01/mitrna/final/2015-05-04_mitrna/combined.counts", "exp2",TRUE)
 
 pro3 = read_projects("~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/2015-06-22_mitrna/project-summary.csv",
-"~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/2015-06-22_mitrna/combined.counts")
+"~/orch/scratch/harper_mitrna_2/Jun_22/mitrna/final/2015-06-22_mitrna/combined.counts","exp3")
 
 
 counts = do.call(cbind, c(pro1[[2]], pro2[[2]], pro3[[2]]))
@@ -91,18 +93,19 @@ condition = "group"
 ```
 
 ```{r deseq2-expression-analysis, results='asis'}
-keep = as.character(colnames(counts))
+keep = setdiff(as.character(colnames(counts)), "exp2t2-t1")
+group = group[c(1:11, 13:24)]
 counts <- counts[rowSums(counts>0)>1, keep]
 
 y = DGEList(counts=counts)
 y = calcNormFactors(y)
 rep = matrix(data=c(which(grepl("control",group)), 
-              which(grepl("treat1",group)),
+              c(which(grepl("treat1",group)), -1),
               c(which(grepl("treat2",group)), rep(-1, 3))
               ), byrow=TRUE, nrow=3)
 ruv_norm= RUVs(cpm(y, normalized.lib.sizes = TRUE, log = TRUE), rownames(y), k=1, rep)
 
-coldata = data.frame(group=group, experiment=as.factor(c(rep(1,6), rep(2,9), rep(3,9))), ruv=ruv_norm$W)
+coldata = data.frame(group=group, experiment=as.factor(c(rep(1,6), rep(2,8), rep(3,9))), ruv=ruv_norm$W)
 
 dds = DESeqDataSetFromMatrix(countData=counts,
     colData=coldata, design = ~ group + experiment + W_1)
@@ -144,7 +147,7 @@ for(i in seq(length(all_res))) {
 
 ## Differentially expressed genes
 
-```{r DESeq-tables, results='asis'}
+```{r DESeq-tables, results='asis', eval=FALSE, echo=FALSE}
 for(i in seq(length(all_res))) {
   cat(paste("Lowest adjusted p-value hits for", names(all_res)[i]))
   out_df = all_res[[i]]
