@@ -623,6 +623,6 @@ for ( gene_name in regions$V6 ) {
 ```
 
 
-[convstreat1](`r get_report_links(paste0(path_files,'/convst1_anno.tsv'))`)
-[convstreat2](`r get_report_links(paste0(path_files,'/convst2_anno.tsv'))`)
-[treat2vstreat2](`r get_report_links(paste0(path_files,'/t1vst2_anno.tsv'))`)
+[convstreat1](`r get_report_links(paste0(path_files,'controlvstreat1_anno.tsv'))`)
+[convstreat2](`r get_report_links(paste0(path_files,'controlvstreat2_anno.tsv'))`)
+[treat2vstreat2](`r get_report_links(paste0(path_files,'treat1vstreat2_anno.tsv'))`)
