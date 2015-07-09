@@ -15,7 +15,7 @@ source("~/repos/myRfunctions/transactions.R")
 dn <- "harper_mtrna_meta/"
 path_files = "~/repos/pipelines/harper_mtrna/meta/"
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, 
-                    cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
+                    cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
                     error=FALSE,
                     eval=TRUE,fig.height=9, fig.width=11,
                     message=FALSE, prompt=TRUE, comment='', fig.cap='', 
@@ -24,7 +24,7 @@ options(bitmapType = 'cairo')
 ```
 
 ```{r setup, echo=FALSE,eval=F}
-render_2_drop("~/repos/pipelines/harper_mtrna/",dn)
+render_2_drop("~/repos/pipelines/harper_mtrna/meta/meta-analysis.Rmd",dn)
 
 ```
 
@@ -158,26 +158,31 @@ for(i in seq(length(all_res))) {
 }
 ```
 
-```{r DESeq-tables, results='asis'}
+```{r DESeq-tables-ann, results='asis'}
 ann = read.table("/home/lpantano/orch/groups/harper_rnaseq/mtrna/final-mt/2015-01-14_mtrna/annotated_combined.counts",sep="\t", header=T)
 rldMat <- assay(rlog(dds))
 library(dplyr)
 
 for(i in seq(length(all_res))) {
   cat(paste("Lowest adjusted p-value hits for", names(all_res)[i]))
+  cat('\n')
   out_df = cbind( as.data.frame(all_res[[i]]), id=row.names(all_res[[i]]) )
   ma = as.data.frame( cbind(id=row.names(rldMat), rldMat) )
   out_df = inner_join(out_df, ma, by = "id")
   out_df = inner_join(out_df, ann[,c("symbol","id")], by = "id")
-  knitr::kable(head(out_df))
   write.table(out_df, file=paste0(names(all_res)[i], "_ann.tsv", sep=""),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+  
+  print(knitr::kable(head(out_df)))
+  
   cat("\n")
 }
 
 ```
 
 
-[convstreat1](`r get_report_links(paste0(path_files,'controlvstreat1_ann.tsv'))`)
-[convstreat2](`r get_report_links(paste0(path_files,'controlvstreat2_ann.tsv'))`)
-[treat2vstreat2](`r get_report_links(paste0(path_files,'treat1vstreat2_ann.tsv'))`)
+[convstreat1](`r get_report_links(paste0(path_files,'treat1_vs_control_ann.tsv'))`)
+
+[convstreat2](`r get_report_links(paste0(path_files,'treat2_vs_control_ann.tsv'))`)
+
+[treat2vstreat2](`r get_report_links(paste0(path_files,'treat1_vs_treat2_ann.tsv'))`)
