@@ -1,0 +1,105 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+```{r setup}
+library(knitr)
+
+library(ggplot2)
+library(reshape)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(Biostrings)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heigh=6,
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+```
+
+
+```{r barcodes-load}
+barcodes = read.table("~/orch/scratch/sui_enhancer/barcode-sequences.csv")
+```
+
+```{r barcode-dist, cache=TRUE}
+ma = matrix(1:1000000, ncol=1000)
+colnames(ma) = barcodes$V2
+rownames(ma) = barcodes$V2
+
+mism = lapply(barcodes$V2, function(b1){
+    lapply(barcodes$V2, function(b2){
+        tmp = cbind( strsplit(as.character(b1), ""), strsplit(as.character(b2), ""))
+        sum(t(apply (tmp, 1, function(x){x[[1]]==x[[2]]})))
+    })
+})
+
+h = hist(unlist(mism), n=10)
+
+sum(unlist(mism)==9)
+```
+
+
+```{r samples}
+sw = list()
+sw[['sw1']] = read.table("~/orch/scratch/sui_enhancer/res9/052715_SW1_ATCACG_L001_R1_001_counts.tsv")
+sw[['sw2']] = read.table("~/orch/scratch/sui_enhancer/res25/052715_SW2_CGATGT_L001_R1_001_counts.tsv")
+sw[['sw3']] = read.table("~/orch/scratch/sui_enhancer/res25/052715_SW3_TTAGGC_L001_R1_001_counts.tsv")
+sw[['sw4']] = read.table("~/orch/scratch/sui_enhancer/res25/052715_SW4_TGACCA_L001_R1_001_counts.tsv")
+```
+
+```{r known_vs_novel}
+detection = lapply(names(sw), function(x){
+    sw[[x]] %>% group_by(V2) %>% summarise(counts=n(),abundance=sum(V3)) %>% mutate(experiment=x)
+})
+dd = do.call(rbind, detection)
+
+ggplot(dd, aes(x=experiment, y=counts, fill=V2)) +
+    geom_bar(stat = 'identity', position = 'dodge') +
+    scale_y_log10() +
+    scale_fill_brewer("", palette = "Set1")
+
+ggplot(dd, aes(x=experiment, y=abundance, fill=V2)) +
+    geom_bar(stat = 'identity', position = 'dodge') +
+    scale_y_log10() +
+    scale_fill_brewer("", palette = "Set1")
+
+```
+
+
+```{r norm}
+library(edgeR)
+library(plyr)
+cleaned = lapply(names(sw), function(x){
+    sw[[x]] %>% filter(V3>1) %>% select(V1, V3) %>% mutate(experiment=x)
+})
+
+dd = do.call(rbind, cleaned)
+mat = reshape(dd, direction = 'wide', idvar = 'V1', timevar = 'experiment')
+mat[is.na(mat)] = 0 
+dge = edgeR::DGEList(mat[,2:5], genes = mat$V1)
+norm = cpm(dge, normalized.lib.sizes = TRUE, log = TRUE)
+pheatmap::pheatmap(norm)
+```
+
+```{r select}
+mm = apply(norm, 1, min)
+mx = apply(norm, 1, max)
+
+keep = mx - mm > 10
+pheatmap::pheatmap(norm[keep,])
+
+write.table(norm[keep,], "difference.tsv", quote=F, sep="\t")
+```
+
+
+
