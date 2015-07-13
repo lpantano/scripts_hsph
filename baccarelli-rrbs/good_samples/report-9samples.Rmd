@@ -1,26 +1,31 @@
 ---
-title: "rrbs"
-author: "lorena pantano"
-date: "5/19/2015"
-output: html_document
----
+output:
+    knitrBootstrap::bootstrap_document:
+        theme: readable
+        highlight: zenburn
+        theme.chooser: TRUE
+        highlight.chooser: TRUE
+    html_document:
+        toc: true
+        highlight: zenburn
 
+---
 ```{r custom-code-2}
 source("~/repos/myRfunctions/transactions.R")
-dn <- "rrbs"
+dn <- "rrbs/good_samples"
 root_path<-"~/orch/scratch/rrbs/good_samples/work/"
 path_files = "~/repos/pipeline/baccarelli-rrbs/good_samples"
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, 
                     cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
                     error=FALSE,echo=FALSE,
-                    eval=TRUE,fig.height=9, fig.width=11,
+                    eval=TRUE,fig.height=9, fig.width=9,
                     message=FALSE, prompt=TRUE, comment='', fig.cap='', 
                     bootstrap.show.code=FALSE)
 options(bitmapType = 'cairo')
 ```
 
 ```{r setup, echo=FALSE,eval=F}
-render_2_drop("~/repos/pipelines/baccarelli-rrbs/hapmap/report.Rmd",dn)
+render_2_drop("~/repos/pipelines/baccarelli-rrbs/good_samples/report-9samples.Rmd",dn)
 ```
 
 ```{r packages}
@@ -40,8 +45,8 @@ Number of SNPs that changed CpG methylation sites:
 
 ```{r single-sample}
 dd = read.table(file.path(root_path, "link", "link_stat.tsv"), header=F, skip=2)
-names(dd) = c('# of samples', '# of snps')
-kable(dd)
+names(dd) = c('sample', '# of snps')
+dd
 
 ```
 
@@ -51,7 +56,7 @@ Number of SNPs shared among samples.
 ```{r shared-sample}
 dd = read.table(file.path(root_path, "link", "link_shared_stat.tsv"), header=F, skip=2)
 names(dd) = c('# of samples', '# of common snps')
-kable(dd)
+dd
 
 ```
 
@@ -67,6 +72,7 @@ dd_m = melt(dd, id.vars = c('sample', 'idx'))
 ggplot(dd_m, aes(x=variable, y=idx, fill=value)) + geom_tile() +facet_wrap(~sample, scales = 'free_y') +
   scale_fill_manual(values = c("red3","green3","grey80","yellow3","orange3"))  + 
   theme_bw() +
+  ylab("read") +
   theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank())
 
 ```
