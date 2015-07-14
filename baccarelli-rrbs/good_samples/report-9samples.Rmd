@@ -62,11 +62,60 @@ dd
 
 # example
 
-```{r example}
+```{r heatmap}
 dd = read.table(file.path(root_path, 'chr4_190641217_190641180.align'))
 names(dd) = c(190641180:190641218, 'sample')
 dd = dd[order(dd$sample, dd$`190641180`),]
 dd$idx = 1:nrow(dd)
+
+metrics = as.data.frame(dd %>% select(sample,snp=`190641180`, cpg=`190641218`)  %>% group_by(sample,snp, cpg) %>% tally())
+metrics_by_snp = reshape(metrics, timevar = "cpg", idvar = c("sample", "snp"), direction = "wide")
+metrics_by_snp[is.na(metrics_by_snp)] = 0  
+metrics_by_snp= metrics_by_snp %>% mutate(pct_methylation = n.Cm/(n.C + n.Cm))
+#reshape(metrics_by_snp[,c(1,2,5)], timevar = "snp", idvar = "sample", direction="wide")
+ggplot(metrics_by_snp, aes(y=sample, x=snp, fill=pct_methylation)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "steelblue", mid = "white", high = "orange", midpoint = 0.5 ) +
+  ggtitle("ASM site between SNP(chr4:190641180) and  CpG (chr4:190641218)")
+```
+
+
+```{r text}
+dd = read.table(file.path(root_path, 'B1850_chr4_example.txt'), sep="", colClasses = "character")
+nt = sapply(as.character(dd$V1), function(x){
+  sp = unlist(strsplit(x, split=""))
+  names(sp) = 190641171:190641227
+  if (sp[11] != '-')
+    sp
+  })
+nt=do.call(rbind,Filter(is.vector,nt))
+
+rownames(nt) = paste0("read",1:nrow(nt))
+ys = 1:nrow(nt)  
+xs=as.numeric(colnames(nt))
+
+
+.color_pos = function(v, pos){
+  pos = as.character(pos)
+  names(v) = as.character(names(v))
+  nt_col=c("-"='grey40',"a"='red3', "t"='blue2', "c"='orange2', "g"='green2')
+  this = rep('grey40', length(v))
+  names(this) = names(v)
+  this[pos] = nt_col[v[pos]]
+  this
+}
+
+nt = nt[order(nt[,"190641180"]),]
+plot(x=c(xs[1], xs[length(xs)]), y=c(ys[1], ys[length(ys)]), type = 'n', axes=FALSE,
+     xlab="position", ylab="")
+log=lapply(ys,function(read){
+  text(xs, rep(read, dim(nt)[1]), nt[read,], col=.color_pos(nt[read,], c(190641180,190641217)))
+  })
+
+```
+
+
+```{r example}
 dd_m = melt(dd, id.vars = c('sample', 'idx'))
 
 ggplot(dd_m, aes(x=variable, y=idx, fill=value)) + geom_tile() +facet_wrap(~sample, scales = 'free_y') +
