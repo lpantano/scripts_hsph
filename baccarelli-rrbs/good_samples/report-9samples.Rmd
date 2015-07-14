@@ -18,7 +18,7 @@ path_files = "~/repos/pipeline/baccarelli-rrbs/good_samples"
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, 
                     cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, 
                     error=FALSE,echo=FALSE,
-                    eval=TRUE,fig.height=9, fig.width=9,
+                    eval=TRUE,fig.height=9, fig.width=12,
                     message=FALSE, prompt=TRUE, comment='', fig.cap='', 
                     bootstrap.show.code=FALSE)
 options(bitmapType = 'cairo')
@@ -35,11 +35,11 @@ library(ggplot2)
 library(reshape)
 library(rmarkdown)
 library(knitr)
-ggplot <- function(...) ggplot2::ggplot(...) + theme_bw() + scale_fill_brewer(palette = "Set1")
+ggplot <- function(...) ggplot2::ggplot(...) + theme_bw() 
 ```
 
 
-# Stats from pilot samples
+## Stats from pilot samples
 
 Number of SNPs that changed CpG methylation sites:
 
@@ -60,71 +60,101 @@ dd
 
 ```
 
-# example
+## example of ASM
 
 ```{r heatmap}
-dd = read.table(file.path(root_path, 'chr4_190641217_190641180.align'))
-names(dd) = c(190641180:190641218, 'sample')
-dd = dd[order(dd$sample, dd$`190641180`),]
-dd$idx = 1:nrow(dd)
-
-metrics = as.data.frame(dd %>% select(sample,snp=`190641180`, cpg=`190641218`)  %>% group_by(sample,snp, cpg) %>% tally())
-metrics_by_snp = reshape(metrics, timevar = "cpg", idvar = c("sample", "snp"), direction = "wide")
-metrics_by_snp[is.na(metrics_by_snp)] = 0  
-metrics_by_snp= metrics_by_snp %>% mutate(pct_methylation = n.Cm/(n.C + n.Cm))
+dd = read.table(file.path(root_path, 'link', 'chr17_all_example.ma'))
+names(dd) = c("snp", "pct_methylation", "sample")
 #reshape(metrics_by_snp[,c(1,2,5)], timevar = "snp", idvar = "sample", direction="wide")
-ggplot(metrics_by_snp, aes(y=sample, x=snp, fill=pct_methylation)) +
+ggplot(dd, aes(y=sample, x=snp, fill=pct_methylation)) +
   geom_tile() +
-  scale_fill_gradient2(low = "steelblue", mid = "white", high = "orange", midpoint = 0.5 ) +
-  ggtitle("ASM site between SNP(chr4:190641180) and  CpG (chr4:190641218)")
+  scale_fill_gradient2(low = "ghostwhite", mid = "grey50", high = "black", midpoint = 0.5) +
+  ggtitle("ASM site between SNP(chr17:21225310) and  CpG (chr17:21225340)") +
+  theme_gray()
 ```
 
+## alignment for one sample
 
-```{r text}
-dd = read.table(file.path(root_path, 'B1850_chr4_example.txt'), sep="", colClasses = "character")
-nt = sapply(as.character(dd$V1), function(x){
-  sp = unlist(strsplit(x, split=""))
-  names(sp) = 190641171:190641227
-  if (sp[11] != '-')
-    sp
-  })
-nt=do.call(rbind,Filter(is.vector,nt))
-
-rownames(nt) = paste0("read",1:nrow(nt))
-ys = 1:nrow(nt)  
-xs=as.numeric(colnames(nt))
-
+```{r fn}
+read_sequence = function(fn, labs){
+    dd = read.table(fn)
+    nt = lapply(as.character(dd$V1), function(x){
+        sp = unlist(strsplit(x, split=""))
+        names(sp) = labs
+        sp
+    })
+    nt=do.call(rbind,Filter(is.vector,nt))
+    
+    rownames(nt) = paste0("read",1:nrow(nt))
+    nt    
+}
 
 .color_pos = function(v, pos){
-  pos = as.character(pos)
+  cpg = pos$cpg
+  snp = pos$snp
   names(v) = as.character(names(v))
-  nt_col=c("-"='grey40',"a"='red3', "t"='blue2', "c"='orange2', "g"='green2')
-  this = rep('grey40', length(v))
+  nt_col=c("-"='grey60',"A"='red3', "T"='blue2', "C"='green2', "G"='orange3')
+  meth_col=c("-"='grey60',"C"='yellow3', "T"='grey50')
+  this = rep('grey60', length(v))
   names(this) = names(v)
-  this[pos] = nt_col[v[pos]]
+  log_in = sapply(snp, function(x){
+    if (v[x["pos"]] != x["ref"])
+        this[x["pos"]] <<- nt_col[v[x["pos"]]]
+  })
+  
+  log_in = sapply(cpg, function(x){
+    this[x] <<- meth_col[v[x]]    
+  })
   this
 }
 
-nt = nt[order(nt[,"190641180"]),]
-plot(x=c(xs[1], xs[length(xs)]), y=c(ys[1], ys[length(ys)]), type = 'n', axes=FALSE,
+```
+
+
+```{r another-example}
+nt = read_sequence(file.path(root_path, 'link', 'B1850_chr17_example.txt'),21225295:21225354)
+ys = 1:nrow(nt)  
+xs=as.numeric(colnames(nt))
+
+nt = nt[order(nt[,"21225309"]),]
+plot(x=c(xs[1], xs[length(xs)]), y=c(ys[1], ys[length(ys)]+4), type = 'n', axes=FALSE,
      xlab="position", ylab="")
 log=lapply(ys,function(read){
-  text(xs, rep(read, dim(nt)[1]), nt[read,], col=.color_pos(nt[read,], c(190641180,190641217)))
+  text(xs, rep(read, dim(nt)[1]), nt[read,], 
+       col=.color_pos( nt[read,], list( 
+           cpg=list("21225308","21225339"),
+           snp= list( c(ref='G',pos="21225309"))
+           )))
   })
+legend("topleft", legend = c("methylated C", "alternative allele in SNP"), fill = c("yellow3", "red"), horiz = TRUE, box.lty = 0, border=0)
+
+```
+
+## another ASM with multiple SNPs and CpG sites.
+
+```{r text}
+
+nt = read_sequence(file.path(root_path, 'link', 'B1850_chr1_example.txt'),105640191:105640260)
+
+
+#nt = nt[order(nt[,"190641180"]),]
+ys = 1:nrow(nt)  
+xs=as.numeric(colnames(nt))
+
+plot(x=c(xs[1], xs[length(xs)]), y=c(ys[1], ys[length(ys)]+3), type = 'n', axes=FALSE,
+     xlab="position", ylab="")
+log=lapply(ys,function(read){
+  text(xs, rep(read, dim(nt)[1]), nt[read,], 
+       col=.color_pos( nt[read,], list( 
+           cpg=list("105640200","105640240"),
+           snp= list( c(ref='T',pos="105640250"),  c(ref='T',pos="105640211"))
+           )))
+  })
+legend("topleft", legend = c("methylated C", "alternative allele in SNP"), fill = c("yellow3", "green2"), horiz = TRUE, box.lty = 0, border=0)
 
 ```
 
 
-```{r example}
-dd_m = melt(dd, id.vars = c('sample', 'idx'))
-
-ggplot(dd_m, aes(x=variable, y=idx, fill=value)) + geom_tile() +facet_wrap(~sample, scales = 'free_y') +
-  scale_fill_manual(values = c("red3","green3","grey80","yellow3","orange3"))  + 
-  theme_bw() +
-  ylab("read") +
-  theme(axis.text.x = element_blank(), axis.text.y = element_blank(), axis.ticks = element_blank())
-
-```
 
  
 Report from Bismark
