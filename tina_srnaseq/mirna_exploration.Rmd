@@ -1,0 +1,137 @@
+---
+    title: "miRNA annotation"
+author: "Lorena Pantano"
+date: "18/02/2015"
+output:
+    knitrBootstrap::bootstrap_document:
+    theme: readable
+highlight: zenburn
+theme.chooser: TRUE
+highlight.chooser: TRUE
+html_document:
+    highlight: zenburn
+
+---
+```{r setup}
+library(knitr)
+
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(isomiRs)
+
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heigh=6,
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+
+root_path = "~/orch/scratch/tina_exosomes/Jun_17/analysis"
+root_file = paste0(root_path,"/report/")
+
+condition = "condition"
+```
+
+```{r render,eval=FALSE, echo=FALSE}
+library(rmarkdown)
+library(knitrBootstrap)
+# render("report.rmd")
+```
+
+```{r load}
+setwd(root_path)
+files = read.table("~/orch/scratch/tina_exosomes/Jun_17/analysis/summary_re.csv", sep=",",header=T,colClasses = "character")
+
+samples = files[,"sample_id"]
+
+names_stats = files[,"size_stats"]
+names(names_stats) = samples
+
+groups = files[,"group"]
+names(groups) = samples
+
+summarydata = data.frame(row.names=samples,samples=samples,group=groups)
+design <- data.frame(row.names=files$sample_id, condition=files$group)
+design$type = sapply(rownames(design), function(x) unlist(strsplit(x,split="_"))[2])
+rownames(design) = sapply(rownames(design), function(x) unlist(strsplit(x,split="_"))[1])
+design$sample = files$sample_id
+
+covariates = read.table("~/repos/pipelines/tina_srnaseq/covariates.tsv.csv", header=T)
+rownames(covariates) = paste0("VS",covariates$id)
+
+cellkeep = intersect(rownames(covariates), rownames(design))
+design[cellkeep,"pta"] =  covariates[cellkeep,"pta"]
+design[cellkeep,"wd"] =  covariates[cellkeep,"wd"]
+```
+
+## miRNA
+
+### total miRNA expression annotated with mirbase
+
+```{r mirna,results='hide'}
+mi_files = files[,"miraligner"]
+row.names(design) = samples
+
+obj <- IsomirDataSeqFromFiles(files = mi_files, design = design ,header = T, cov = 1)
+
+```
+
+
+```{r mirna-mirbase}
+isoSelect(obj,mirna="hsa-miR-6798-3p", minc=1)
+obj = isoCounts(obj, minc = 1)
+raw=counts(obj)
+cell = raw[, grepl("VS",colnames(raw))]
+cell["hsa-miR-6798-3p",]
+design_c =  design[grepl("VS",row.names(design)),,drop=F]
+# design_c = as.data.frame(apply(design_c, 2, as.factor))
+
+dss = DESeqDataSetFromMatrix(countData = cell[rowSums(cell>5)>4,],
+                             colData = design_c,
+                             design = ~ type)
+dss = DESeq(dss)
+plotDispEsts(dss)
+res = results(dss)
+res[order(res$padj)[1:5], ]
+
+
+
+dss = DESeq(dss)
+plotDispEsts(dss)
+res = results(dss, name = "wd")
+res[order(res$pvalue)[1:5], ]
+
+
+plotCounts(dss, gene = "hsa-miR-6798-3p", intgroup = "type", transform = TRUE)
+plotCounts(dss, gene = "hsa-miR-6868-3p", intgroup = "type", transform = TRUE)
+plotCounts(dss, gene = "hsa-miR-192-5p", intgroup = "type", transform = TRUE)
+plotCounts(dss, gene = "hsa-miR-431-5p", intgroup = "type", transform = TRUE)
+
+```
+
+
+```{r isomirna-mirbase}
+obj = isoCounts(obj, minc = 1, ref = T, iso5 = T, iso3 = T, add = T, subs = T, seed = T)
+raw=counts(obj)
+cell = raw[, grepl("VS",colnames(raw))]
+#  cell["hsa-miR-6798-3p",]
+design_c =  design[grepl("VS",row.names(design)),,drop=F]
+dss = DESeqDataSetFromMatrix(countData = cell[rowSums(cell>5)>4,],
+                             colData = design_c,
+                             design = ~ type)
+dss = DESeq(dss)
+plotDispEsts(dss)
+res = results(dss)
+res[order(res$padj)[1:5], ]
+
+
+plotCounts(dss, gene = "hsa-miR-6798-3p", intgroup = "type", transform = TRUE)
+plotCounts(dss, gene = "hsa-miR-192-5p.iso.t5:0.seed:0.t3:d-A.ad:0.mm:0", intgroup = "type", transform = TRUE)
+plotCounts(dss, gene = "hsa-miR-192-5p.ref.t5:0.seed:0.t3:0.ad:0.mm:0", intgroup = "type", transform = TRUE)
+plotCounts(dss, gene = "hsa-miR-431-5p.iso.t5:0.seed:0.t3:u-A.ad:0.mm:0", intgroup = "type", transform = TRUE)
+
+```

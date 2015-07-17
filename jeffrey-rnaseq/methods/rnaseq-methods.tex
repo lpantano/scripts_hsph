@@ -1,0 +1,56 @@
+% Created 2015-01-21 Wed 13:38
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{fixltx2e}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{marvosym}
+\usepackage{wasysym}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\tolerance=1000
+\date{}
+\title{rnaseq-methods}
+\hypersetup{
+  pdfkeywords={},
+  pdfsubject={},
+  pdfcreator={Emacs 25.0.50.1 (Org mode 8.2.10)}}
+\begin{document}
+
+\maketitle
+
+\section{Methods}
+
+All samples are processed using RNA-seq pipeline implemented in
+\href{http://bcbio-nextgen.readthedocs.org/en/latest/}{bcbio-nextgen project}.
+Raw reads will be examined for quality
+issues using FastQC to ensure library generation and sequencing are
+suitable for further analysis. Adapter sequences, other contaminant
+sequences such as polyA tails and low quality sequences with PHRED
+quality scores less than five will be trimmed from reads using
+cutadapt (\cite{Martin:2011va}). Trimmed reads will be aligned to build
+hg19 of the Hsapiens genome, augmented with transcript information from
+Ensembl release GRCh37.75 using STAR (\cite{Dobin:2013fg}).
+
+Alignments will be checked for evenness of coverage, rRNA content,
+genomic context of alignments (for example, alignments in known
+transcripts and introns), complexity and other quality checks using a
+combination of FastQC (\cite{Andrews:2010}), RNA-SeQC (\cite{DeLuca:2012dp}) and custom tools.
+Counts of reads aligning to known genes are detected by featureCounts (\cite{Anonymous:2014cj}).
+
+Normalilzation and differential expression at the gene level are called with
+DESeq2 (\cite{Love:2014do}), which has been shown to be a robust,
+conservative differential expression calller.
+
+\section{Bibliography}
+\bibliographystyle{plain}
+\bibliography{rnaseq-methods}
+% Emacs 25.0.50.1 (Org mode 8.2.10)
+\end{document}
