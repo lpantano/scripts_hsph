@@ -1,0 +1,262 @@
+---
+output:
+    knitrBootstrap::bootstrap_document:
+        theme: readable
+        highlight: zenburn
+        theme.chooser: TRUE
+        highlight.chooser: TRUE
+    html_document:
+        toc: true
+        highlight: zenburn
+---
+
+```{r custom}
+source("~/repos/myRfunctions/transactions.R")
+dn <- "perrimon_report"
+files_path = "~/repos/pipelines/perrimon_rnaseq/report/"
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+```
+
+
+```{r render,eval=FALSE,cache=FALSE}
+render_2_drop("~/repos/pipelines/yellen_scneuron/report/qc-summary.Rmd",dn)
+```
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(dplyr)
+library(gtools)
+
+counts = read.csv("R1_R4_R5_TimeSeries_counts.csv", row.names = 1)
+de = as.data.frame(do.call(rbind,strsplit(colnames(counts),split = "_")))
+rownames(de) = colnames(counts)
+names(de) = c("experiment", "time")
+de$time = gsub("P","",de$time)
+de$condition = sapply(as.character(colnames(counts)), function(x){
+  day = as.numeric(substr(x, 5,6))
+  if (day < 5){
+    return("early")
+  }
+  if (day < 13){
+    return("medium")
+  }
+  return("late")
+  
+})
+```
+
+
+### Boxplot of log10 counts per gene
+```{r boxplot-raw}
+melted = melt(counts)
+colnames(melted) = c("sample", "count")
+melted$sample = factor(melted$sample)
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Correlation heatmap of raw counts
+```{r heatmap-raw}
+pheatmap(cor(counts),annotation = de)
+```
+
+### Correlation heatmap of log2 raw counts
+```{r heatmap-log2-raw}
+pheatmap(cor(log2(counts+0.5)),annotation = de)
+```
+This means the correlation is due to highly expressed genes, because after log2 transformation
+the correlation values are much lower. Now, samples cluster by # mapped reads and 
+rRNA ammount.
+
+### Boxplot of log10 TMM-normalized counts per gene
+Trimmed mean of M-values (TMM) normalization is described
+[here](http://genomebiology.com/2010/11/3/R25)
+
+Robinson, M. D., & Oshlack, A. (2010). A scaling normalization method for differential expression analysis of RNA-seq data. Genome Biology, 11(3). doi:10.1186/gb-2010-11-3-r25
+
+```{r boxplot-normalized}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample)
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"))
+```
+
+### Correlation heatmap of TMM-normalized counts
+```{r heatmap-normalized}
+pheatmap(cor(normalized_counts),annotation = de)
+```
+
+### Correlation (Spearman) heatmap of TMM-normalized counts
+```{r spearman-heatmap-normalized}
+pheatmap(cor(normalized_counts, method="spearman"),annotation = de)
+```
+
+### Correlation (Spearman) heatmap of log2-TMM-normalized counts
+```{r spearman-heatmap-log2-normalized}
+log2_normalized_counts = cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
+pheatmap(cor(normalized_counts, method="spearman"),annotation = de)
+```
+
+
+### MDS plot of TMM-normalized counts
+```{r mds-normalized}
+mds(log2_normalized_counts, k=length(colnames(normalized_counts)) - 1, condition = de$condition) + 
+    ggtitle("With Mapped reads information")
+```
+
+# DE
+
+```{r de, results='asis'}
+library(DESeq2)
+keep = rowSums(counts>2)>3
+samples = rownames(de[de$experiment!="R5",])
+dse = DESeqDataSetFromMatrix( counts[keep,samples], de[samples,], ~ experiment + condition)
+dse = DESeq(dse)
+plotDispEsts(dse)
+res = results(dse, contrast = c("condition", "late", "early"))
+plotMA(res)
+res = results(dse, contrast = c("condition", "late", "early"), tidy = TRUE)
+rlog_ma = rlog(dse)
+```
+
+```{r plotpca}
+plotPCA(rlog_ma)
+plotPCA(rlog_ma, intgroup="experiment")
+```
+
+```{r heatmap-norm}
+library(dplyr)
+deg = res %>% filter(padj<0.01 & abs(log2FoldChange)>1)
+pheatmap(assay(rlog_ma)[deg$row,], annotation = de,show_rownames = FALSE)
+```
+
+```{r upgenes}
+up_1.5_0.05 = res %>% filter(log2FoldChange > 1.5 & padj < 0.05)
+up_genes = gsub(":.*$","",up_1.5_0.05$row)
+common = read.table("121genes.csv",header=T,sep="\t", stringsAsFactors = FALSE)
+new_common = intersect(common$current.FBG, up_genes)
+new_common
+```
+
+```{r heatmap-up}
+rlog_ma_genes = assay(rlog_ma)
+rownames(rlog_ma_genes) = gsub(":.*$","",rownames(rlog_ma_genes))
+pheatmap(rlog_ma_genes[new_common,], annotation = de,show_rownames = FALSE)
+```
+
+```{r pca-up-fn}
+plotPCA.custom = function(object, select = NULL, intgroup="condition", ntop=500, returnData=FALSE)
+{
+  # perform a PCA on the data in assay(x) for the selected genes
+  pca <- prcomp(t(assay(object)[select,]))
+
+  # the contribution to the total variance for each component
+  percentVar <- pca$sdev^2 / sum( pca$sdev^2 )
+
+  if (!all(intgroup %in% names(colData(object)))) {
+    stop("the argument 'intgroup' should specify columns of colData(dds)")
+  }
+
+  intgroup.df <- as.data.frame(colData(object)[, intgroup, drop=FALSE])
+  
+  # add the intgroup factors together to create a new grouping factor
+  group <- if (length(intgroup) > 1) {
+    factor(apply( intgroup.df, 1, paste, collapse=" : "))
+  } else {
+    colData(object)[[intgroup]]
+  }
+
+  # assembly the data for the plot
+  d <- data.frame(PC1=pca$x[,1], PC2=pca$x[,2], group=factor(group, levels=mixedsort(unique(group))), intgroup.df, name=colnames(object))
+
+  if (returnData) {
+    attr(d, "percentVar") <- percentVar[1:2]
+    return(d)
+  }
+  
+  ggplot(data=d, aes_string(x="PC1", y="PC2", color="group", label="name")) + 
+    geom_text() +
+    xlab(paste0("PC1: ",round(percentVar[1] * 100),"% variance")) +
+      ylab(paste0("PC2: ",round(percentVar[2] * 100),"% variance")) +
+        coord_fixed()
+}
+
+
+plotPCA.matrix = function(ma, object, select = NULL, intgroup="condition", ntop=500, returnData=FALSE)
+{
+  # perform a PCA on the data in assay(x) for the selected genes
+  pca <- prcomp(t((ma)[select,]))
+
+  # the contribution to the total variance for each component
+  percentVar <- pca$sdev^2 / sum( pca$sdev^2 )
+
+  if (!all(intgroup %in% names(colData(object)))) {
+    stop("the argument 'intgroup' should specify columns of colData(dds)")
+  }
+
+  intgroup.df <- as.data.frame(colData(object)[, intgroup, drop=FALSE])
+  
+  # add the intgroup factors together to create a new grouping factor
+  group <- if (length(intgroup) > 1) {
+    factor(apply( intgroup.df, 1, paste, collapse=" : "))
+  } else {
+    colData(object)[[intgroup]]
+  }
+
+  # assembly the data for the plot
+  d <- data.frame(PC1=pca$x[,1], PC2=pca$x[,2], group=factor(group, levels=mixedsort(unique(group))), intgroup.df, name=colnames(object))
+
+  if (returnData) {
+    attr(d, "percentVar") <- percentVar[1:2]
+    return(d)
+  }
+  
+  ggplot(data=d, aes_string(x="PC1", y="PC2", color="group", label="name")) + 
+    geom_text() +
+    xlab(paste0("PC1: ",round(percentVar[1] * 100),"% variance")) +
+      ylab(paste0("PC2: ",round(percentVar[2] * 100),"% variance")) +
+        coord_fixed()
+ }
+
+```
+
+```{r pca-up}
+idx = which(rownames(rlog_ma_genes) %in% new_common)
+
+# plotPCA.custom(rlog_ma, idx)
+# plotPCA.custom(rlog_ma, idx, intgroup = "experiment")
+plotPCA.custom(rlog_ma, up_1.5_0.05$row)
+```
+
+```{r ruv}
+library(RUVSeq)
+e = which(de[samples, "condition"]=="early")
+m = which(de[samples, "condition"]=="medium")
+l = which(de[samples, "condition"]=="late")
+replicates = matrix(c(c(e,rep(-1, 5)), m, c(l, rep(-1, 5))), byrow=TRUE, nrow=3)
+
+ruv = RUVs(assay(rlog_ma), rownames(assay(rlog_ma)), k=2, replicates)
+
+plotPCA.matrix(log2(ruv$normalizedCounts+0.25),rlog_ma, up_1.5_0.05$row)
+               
+```
