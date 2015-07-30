@@ -128,7 +128,7 @@ mds(log2_normalized_counts, k=length(colnames(normalized_counts)) - 1, condition
 
 ```{r de, results='asis'}
 library(DESeq2)
-keep = rowSums(counts>2)>3
+keep = rowSums(counts>3)>3 & rowMeans(counts)>5
 samples = rownames(de[de$experiment!="R5",])
 dse = DESeqDataSetFromMatrix( counts[keep,samples], de[samples,], ~ experiment + condition)
 dse = DESeq(dse)
@@ -136,12 +136,15 @@ plotDispEsts(dse)
 res = results(dse, contrast = c("condition", "late", "early"))
 plotMA(res)
 res = results(dse, contrast = c("condition", "late", "early"), tidy = TRUE)
+res_fixed = res %>% mutate(row=gsub(":.*$","",res$row))
+write.table(res_fixed,"late_vs_early.tsv", sep="\t", quote=F, row.names=F)
 rlog_ma = rlog(dse)
 ```
 
 ```{r plotpca}
-plotPCA(rlog_ma)
-plotPCA(rlog_ma, intgroup="experiment")
+plotPCA(rlog_ma,ntop=1000) + ggtitle("top 1000 variable genes")
+plotPCA(rlog_ma,ntop=10800) + ggtitle("all genes")
+plotPCA(rlog_ma, intgroup="experiment",ntop=1000)
 ```
 
 ```{r heatmap-norm}
@@ -151,7 +154,7 @@ pheatmap(assay(rlog_ma)[deg$row,], annotation = de,show_rownames = FALSE)
 ```
 
 ```{r upgenes}
-up_1.5_0.05 = res %>% filter(log2FoldChange > 1.5 & padj < 0.05)
+up_1.5_0.05 = res %>% filter(log2FoldChange > 1 & padj < 0.05)
 up_genes = gsub(":.*$","",up_1.5_0.05$row)
 common = read.table("121genes.csv",header=T,sep="\t", stringsAsFactors = FALSE)
 new_common = intersect(common$current.FBG, up_genes)
@@ -260,3 +263,21 @@ ruv = RUVs(assay(rlog_ma), rownames(assay(rlog_ma)), k=2, replicates)
 plotPCA.matrix(log2(ruv$normalizedCounts+0.25),rlog_ma, up_1.5_0.05$row)
                
 ```
+
+```{r compare}
+library(dplyr)
+seq = read.table("late_vs_early.tsv", header=T)
+array = read.table("array.late_vsearly.tsv", header=T, row.names = 1)
+
+seq_de = seq %>% filter(padj < 0.05 & log2FoldChange>1)
+array_de = array %>% filter(adj.P.Val<0.5 & logFC>1)
+intersect(seq_de$row, array_de$ensemble)
+
+totalpop = length(intersect(seq$row, array$ensemble))
+sample1 = length(intersect(intersect(seq$row, array$ensemble),seq_de$row))
+sample2 = length(intersect(intersect(seq$row, array$ensemble),array_de$ensemble))
+
+sum(dhyper(39:min(sample1,sample1), sample1, totalpop-sample1, sample2))
+
+```
+
