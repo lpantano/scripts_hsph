@@ -18,17 +18,25 @@ knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                       eval=TRUE, fig.width= 9,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+options(bitmapType = "cairo")
+```
+
+```{r torender}
+library(knitrBootstrap)
+library(rmarkdown)
 ```
 
 
 ```{r render,eval=FALSE,cache=FALSE}
-render_2_drop("~/repos/pipelines/yellen_scneuron/report/qc-summary.Rmd",dn)
+render_2_drop("~/repos/pipelines/perrimon_rnaseq/qc-summary.Rmd", dn)
 ```
 
 # Overview
 
 ```{r qc-setup}
+library(DESeq2)
 library(ggplot2)
+library(ggthemes)
 library(reshape)
 library(gplots)
 library(edgeR)
@@ -36,6 +44,7 @@ library(CHBUtils)
 library(pheatmap)
 library(dplyr)
 library(gtools)
+library(knitr)
 
 counts = read.csv("R1_R4_R5_TimeSeries_counts.csv", row.names = 1)
 de = as.data.frame(do.call(rbind,strsplit(colnames(counts),split = "_")))
@@ -55,8 +64,10 @@ de$condition = sapply(as.character(colnames(counts)), function(x){
 })
 ```
 
+## QC figures
 
 ### Boxplot of log10 counts per gene
+
 ```{r boxplot-raw}
 melted = melt(counts)
 colnames(melted) = c("sample", "count")
@@ -69,19 +80,19 @@ ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
 ```
 
 ### Correlation heatmap of raw counts
+
 ```{r heatmap-raw}
 pheatmap(cor(counts),annotation = de)
 ```
 
 ### Correlation heatmap of log2 raw counts
+
 ```{r heatmap-log2-raw}
 pheatmap(cor(log2(counts+0.5)),annotation = de)
 ```
-This means the correlation is due to highly expressed genes, because after log2 transformation
-the correlation values are much lower. Now, samples cluster by # mapped reads and 
-rRNA ammount.
 
 ### Boxplot of log10 TMM-normalized counts per gene
+
 Trimmed mean of M-values (TMM) normalization is described
 [here](http://genomebiology.com/2010/11/3/R25)
 
@@ -102,16 +113,19 @@ ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
 ```
 
 ### Correlation heatmap of TMM-normalized counts
+
 ```{r heatmap-normalized}
 pheatmap(cor(normalized_counts),annotation = de)
 ```
 
 ### Correlation (Spearman) heatmap of TMM-normalized counts
+
 ```{r spearman-heatmap-normalized}
 pheatmap(cor(normalized_counts, method="spearman"),annotation = de)
 ```
 
 ### Correlation (Spearman) heatmap of log2-TMM-normalized counts
+
 ```{r spearman-heatmap-log2-normalized}
 log2_normalized_counts = cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
 pheatmap(cor(normalized_counts, method="spearman"),annotation = de)
@@ -119,53 +133,80 @@ pheatmap(cor(normalized_counts, method="spearman"),annotation = de)
 
 
 ### MDS plot of TMM-normalized counts
+
 ```{r mds-normalized}
 mds(log2_normalized_counts, k=length(colnames(normalized_counts)) - 1, condition = de$condition) + 
     ggtitle("With Mapped reads information")
 ```
 
-# DE
+
+```{r mds-normalized-r1-r4}
+mds(log2_normalized_counts[,!grepl("R5", colnames(log2_normalized_counts))], k=sum(!grepl("R5", colnames(log2_normalized_counts))) - 1, condition = de$condition[!grepl("R5", colnames(log2_normalized_counts))]) + 
+    ggtitle("With Mapped reads information") + theme_few() + scale_colour_few()
+```
+
+## Differential Expression
+
+### Dispersion plot
 
 ```{r de, results='asis'}
-library(DESeq2)
 keep = rowSums(counts>3)>3 & rowMeans(counts)>5
 samples = rownames(de[de$experiment!="R5",])
 dse = DESeqDataSetFromMatrix( counts[keep,samples], de[samples,], ~ experiment + condition)
 dse = DESeq(dse)
 plotDispEsts(dse)
+```
+
+### MA-plot
+
+```{r plotma}
 res = results(dse, contrast = c("condition", "late", "early"))
-plotMA(res)
+DESeq2::plotMA(res)
 res = results(dse, contrast = c("condition", "late", "early"), tidy = TRUE)
 res_fixed = res %>% mutate(row=gsub(":.*$","",res$row))
 write.table(res_fixed,"late_vs_early.tsv", sep="\t", quote=F, row.names=F)
 rlog_ma = rlog(dse)
 ```
 
-```{r plotpca}
-plotPCA(rlog_ma,ntop=1000) + ggtitle("top 1000 variable genes")
-plotPCA(rlog_ma,ntop=10800) + ggtitle("all genes")
-plotPCA(rlog_ma, intgroup="experiment",ntop=1000)
-```
+
+### heatmap of DE-genes
 
 ```{r heatmap-norm}
 library(dplyr)
-deg = res %>% filter(padj<0.01 & abs(log2FoldChange)>1)
+deg = res %>% filter(padj<0.05 & abs(log2FoldChange)>1)
 pheatmap(assay(rlog_ma)[deg$row,], annotation = de,show_rownames = FALSE)
 ```
+
+### Common genes with 121 in the paper
 
 ```{r upgenes}
 up_1.5_0.05 = res %>% filter(log2FoldChange > 1 & padj < 0.05)
 up_genes = gsub(":.*$","",up_1.5_0.05$row)
 common = read.table("121genes.csv",header=T,sep="\t", stringsAsFactors = FALSE)
 new_common = intersect(common$current.FBG, up_genes)
-new_common
 ```
+
+common genes with the 121 in the paper `r length(new_common)`
+
+### heatmap of common genes
 
 ```{r heatmap-up}
 rlog_ma_genes = assay(rlog_ma)
 rownames(rlog_ma_genes) = gsub(":.*$","",rownames(rlog_ma_genes))
 pheatmap(rlog_ma_genes[new_common,], annotation = de,show_rownames = FALSE)
 ```
+
+### heatmap of 121 genes
+
+expression values are scaled by row.
+
+```{r heatmap-up-121}
+rlog_ma_genes = assay(rlog_ma)
+rownames(rlog_ma_genes) = gsub(":.*$","",rownames(rlog_ma_genes))
+pheatmap(rlog_ma_genes[new_common,], annotation = de,show_rownames = FALSE, scale='row')
+```
+
+### PCA of DEG-genes
 
 ```{r pca-up-fn}
 plotPCA.custom = function(object, select = NULL, intgroup="condition", ntop=500, returnData=FALSE)
@@ -197,11 +238,12 @@ plotPCA.custom = function(object, select = NULL, intgroup="condition", ntop=500,
     return(d)
   }
   
-  ggplot(data=d, aes_string(x="PC1", y="PC2", color="group", label="name")) + 
+  p = ggplot(data=d, aes_string(x="PC1", y="PC2", color="group", label="name")) + 
     geom_text() +
     xlab(paste0("PC1: ",round(percentVar[1] * 100),"% variance")) +
       ylab(paste0("PC2: ",round(percentVar[2] * 100),"% variance")) +
         coord_fixed()
+  return(list(plot=p, pca=pca))
 }
 
 
@@ -213,45 +255,66 @@ plotPCA.matrix = function(ma, object, select = NULL, intgroup="condition", ntop=
   # the contribution to the total variance for each component
   percentVar <- pca$sdev^2 / sum( pca$sdev^2 )
 
-  if (!all(intgroup %in% names(colData(object)))) {
+  if (!all(intgroup %in% names(object))) {
     stop("the argument 'intgroup' should specify columns of colData(dds)")
   }
 
-  intgroup.df <- as.data.frame(colData(object)[, intgroup, drop=FALSE])
+  intgroup.df <- as.data.frame(object[, intgroup, drop=FALSE])
   
   # add the intgroup factors together to create a new grouping factor
   group <- if (length(intgroup) > 1) {
     factor(apply( intgroup.df, 1, paste, collapse=" : "))
   } else {
-    colData(object)[[intgroup]]
+    object[[intgroup]]
   }
 
   # assembly the data for the plot
-  d <- data.frame(PC1=pca$x[,1], PC2=pca$x[,2], group=factor(group, levels=mixedsort(unique(group))), intgroup.df, name=colnames(object))
+  d <- data.frame(PC1=pca$x[,1], PC2=pca$x[,2], group=factor(group, levels=mixedsort(unique(group))), intgroup.df, name=colnames(ma))
 
   if (returnData) {
     attr(d, "percentVar") <- percentVar[1:2]
     return(d)
   }
   
-  ggplot(data=d, aes_string(x="PC1", y="PC2", color="group", label="name")) + 
+  p = ggplot(data=d, aes_string(x="PC1", y="PC2", color="group", label="name")) + 
     geom_text() +
     xlab(paste0("PC1: ",round(percentVar[1] * 100),"% variance")) +
       ylab(paste0("PC2: ",round(percentVar[2] * 100),"% variance")) +
         coord_fixed()
+  return(list(plot=p, pca=pca))
  }
 
 ```
 
 ```{r pca-up}
 idx = which(rownames(rlog_ma_genes) %in% new_common)
-
 # plotPCA.custom(rlog_ma, idx)
 # plotPCA.custom(rlog_ma, idx, intgroup = "experiment")
-plotPCA.custom(rlog_ma, up_1.5_0.05$row)
+rna_pca = plotPCA.custom(rlog_ma, up_1.5_0.05$row)
+rna_pca$plot  + theme_few() + scale_colour_few()
 ```
 
-```{r ruv}
+### PCA-plots
+
+```{r plotpca}
+rnaseq_all = plotPCA.custom(rlog_ma,rownames(rlog_ma)) 
+rnaseq_all$plot + ggtitle("All-genes") + theme_few() + scale_colour_few()
+write.table(rnaseq_all$pca$rotation, "rnaseq_pca_scores", sep="\t", quote=F)
+top_pc1 = sort(abs(rnaseq_all$pca$rotation[,"PC1"]), decreasing = TRUE)
+top_pc2 = sort(abs(rnaseq_all$pca$rotation[,"PC2"]), decreasing = TRUE)
+# plotPCA(rlog_ma,ntop=1000) + ggtitle("top 1000 variable genes") + theme_few() + scale_colour_few()
+```
+
+### Heatmap of the top genes for PC1
+
+```{r heatmap-toppca}
+pheatmap(assay(rlog_ma)[names(top_pc1)[1:50],], annotation = de,show_rownames = FALSE, scale='row', main="top_PC1")
+
+pheatmap(assay(rlog_ma)[names(top_pc2)[1:50],], annotation = de,show_rownames = FALSE, scale='row', main="top_PC2")
+```
+
+
+```{r ruv, echo=FALSE, eval=FALSE}
 library(RUVSeq)
 e = which(de[samples, "condition"]=="early")
 m = which(de[samples, "condition"]=="medium")
@@ -264,20 +327,76 @@ plotPCA.matrix(log2(ruv$normalizedCounts+0.25),rlog_ma, up_1.5_0.05$row)
                
 ```
 
+## Comparison between arrays and RNA-seq
+
 ```{r compare}
-library(dplyr)
 seq = read.table("late_vs_early.tsv", header=T)
 array = read.table("array.late_vsearly.tsv", header=T, row.names = 1)
 
 seq_de = seq %>% filter(padj < 0.05 & log2FoldChange>1)
 array_de = array %>% filter(adj.P.Val<0.5 & logFC>1)
-intersect(seq_de$row, array_de$ensemble)
+array_and_seq = length(intersect(seq_de$row, array_de$ensemble))
 
 totalpop = length(intersect(seq$row, array$ensemble))
 sample1 = length(intersect(intersect(seq$row, array$ensemble),seq_de$row))
 sample2 = length(intersect(intersect(seq$row, array$ensemble),array_de$ensemble))
 
-sum(dhyper(39:min(sample1,sample1), sample1, totalpop-sample1, sample2))
+prob = sum(dhyper(array_and_seq:min(sample1,sample1), sample1, totalpop-sample1, sample2))
 
+```
+
+Common genes between two platform at FDR < 0.05 and log2FC > 1: `r array_and_seq` 
+with a p-value for the overlap of `r prob`.
+
+
+```{r show-common-paper, results='asis'}
+idx = intersect(common$current.FBG, intersect(seq_de$row, array_de$ensemble))
+
+kable(array %>% filter(ensemble %in% idx) %>% select(ensemble, symbol, genename))
+
+```
+
+# apendix
+
+## PCA of array data
+
+```{r pca-array}
+select = rownames(array[array$ensemble %in% array_de$ensembl,])
+
+array_ma = array[,14:29]
+rownames(array_ma) = rownames(array)
+
+de_array = data.frame(experiment=sapply(colnames(array_ma), function(x) strsplit(x, split = "[::.::]")[[1]][1]), condition = "None")
+
+de_array$condition = sapply(as.character(colnames(array_ma)), function(x){
+  day = as.numeric(substr(x, 5,6))
+  if (day < 5){
+    return("early")
+  }
+  if (day < 13){
+    return("medium")
+  }
+  return("late")
+  
+})
+
+rownames(de_array) = colnames(array_ma)
+
+array_de_pca = plotPCA.matrix(array_ma, de_array, select) 
+array_de_pca$plot + theme_few() + scale_colour_few() + ggtitle("DE-genes") 
+
+array_all = plotPCA.matrix(array_ma, de_array, rownames(array_ma)) 
+array_all$plot + ggtitle("All-genes") + theme_few() + scale_colour_few() 
+
+write.table(array_all$pca$rotation, "array_pca_scores", sep="\t", quote=F)
+top_pc1 = sort(abs(array_all$pca$rotation[,"PC1"]), decreasing = TRUE)
+top_pc2 = sort(abs(array_all$pca$rotation[,"PC2"]), decreasing = TRUE)
+# plotPCA(rlog_ma,ntop=1000) + ggtitle("top 1000 variable genes") + theme_few() + scale_colour_few()
+```
+
+## Heatmap of the top genes for PC1
+
+```{r heatmap-toppca}
+pheatmap(array_ma[names(top_pc1)[1:50],], annotation = de_array,show_rownames = FALSE, scale='row', main="top_PC1")
 ```
 
