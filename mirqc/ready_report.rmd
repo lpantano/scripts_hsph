@@ -79,12 +79,13 @@ design <- data.frame(row.names=files$sample_id, condition=files$group)
 
 # Exploratory analysis
 
-In this section we will see descriptive figures about quality of the data, 
-reads with adapter, reads mapped to miRNAs, reads mapped to other small RNAs. 
+In this section we will see exploratory figures about quality of the data, 
+reads with adapter, reads mapped to miRNAs and reads mapped to other small RNAs. 
 
 ## size distribution
 
-After adapter removal, we can plot the size distribution of the small RNAs.
+After adapter removal, we can plot the size distribution of the small RNAs. In a normal
+small RNA sample, we should see a peak at 22/23 and maybe another at 26 or 31 depending on the biological background.
 
 ```{r adapter,fig.width=10}
 tab = data.frame()
@@ -138,8 +139,6 @@ ggplot(melt(counts(obj))) +
 
 ### cumulative distribution of miRNAs
 
-We can see this time we detect much more miRNAs. The saturation is near to 200.
-
 ```{r cum}
 
 cs <- as.data.frame(apply(counts(obj),2,cumsum))
@@ -178,7 +177,7 @@ Number of reads in the data after each step:
 
 * raw: initial reads
 * cluster: after cluster detection
-* multimap: after meta-cluster detection
+* multimap: after meta-cluster detection using all hits
 
 ```{r reads-track}
 reads_stats <- read.table(file.path(root_path, "seqcluster", "cluster", "read_stats.tsv"),sep="\t",check.names = F)
@@ -200,7 +199,7 @@ clus_ma = clus_ma[,row.names(design)]
 
 
 Check complex meta-clusters: This kind of events happen when there are small RNA over the whole genome, and all
-repetitive small rnas map to thousands of places and sharing many sequences in many positions.
+repetitive small RNAs map to thousands of places and sharing many sequences in many positions.
 If any meta-cluster is > 40% of the total data, maybe it is worth to add some filters
 like: minimum number of counts `-e` or `--min--shared` in `seqcluster prepare`
 
@@ -210,6 +209,7 @@ clus_ma_norm = sweep(clus_ma, 2, colSums(clus_ma), "/")
 head(clus_ma_norm[toomany>0,])
 ```
 
+Until here is an example of the `Rmd` template that the user can get from `seqcluster-helper` and render directly in `R` / `Rstudio`.
 
 Contribution by class:
 
@@ -326,7 +326,7 @@ mirna_c = counts(obj)
 ```
 
 
-### abundance detection miRQC samples
+### abundance detection of miRQC samples
 
 There are 4 samples:
 
@@ -394,7 +394,7 @@ kable(t(as.matrix(summary(mirqca[top_a]-mirqcd[top_a]))))
 
 ```
 
-the logFC is 0.5 that is a FC of log2(1/0.75)=0.5 that should be C according to description but is D
+the logFC is 0.5 that is a FC of log2(1/0.75)=0.5 that should be D according to description
 
 
 ratio expression summary of A/C
@@ -404,7 +404,7 @@ kable(t(as.matrix(summary(mirqca[top_a]-mirqcc[top_a]))))
       
 ```
 
-the logFC is 1.6 that is a FC of log2(1/0.25)=2 that should be D according to description but is C
+the logFC is 1.6 that is a FC of log2(1/0.25)=2 that should be C according to description
 
 Same happens when comparing B vs D 
 
@@ -426,13 +426,14 @@ miRQC_C = 0.75 * miRQC_B + 0.25 * miRQC_A
 
 miRQC_D = 0.75 * miRQC_A + 0.25 * miRQC_B
 
-what is the same that is in the GEO data set description.
+that is the same that is in the GEO data set description file.
 
 
 ### specificity
 
 >> we spiked in 8 synthetic miRNAs from two miRNA families into human liver RNA (miR-302a/b/c/d) or MS2-phage RNA (let-7a/b/c/d)
 
+We should only see those miRNAs in those samples and not in anywhere else.
 
 ```{r detection-serum-ms2, results="asis"}
 
@@ -459,10 +460,11 @@ kable(isoSelect(obj, mirna="hsa-miR-302d-3p")[,grepl("liver", rownames(design))]
 ```
 
 
-According to the text they saw cross-mapping between this miRNAs, but here we are seeing perfect annotation.
-I think the method was causing this, since I am not seeing this with seqbuster.
+According to the text they saw cross-mapping between these miRNAs, but here we are seeing perfect annotation.
 
 [Figure-e](http://www.nature.com.ezp-prod1.hul.harvard.edu/nmeth/journal/v11/n8/images/nmeth.3014-F4.jpg)
+
+Probably the method was causing that, since I am not seeing this with seqbuster.
 
 ### accuracy
 
@@ -480,14 +482,17 @@ serum_n[target,]
 For miR10 and let-7a the changes are clear although not proportional.
 
 I cannot detect sequences for miR-302 and miR-133 (< 5 reads). I checked directly in the raw data and these sequences are not there.
+
 I think they weren't captured by the sequencing at all. The text shows the same for miR-302, and not 
 detection of changes in the miR-133 ( I guess for the same reason).
 
 ## isomiRs
 
-As an example of some figures you can do with the package. There is one figure per type of
-isomiR (read more [here](http://lpantano.github.io/isomiRs)). The yaxes shows the percentage of unique sequences with that change.
-The xaxes shows the percentage of abundance with that change.
+As an example of some figures you can do with this package.  (read more [here](http://lpantano.github.io/isomiRs)). 
+
+There is one figure per type of isomiR. 
+The y-axes shows the percentage of unique sequences with that change.
+The x-axes shows the percentage of abundance with that change.
 
 ```{r isomir-example}
 obj = isoPlot(obj)
@@ -496,14 +501,14 @@ obj = isoPlot(obj, type="add")
 obj = isoPlot(obj, type="subs")
 ```
 
-Seems there are some errors for serum and MS2 samples at position 13/14, 
+Seems there are some nt-changes for serum and MS2 samples at position 13/14, 
 and at position 9-11 for miRQC and liver samples. These are just
 exploratory figures and could lead to a deep analysis of differential
 expression of isomiRs.
 
 ## clusters
  
-The same logic is applied to clusters detection.
+The same logic was applied to clusters detection.
 
 ```{r cluster-norm}
 keep = grepl("miRQC", colnames(clus_ma))
@@ -545,7 +550,7 @@ kable(t(as.matrix(summary(mirqca[top_a]-mirqcd[top_a]))))
 
 ```
 
-the logFC is 0.5 that is a FC of log2(1/0.75)=0.5 that should be C according to description but is D
+the logFC is 0.5 that is a FC of log2(1/0.75)=0.5 that should be D
 
 
 ratio expression summary of A/C
@@ -555,7 +560,7 @@ kable(t(as.matrix(summary(mirqca[top_a]-mirqcc[top_a]))))
 
 ```
 
-the logFC is 1.6 that is a FC of log2(1/0.25)=2 that should be D according to description but is C
+the logFC is 1.6 that is a FC of log2(1/0.25)=2 that should be C
 
 Same happens when comparing B vs D 
 
@@ -571,5 +576,15 @@ kable(t(as.matrix(summary(mirqcb[top_b]-mirqcc[top_b]))))
 
 ```
 
-The exactly same thing than we saw for miRNA analysis.
+The exactly same thing than we saw for miRNA analysis and in concordance
+with the samples description file.
 
+# Conclusions
+
+We can conclude that the miRNAs and clusters quantification is accurate. The mapping annotation for miRNAs is perfect with those examples, and the difference detection is good for 2 miRNAs, and bad for the other two miRNAs due to a lack of reads support for those miRNAs.
+
+In general, `seqbuster/seqcluster` show good accuracy for abundance detection and mapping accuracy for miRNAs.
+
+# Thanks
+
+special thanks to the author of that papers to make data available. I encourage to use this data for any tool that analyze small RNA data.
