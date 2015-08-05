@@ -11,14 +11,20 @@ output:
 ---
 
 ```{r custom}
+my_pdf = function(file, width, height) {
+  pdf(file, width = width, height = height, pointsize = 10)
+}
+
 source("~/repos/myRfunctions/transactions.R")
 dn <- "perrimon_report"
 files_path = "~/repos/pipelines/perrimon_rnaseq/report/"
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="my_pdf", fig.ext="pdf",
                       cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
-                      eval=TRUE, fig.width= 9,
+                      eval=TRUE, fig.width= 9, fig.height = 9,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
 options(bitmapType = "cairo")
+
+
 ```
 
 ```{r torender}
@@ -145,6 +151,7 @@ mds(log2_normalized_counts[,!grepl("R5", colnames(log2_normalized_counts))], k=s
     ggtitle("With Mapped reads information") + theme_few() + scale_colour_few()
 ```
 
+
 ## Differential Expression
 
 ### Dispersion plot
@@ -208,7 +215,7 @@ pheatmap(rlog_ma_genes[new_common,], annotation = de,show_rownames = FALSE, scal
 
 ### PCA of DEG-genes
 
-```{r pca-up-fn}
+```{r pca-fn}
 plotPCA.custom = function(object, select = NULL, intgroup="condition", ntop=500, returnData=FALSE)
 {
   # perform a PCA on the data in assay(x) for the selected genes
@@ -247,7 +254,7 @@ plotPCA.custom = function(object, select = NULL, intgroup="condition", ntop=500,
 }
 
 
-plotPCA.matrix = function(ma, object, select = NULL, intgroup="condition", ntop=500, returnData=FALSE)
+plotPCA.matrix = function(ma, object, select, intgroup="condition", ntop=500, returnData=FALSE)
 {
   # perform a PCA on the data in assay(x) for the selected genes
   pca <- prcomp(t((ma)[select,]))
@@ -296,21 +303,48 @@ rna_pca$plot  + theme_few() + scale_colour_few()
 
 ### PCA-plots
 
-```{r plotpca}
-rnaseq_all = plotPCA.custom(rlog_ma,rownames(rlog_ma)) 
-rnaseq_all$plot + ggtitle("All-genes") + theme_few() + scale_colour_few()
-write.table(rnaseq_all$pca$rotation, "rnaseq_pca_scores", sep="\t", quote=F)
-top_pc1 = sort(abs(rnaseq_all$pca$rotation[,"PC1"]), decreasing = TRUE)
-top_pc2 = sort(abs(rnaseq_all$pca$rotation[,"PC2"]), decreasing = TRUE)
-# plotPCA(rlog_ma,ntop=1000) + ggtitle("top 1000 variable genes") + theme_few() + scale_colour_few()
+```{r pca-all, cache=TRUE}
+keep = rowSums(counts>3)>3 & rowMeans(counts)>5
+dse = DESeqDataSetFromMatrix( counts[keep,], de[,], ~ experiment + condition)
+dse = DESeq(dse)
+rlog = rlog(dse)
+rlog_ma = assay(rlog)
 ```
+
+
+```{r plotpca-fn}
+pca_fn = function(ma, de, select, title){
+  obj = plotPCA.matrix(ma, de, select) 
+  write.table(obj$pca$rotation, paste0(title, "_pca_scores.txt"), sep="\t", quote=F)
+  top_pc1 = sort(abs(obj$pca$rotation[,"PC1"]), decreasing = TRUE)
+  top_pc2 = sort(abs(obj$pca$rotation[,"PC2"]), decreasing = TRUE)
+  obj$plot + ggtitle(title) + theme_few() + scale_colour_few()
+  # plotPCA(rlog_ma,ntop=1000) + ggtitle("top 1000 variable genes") + theme_few() + scale_colour_few()
+}
+```
+
+```{r pca-tables-figures}
+pca_fn(rlog_ma, de, rownames(rlog_ma), "rnaseq_all")
+keep = !grepl("R5", colnames(rlog_ma))
+pca_fn(rlog_ma[, keep], de[keep,], rownames(rlog_ma), "rnaseq_R1R4")
+for (group in c("R1", "R4", "R5")){
+  keep = grepl(group, colnames(rlog_ma))
+  print(pca_fn(rlog_ma[,keep], de[keep,], rownames(rlog_ma), paste0("rnaseq_", group)))
+}
+```
+
 
 ### Heatmap of the top genes for PC1
 
 ```{r heatmap-toppca}
-pheatmap(assay(rlog_ma)[names(top_pc1)[1:50],], annotation = de,show_rownames = FALSE, scale='row', main="top_PC1")
+keep = !grepl("R5", colnames(rlog_ma))
+obj = plotPCA.matrix(rlog_ma[,keep], de[keep,], rownames(rlog_ma))
+top_pc1 = sort(abs(obj$pca$rotation[,"PC1"]), decreasing = TRUE)
+top_pc2 = sort(abs(obj$pca$rotation[,"PC2"]), decreasing = TRUE)
 
-pheatmap(assay(rlog_ma)[names(top_pc2)[1:50],], annotation = de,show_rownames = FALSE, scale='row', main="top_PC2")
+pheatmap(rlog_ma[names(top_pc1)[1:50],keep], annotation = de[keep,],show_rownames = FALSE, scale='row', main="top_PC1")
+
+pheatmap(rlog_ma[names(top_pc2)[1:50],keep], annotation = de[keep,],show_rownames = FALSE, scale='row', main="top_PC2")
 ```
 
 
@@ -364,7 +398,7 @@ kable(array %>% filter(ensemble %in% idx) %>% select(ensemble, symbol, genename)
 select = rownames(array[array$ensemble %in% array_de$ensembl,])
 
 array_ma = array[,14:29]
-rownames(array_ma) = rownames(array)
+rownames(array_ma) = paste0(rownames(array),'_',array$symbol)
 
 de_array = data.frame(experiment=sapply(colnames(array_ma), function(x) strsplit(x, split = "[::.::]")[[1]][1]), condition = "None")
 
@@ -384,19 +418,25 @@ rownames(de_array) = colnames(array_ma)
 
 array_de_pca = plotPCA.matrix(array_ma, de_array, select) 
 array_de_pca$plot + theme_few() + scale_colour_few() + ggtitle("DE-genes") 
+```
 
-array_all = plotPCA.matrix(array_ma, de_array, rownames(array_ma)) 
-array_all$plot + ggtitle("All-genes") + theme_few() + scale_colour_few() 
+### PCA all genes
 
-write.table(array_all$pca$rotation, "array_pca_scores", sep="\t", quote=F)
-top_pc1 = sort(abs(array_all$pca$rotation[,"PC1"]), decreasing = TRUE)
-top_pc2 = sort(abs(array_all$pca$rotation[,"PC2"]), decreasing = TRUE)
-# plotPCA(rlog_ma,ntop=1000) + ggtitle("top 1000 variable genes") + theme_few() + scale_colour_few()
+```{r array-plot-tables-pca}
+pca_fn(array_ma, de_array, rownames(array_ma), "array_all")
+for (group in c("R3", "R7")){
+  keep = grepl(group, colnames(array_ma))
+  print(pca_fn(array_ma[,keep], de_array[keep,], rownames(array_ma), paste0("array_", group)))
+}
+
 ```
 
 ## Heatmap of the top genes for PC1
 
-```{r heatmap-toppca}
+```{r array-heatmap-toppca}
+obj = plotPCA.matrix(array_ma, de_array, rownames(array_ma))
+top_pc1 = sort(abs(obj$pca$rotation[,"PC1"]), decreasing = TRUE)
+
 pheatmap(array_ma[names(top_pc1)[1:50],], annotation = de_array,show_rownames = FALSE, scale='row', main="top_PC1")
 ```
 
