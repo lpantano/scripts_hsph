@@ -402,6 +402,40 @@ kable(cbind(clust_des, ann_des))
 do_norm(dds, all_results, root_file, "clusters_")
 ```
 
+
+# novel miRNAs
+
+```{r load-novel}
+fn = list.files(file.path(root_path, "mirdeep2", "novel_res"), pattern = "clean", full.names = TRUE)
+obj = IsomirDataSeqFromFiles(fn, design)
+```
+## differential expression
+
+```{r de-novel}
+dds = do_de(counts(obj), design, condition)
+```
+
+### MA-plots
+  
+```{r DESeq-output-novel, results='asis'}
+all_results = handle_deseq2(dds, design, condition)
+plot_MA(all_results)
+
+kable(head(all_results$ko_vs_wt))
+
+```
+
+```{r DESeq-confirmation-novel}
+DESeq2::plotCounts(dds, "cel-IV_35256-5p")
+DESeq2::plotCounts(dds, "cel-II_11977-3p")
+DESeq2::plotCounts(dds, "cel-IV_39449-5p")
+
+```
+
+```{r tables-novel}
+do_norm(dds, all_results, root_file, "novel_")
+```
+
 # Files
 
 ```{r files, results='asis'}
@@ -410,5 +444,3 @@ for (f in list.files("files", full.names = T)){
 }
 
 ```
-
-
