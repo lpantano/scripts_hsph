@@ -13,14 +13,22 @@ output:
 last update `r date()` by @lopantano
 
 ```{r set-path,echo=FALSE}
+library(knitr)
+
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heigh=6,
+               fig.path="../figures/mirqc",
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+
 root_path = "~/orch/scratch/simulator/mirqc/work"
 
 ```
 
 For replication [go here](http://seqcluster.readthedocs.org/example_pipeline.html)
 
+Document with R code [go here](http://github.com/lpantano/seqcluster/docs/post/mirqc/report_with_code.md)
+
 ```{r setup}
-library(knitr)
 
 library(ggplot2)
 library(reshape)
@@ -33,9 +41,6 @@ library(devtools)
 library(dplyr)
 library(isomiRs)
 
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heigh=6,
-               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
-               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
 
 root_file = paste0(root_path,"/report/")
 
@@ -160,7 +165,7 @@ same sequences. This way the output are meta-clusters, common sequences that cou
 come from different region of the genome.
 
 
-### genome covered
+### Genome covered
 
 ```{r genome-covered, results='asis'}
 cov_stats <- read.table(file.path(root_path, "align", "seqs_clean_rmlw.bam_cov.tsv"),sep="\t",check.names = F)
@@ -171,7 +176,7 @@ kable(cov_stats[cov_stats$V1=="genome",] %>% select(coverage=V2,ratio_genome=V5)
 
 The normal value for data with strong small RNA signal is: 0.0002
 
-### classification
+### Classification
 
 Number of reads in the data after each step:
 
@@ -319,14 +324,14 @@ do_norm = function(dss, root_path, prefix){
 
 ```
 
-## mirna
+## miRNA
 
 ```{r mirna-counts}
 mirna_c = counts(obj)
 ```
 
 
-### abundance detection of miRQC samples
+### Abundance detection of miRQC samples
 
 There are 4 samples:
 
@@ -429,7 +434,7 @@ miRQC_D = 0.75 * miRQC_A + 0.25 * miRQC_B
 that is the same that is in the GEO data set description file.
 
 
-### specificity
+### Specificity
 
 >> we spiked in 8 synthetic miRNAs from two miRNA families into human liver RNA (miR-302a/b/c/d) or MS2-phage RNA (let-7a/b/c/d)
 
@@ -466,7 +471,7 @@ According to the text they saw cross-mapping between these miRNAs, but here we a
 
 Probably the method was causing that, since I am not seeing this with seqbuster.
 
-### accuracy
+### Accuracy
 
 ```{r serum-accuracy}
 target = c("hsa-miR-10a-5p", "hsa-let-7a-5p", "hsa-miR-302a-3p", "hsa-miR-133a-3p")
@@ -506,7 +511,7 @@ and at position 9-11 for miRQC and liver samples. These are just
 exploratory figures and could lead to a deep analysis of differential
 expression of isomiRs.
 
-## clusters
+## Clusters
  
 The same logic was applied to clusters detection.
 
@@ -519,13 +524,13 @@ clus_ma_norm = cpm(dge, normalized.lib.sizes = T, log = T)
 clus_ma_norm = clus_ma_norm[rowMedians(clus_ma_norm)>5,]
 ```
 
-### matrix correlation among samples
+### Matrix correlation among samples
 
 ```{r cluster-cor, cache=TRUE}
 GGally::ggpairs(clus_ma_norm, axisLabels = "internal")
 ```
 
-### abundance detection
+### Abundance detection
 
 ```{r cluster-checking}
 mirqca = rowMeans(clus_ma_norm[, 1:2])

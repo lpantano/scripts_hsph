@@ -1,0 +1,545 @@
+miRDeep2 score	novel miRNAs reported by miRDeep2	novel miRNAs, estimated false positives	novel miRNAs, estimated true positives	known miRNAs in species	known miRNAs in data	known miRNAs detected by miRDeep2	estimated signal-to-noise	excision gearing
+10	88	25 +/- 5	63 +/- 5 (71 +/- 6%)	436	364	239 (66%)	7.9	12
+9	88	26 +/- 5	62 +/- 5 (70 +/- 6%)	436	364	240 (66%)	7.7	12
+8	91	27 +/- 5	64 +/- 5 (71 +/- 6%)	436	364	240 (66%)	7.7	12
+7	92	27 +/- 6	65 +/- 6 (71 +/- 6%)	436	364	240 (66%)	7.6	12
+6	92	28 +/- 6	64 +/- 6 (70 +/- 6%)	436	364	240 (66%)	7.4	12
+5	92	28 +/- 6	64 +/- 6 (69 +/- 7%)	436	364	240 (66%)	7.2	12
+4	93	29 +/- 6	64 +/- 6 (69 +/- 6%)	436	364	240 (66%)	7.2	12
+3	93	29 +/- 6	64 +/- 6 (68 +/- 7%)	436	364	240 (66%)	7.1	12
+2	93	31 +/- 6	62 +/- 6 (67 +/- 7%)	436	364	240 (66%)	6.7	12
+1	133	84 +/- 8	49 +/- 8 (37 +/- 6%)	436	364	247 (68%)	3	12
+0	247	313 +/- 13	0 +/- 0 (0 +/- 0%)	436	364	295 (81%)	1.3	12
+-1	363	534 +/- 18	0 +/- 0 (0 +/- 0%)	436	364	314 (86%)	1	12
+-2	490	721 +/- 20	0 +/- 0 (0 +/- 0%)	436	364	320 (88%)	0.9	12
+-3	576	883 +/- 23	0 +/- 0 (0 +/- 0%)	436	364	324 (89%)	0.9	12
+-4	671	1023 +/- 26	0 +/- 0 (0 +/- 0%)	436	364	325 (89%)	0.8	12
+-5	776	1135 +/- 27	0 +/- 0 (0 +/- 0%)	436	364	327 (90%)	0.8	12
+-6	867	1239 +/- 29	0 +/- 0 (0 +/- 0%)	436	364	329 (90%)	0.8	12
+-7	959	1334 +/- 29	0 +/- 0 (0 +/- 0%)	436	364	332 (91%)	0.9	12
+-8	1063	1437 +/- 28	0 +/- 0 (0 +/- 0%)	436	364	333 (91%)	0.9	12
+-9	1136	1520 +/- 30	0 +/- 0 (0 +/- 0%)	436	364	334 (92%)	0.9	12
+-10	1221	1608 +/- 29	0 +/- 0 (0 +/- 0%)	436	364	336 (92%)	0.9	12
+
+
+
+novel miRNAs predicted by miRDeep2
+provisional id	miRDeep2 score	estimated probability that the miRNA candidate is a true positive	rfam alert	total read count	mature read count	loop read count	star read count	significant randfold p-value	miRBase miRNA	example miRBase miRNA with the same seed	UCSC browser	NCBI blastn	consensus mature sequence	consensus star sequence	consensus precursor sequence	precursor coordinate
+X_47818	2344.7	71 +/- 6%	-	4602	2540	2048	14	-	-	-	-	-	augacugcuuggcgcaaugguagc	auccgcucaguggucaaauuuuu	augacugcuuggcgcaaugguagcgcguucgacuccagaucgaaagguugggcguucgauccgcucaguggucaaauuuuu	X:6371375..6371456:+
+X_47914	2343.5	71 +/- 6%	-	4599	2540	2048	11	-	-	-	-	-	augacugcuuggcgcaaugguagc	auccgcucaguggucaaaguuuu	augacugcuuggcgcaaugguagcgcguucgacuccagaucgaaagguugggcguucgauccgcucaguggucaaaguuuu	X:8877337..8877418:+
+X_48803	2342.5	71 +/- 6%	-	4599	2540	2048	11	-	-	-	-	-	augacugcuuggcgcaaugguagc	auccgcucaguggucaaaguuuu	augacugcuuggcgcaaugguagcgcguucgacuccagaucgaaagguugggcguucgauccgcucaguggucaaaguuuu	X:8944224..8944305:-
+IV_27062	2198.7	71 +/- 6%	-	4314	4288	0	26	-	-	-	-	-	uucgucguguguaguuucgcc	gaaacucggaaauugucggccg	uucgucguguguaguuucgccacucacuauaaaauugcugauuaaguauagugaguggcgaaacucggaaauugucggccg	IV:15234325..15234406:+
+IV_39449	1490.8	71 +/- 6%	-	2964	2960	0	4	-	-	-	-	-	uucagucauguuaaucaaguc	ucugagauucuugcggaccgc	uucagucauguuaaucaagucaccuucugagauucuugcggaccgc	IV:15674277..15674323:-
+I_3817	1201.6	71 +/- 6%	-	2369	2357	0	12	-	-	-	-	-	uaucgguacagagaguguaga	agacgauuugugucgauuuacg	uaucgguacagagaguguagauaguuagagugccagacauccgggacccaagcggaagagacgauuugugucgauuuacg	I:54925..55005:-
+III_19415	799.4	71 +/- 6%	-	1567	1493	0	74	-	-	-	-	-	ucagcguccucgaacuccgcccacu	ugggcggagcgagucgcugauu	ucagcguccucgaacuccgcccacuucaucugauugguugaaaagugggcggagcgagucgcugauu	III:12420398..12420465:-
+I_4073	575.5	71 +/- 6%	-	1128	660	0	468	-	-	-	-	-	uuaccuaucggcuuuaaaugua	cauuuaaagccgaucgguaacc	cauuuaaagccgaucgguaaccaauuucgacgauuuuugguuaccuaucggcuuuaaaugua	I:1259121..1259183:-
+X_49109	449.3	71 +/- 6%	-	879	807	0	72	-	-	-	-	-	uaaacauagcggcgcgcggaacc	uacgcgcgccgcuguuuuuaacu	uacgcgcgccgcuguuuuuaacucgcacagcucgccacgcccgcugugaguuaaacauagcggcgcgcggaacc	X:16341964..16342038:-
+V_46194	422.4	71 +/- 6%	-	829	742	0	87	-	-	-	-	-	agacuuacuguaguuuucgcca	gcgaaaacuacaguaacucuuu	gcgaaaacuacaguaacucuuuagaucaucaucauuuaaagacuuacuguaguuuucgcca	V:11225548..11225609:-
+IV_30731	382.5	71 +/- 6%	-	751	701	0	50	-	-	-	-	-	caauuugccgauuugccggaaau	gucggcaaacucggcaaauuugc	gucggcaaacucggcaaauuugccggaaauuuucaauuccugcaauuugccgauuugccggaaau	IV:188937..189002:-
+IV_30155	358	71 +/- 6%	-	701	533	0	168	-	-	-	-	-	cgcgcgccgcuauguuuaacu	uuaaacauagcggcgcgcggaac	cgcgcgccgcuauguuuaacucgcagcgggcggagacagcuugccacacccacaacgaguuaaacauagcggcgcgcggaac	IV:16797572..16797654:+
+IV_34632	340.5	71 +/- 6%	-	676	673	0	3	-	-	-	-	-	gguaccaagaucgucuucaaug	ccaggagacauccaaaccca	ccaggagacauccaaacccaaccggguaccaagaucgucuucaaug	IV:9836353..9836399:-
+IV_34606	340.4	71 +/- 6%	-	676	673	0	3	-	-	-	-	-	gguaccaagaucgucuucaaug	ccaggagacauccaaaccca	ccaggagacauccaaacccaaccggguaccaagaucgucuucaaug	IV:9767090..9767136:-
+IV_23139	340.4	71 +/- 6%	-	676	673	0	3	-	-	-	-	-	gguaccaagaucgucuucaaug	ccaggagacauccaaaccca	ccaggagacauccaaacccaaccggguaccaagaucgucuucaaug	IV:9770063..9770109:+
+IV_24394	274.8	71 +/- 6%	-	581	515	0	66	-	-	-	-	-	uagguuggucaaaaagucuuu	uugaacuuuuuggaaacauua	uugaacuuuuuggaaacauuagaauuaagaaaaauguaaauauuagguuggucaaaaagucuuu	IV:13802429..13802493:+
+I_751	251.2	71 +/- 6%	-	515	512	0	3	-	-	-	-	-	uuuaggccuuugacugaaacu	uuuggucuucuggcgcgaaau	uuuggucuucuggcgcgaaauuuugauuaucauuuuauuuuaggccuuugacugaaacu	I:3726803..3726862:+
+X_47465	251.2	71 +/- 6%	-	515	512	0	3	-	-	-	-	-	uuuaggccuuugacugaaacu	uuuggucuucuggcgcgaaau	uuuggucuucuggcgcgaaauuuugauuaucauuuuauuuuaggccuuugacugaaacu	X:172922..172981:+
+X_48571	238.6	71 +/- 6%	-	468	432	0	36	-	-	-	-	-	aaaucggcaaaauguagaaaugc	aauuuuccaaauugccgauuug	aaaucggcaaaauguagaaaugcaaauuuccggcaaaucagcaauuuuccaaauugccgauuug	X:2504837..2504901:-
+X_47973	230.1	71 +/- 6%	-	453	321	8	124	-	-	-	-	-	cacucccauccuugcccgauu	gugggcaggauggcguaguggu	gugggcaggauggcguagugguuagcaugcgccagcgauauugugauugauuggggaucacucccauccuugcccgauu	X:10840282..10840361:+
+IV_36842	224.3	71 +/- 6%	-	505	453	0	52	-	-	-	-	-	uuauguuaagauccaugauuc	ucuaccguuucaacaaacugu	ucuaccguuucaacaaacugugaaguaaugaauauuuucaaaaguauucaguuauguuaagauccaugauuc	IV:14348136..14348208:-
+I_4245	205.8	71 +/- 6%	-	404	401	0	3	-	-	-	-	-	ucuucgaucgccagaugcgugucg	accgcucuggggauugguguac	ucuucgaucgccagaugcgugucguguuuccggcaauuauugaaaaccgaccgcucuggggauugguguac	I:2374191..2374262:-
+IV_31147	194.7	71 +/- 6%	-	383	372	0	11	-	-	-	-	-	aucuagaaacucaauauaugga	uauauagugcgcuucuagauaag	aucuagaaacucaauauauggaaaacugaaaaacaccacuguuuucuauauagugcgcuucuagauaag	IV:3231135..3231204:-
+I_4853	193.5	71 +/- 6%	-	378	368	0	10	-	-	-	-	-	ggcguccggucguccgauuuug	gguucggacgaccggacguccggu	ggcguccggucguccgauuuugacaccaccggacgcacugcguccgaaccggacgcaugugcguccgguucggacgaccggacguccggu	I:4785636..4785726:-
+II_11977	188.9	71 +/- 6%	-	371	275	0	96	-	-	-	-	-	uucgguggccauuguggacugac	ucagacuacgaucgcuaccgggu	uucgguggccauuguggacugacuauguaugagucagacuacgaucgcuaccgggu	II:8877489..8877545:-
+I_158	180.8	71 +/- 6%	-	354	302	4	48	-	-	-	-	-	caauuugucgauuugccgaau	cgguaaaucgguaaauugcc	cgguaaaucgguaaauugccggaauugaaauuucuggcaaaucggaaaaccggcaauuugucgauuugccgaau	I:553628..553702:+
+III_16521	172.4	71 +/- 6%	-	338	158	0	180	-	-	-	-	-	uucuuacuguagucuucgcuaag	agcgaaaacuacaguaagaacu	agcgaaaacuacaguaagaacucaaauaacuauuguuauuuaaguucuuacuguagucuucgcuaag	III:13694734..13694801:+
+I_5004	165.6	71 +/- 6%	-	327	321	0	6	-	-	-	-	-	gucuuguuugaacuuucuggcacgg	gguccgauaggucagcaggagucuug	gguccgauaggucagcaggagucuugggaagauucgauuugcugcaugcuugcaaaucuuccccgucuuguuugaacuuucuggcacgg	I:5402654..5402743:-
+IV_31121	153.9	71 +/- 6%	-	305	259	0	46	-	-	-	-	-	ugagaauuuugaaugaaagcua	uuuucauuuaacauucccaga	ugagaauuuugaaugaaagcuaccauucagcgcacuagacaguuuucauuuaacauucccaga	IV:3039450..3039513:-
+I_1522	138.5	71 +/- 6%	-	277	197	77	3	-	-	-	-	-	gagaugcuaagcuuguggggcugca	gcagaucacccuucugagucaagug	gagaugcuaagcuuguggggcugcacguggcacaaugaccucauccucgagcagaucacccuucugagucaagug	I:6090081..6090156:+
+V_45240	124.7	71 +/- 6%	-	246	181	0	65	-	-	-	-	-	aauauaucguaugccugccgaau	ugcggcaggaauaugauauuuu	ugcggcaggaauaugauauuuuaagguuaaagagaaaccaauauaucguaugccugccgaau	V:4651066..4651128:-
+II_13317	113.3	71 +/- 6%	-	224	221	0	3	-	-	-	-	-	accgccucucuaccaaacacuugc	caagugcauggaagaggcgaau	accgccucucuaccaaacacuugcaaguucuguuuauugcaagugcauggaagaggcgaau	II:15165966..15166027:-
+III_19276	99.7	71 +/- 6%	-	195	189	3	3	-	-	-	-	-	gugggcggagcgaaucgcugcu	cagcgauucgccccgccuacuu	cagcgauucgccccgccuacuuuugaaccaaucagaugaagugggcggagcgaaucgcugcu	III:11337787..11337849:-
+III_14010	96.1	71 +/- 6%	-	188	176	0	12	-	-	-	-	-	uaacagggaugaaguaacgcc	cguuacuucaucccuguuaga	uaacagggaugaaguaacgccaguuccacuggcguuacuucaucccuguuaga	III:4616026..4616079:+
+III_17219	96.1	71 +/- 6%	-	188	176	0	12	-	-	-	-	-	uaacagggaugaaguaacgcc	cguuacuucaucccuguuaga	uaacagggaugaaguaacgccaguggaacuggcguuacuucaucccuguuaga	III:4616024..4616077:-
+X_48097	95.4	71 +/- 6%	-	215	210	0	5	-	-	-	-	-	uuaagaaaaaucgaaaggaacc	cuucuuuucuuuuuacuuaacu	cuucuuuucuuuuuacuuaacuuccggugagaauuuaagaaaaaucgaaaggaacc	X:13775774..13775830:+
+IV_35222	92.3	71 +/- 6%	-	183	180	0	3	-	-	-	-	-	uuucugggugugauggcgucaga	cagcgucaucaucaccaacgagaaagc	cagcgucaucaucaccaacgagaaagcaucgaugcuuucugggugugauggcgucaga	IV:11593779..11593837:-
+III_13376	83.4	71 +/- 6%	-	163	153	0	10	-	-	-	-	-	aucggcgacucggcaaauugcc	caaauuguagaguugccgaau	aucggcgacucggcaaauugccggaauuaaaaaauuuuccggcaaauuguagaguugccgaau	III:611177..611240:+
+V_47132	79.7	71 +/- 6%	-	157	81	0	76	-	-	-	-	-	ucugccagacuacaaacuacu	uaguuuguagccuggcagacc	uaguuuguagccuggcagaccaaugucaagcauuuucggucugccagacuacaaacuacu	V:18037635..18037695:-
+II_12541	79	71 +/- 6%	-	155	151	0	4	-	-	-	-	-	acugugacggcuuauaucucg	gagauauaagcugucaaagug	acugugacggcuuauaucucgguuguaucaggccaaagauauccgagauauaagcugucaaagug	II:11616608..11616673:-
+I_7143	71.6	71 +/- 6%	-	141	78	0	63	-	-	-	-	-	uaccggauuuuguaaugagacg	ucucauuacgaaauucggucu	uaccggauuuuguaaugagacgucuugaaaacuucucauuacgaaauucggucu	I:14633771..14633825:-
+I_823	69	71 +/- 6%	-	142	135	3	4	-	-	-	-	-	gugacgagaucggcugugguga	gaccacaauggagaaccuucggcuug	gaccacaauggagaaccuucggcuugcggguuuuugugucgaacucccgaauacaaauuaggcaugugacgagaucggcugugguga	I:3927775..3927862:+
+II_11661	69	71 +/- 6%	-	138	47	65	26	-	-	-	-	-	gaagacuugaaccccuggggca	gaauagggcaaguugagaguc	gaagacuugaaccccuggggcaagaaugaagagauggucaaagaucagcugaccaugcuugaauagggcaaguugagaguc	II:7864742..7864823:-
+I_4890	67.1	71 +/- 6%	-	132	59	0	73	-	-	-	-	-	uuuuucaauuguuccaacuga	uaguuggaacaauugaaaaagu	uaguuggaacaauugaaaaaguccucaaacuuuccaaucucgagcacuuuuucaauuguuccaacuga	I:4847602..4847670:-
+III_16581	62.8	71 +/- 6%	-	123	96	0	27	-	-	-	-	-	gaacucuugccuaucuuuggccc	accaaaguuaggcaagaguugggu	gaacucuugccuaucuuuggcccaaacuuuucuuguuuuguuucaaacuuggaccaaaguuaggcaagaguugggu	III:350896..350972:-
+III_19375	57.9	71 +/- 6%	-	113	96	0	17	-	-	-	-	-	cagcguucucgaacuccgcccacu	ugggcggggcgaaucgcugauu	cagcguucucgaacuccgcccacucggccugauugacugaaaagugggcggggcgaaucgcugauu	III:12231706..12231772:-
+IV_30890	52.7	71 +/- 6%	-	104	98	0	6	-	-	-	-	-	cagcgcggaauggucaagacgc	acuugaucuauuccggacgcc	acuugaucuauuccggacgccgggcaaugcccagcgcggaauggucaagacgc	IV:1375476..1375529:-
+V_42890	45.1	71 +/- 6%	-	89	82	0	7	-	-	-	-	-	ucagucuaccacauggucgucgau	cggaggcgaugugagaggcgaug	ucagucuaccacauggucgucgaucauggcaaaucggaggcgaugugagaggcgaug	V:6276504..6276561:+
+I_2247	42.7	71 +/- 6%	-	93	90	0	3	-	-	-	-	-	gcaauucgucgauuugacuggu	gcaguccauugaacgggaggcu	gcaguccauugaacgggaggcucucgauuuuuacaucugucccauuuaaaaugugcaauucgucgauuugacuggu	I:8680945..8681021:+
+I_513	40.8	71 +/- 6%	-	89	58	27	4	-	-	-	-	-	gaauucgauggaggaacuucu	gucuccucuuucguguguuccucgac	gucuccucuuucguguguuccucgacgagucguuggaucauacacuuggcguauugaauucgauggaggaacuucu	I:2755932..2756008:+
+IV_31014	36.3	71 +/- 6%	-	71	68	0	3	-	-	-	-	-	acggaguuaaauuugaauuuuu	aaaauucaaauuuaacuccgu	aaaauucaaauuuaacuccgugacaagugugcucuaugucacggaguuaaauuugaauuuuu	IV:2502447..2502509:-
+IV_19995	36.3	71 +/- 6%	-	71	68	0	3	-	-	-	-	-	acggaguuaaauuugaauuuuu	aaaauucaaauuuaacuccgu	aaaauucaaauuuaacuccgugacauagagcacacuugucacggaguuaaauuugaauuuuu	IV:2502448..2502510:+
+I_577	34.7	71 +/- 6%	-	78	69	0	9	-	-	-	-	-	acagaaaaugcgaaugagga	cuucauaucgucaugucaaaa	cuucauaucgucaugucaaaaucaacagaaaaugcgaaugagga	I:2915223..2915267:+
+I_4506	31.9	71 +/- 6%	-	61	40	0	21	-	-	-	-	-	gaagggcaaagagugcgauauc	uaucgcacucuuugcccuuccg	uaucgcacucuuugcccuuccgccaugagucaugccggaagggcaaagagugcgauauc	I:3632122..3632181:-
+I_735	31.9	71 +/- 6%	-	61	40	0	21	-	-	-	-	-	gaagggcaaagagugcgauauc	uaucgcacucuuugcccuuccg	uaucgcacucuuugcccuuccggcaugacucauggcggaagggcaaagagugcgauauc	I:3632124..3632183:+
+III_13847	31.2	71 +/- 6%	-	67	61	0	6	-	-	-	-	-	guuuuaucaucuuccaucguugacu	gucuagacgaugguuuucugaucacu	gucuagacgaugguuuucugaucacuuuuaauuguguuuuaucaucuuccaucguugacu	III:4286089..4286149:+
+III_19611	31	71 +/- 6%	-	60	57	0	3	-	-	-	-	-	aaaaugagaacugcaggaccaauc	uugguuugcaguucucauuuugg	aaaaugagaacugcaggaccaaucagcgauuugcuccgcccaccccuucugauugguuugcaguucucauuuugg	III:13317585..13317660:-
+X_48453	28.7	71 +/- 6%	-	56	49	0	7	-	-	-	-	-	accguauuuccucuguuagucu	acuaacagaggaaauacgggauu	accguauuuccucuguuagucuugcaugcaagacuaaauuucaauugguccguaggggugccagacuaacagaggaaauacgggauu	X:833916..834003:-
+V_42455	27.1	71 +/- 6%	-	51	32	0	19	-	-	-	-	-	ugcaaauuugguucccguccgac	cggacgggagccaaguuugcacc	cggacgggagccaaguuugcaccaaauagugcgauagggucugucaccauuuggugcaaauuugguucccguccgac	V:1918837..1918914:+
+II_7745	26.9	71 +/- 6%	-	56	46	7	3	-	-	-	-	-	gagguggugcggaggucgauc	auugacguacaccuucacgaaa	auugacguacaccuucacgaaaucgaggaaaucgcgcaaacuugugguuucuggugcagcuggagguggugcggaggucgauc	II:3932720..3932803:+
+III_16267	26.1	71 +/- 6%	-	51	29	0	22	-	-	-	-	-	uggacggagcgacgaucgcugau	ucagcaucuucgaacuccgcccacu	ucagcaucuucgaacuccgcccacuccgccugauugguugaaaaguggacggagcgacgaucgcugau	III:12702589..12702657:+
+I_3476	25.7	71 +/- 6%	-	50	47	0	3	-	-	-	-	-	uaguuuguaguuugugagccu	ggcucgaagacuacaaacuaca	uaguuuguaguuugugagccucacucaaugaugguugaggcucgaagacuacaaacuaca	I:14119300..14119360:+
+IV_20177	25.5	71 +/- 6%	-	52	46	0	6	-	-	-	-	-	uccgguuuggucacaauu	uaaagaccgggcuggauacagc	uaaagaccgggcuggauacagcuccuuuugaauuccgguuuggucacaauu	IV:3499816..3499867:+
+I_6260	25.5	71 +/- 6%	-	52	46	0	6	-	-	-	-	-	uccgguuuggucacaauu	uaaagaccgggcuggauacagc	uaaagaccgggcuggauacagcuccuuuugaauuccgguuuggucacaauu	I:9681526..9681577:-
+V_44739	25.5	71 +/- 6%	-	52	46	0	6	-	-	-	-	-	uccgguuuggucacaauu	uaaagaccgggcuggauacagc	uaaagaccgggcuggauacagcuccuuuugaauuccgguuuggucacaauu	V:20511343..20511394:+
+I_3858	25.5	71 +/- 6%	-	52	46	0	6	-	-	-	-	-	uccgguuuggucacaauu	uaaagaccgggcuggauacagc	uaaagaccgggcuggauacagcuccuuuugaauuccgguuuggucacaauu	I:187194..187245:-
+I_5788	25.5	71 +/- 6%	-	52	46	0	6	-	-	-	-	-	uccgguuuggucacaauu	uaaagaccgggcuggauacagc	uaaagaccgggcuggauacagcuccuuuugaauuccgguuuggucacaauu	I:7844808..7844859:-
+I_282	23.1	71 +/- 6%	-	45	42	0	3	-	-	-	-	-	ucaccuaucggcuuuaaauguac	caauuaaagccgaucgguaacc	caauuaaagccgaucgguaaccaauuucgacgauuuuuggucaccuaucggcuuuaaauguac	I:1749071..1749134:+
+I_4990	20.3	71 +/- 6%	-	42	39	0	3	-	-	-	-	-	gauggcuugauggcuggggcu	gcuccagguauuugguuucuuu	gcuccagguauuugguuucuuuacaguucuccgugcagaagcaauugcagguuuuggagcaguugauggcuugauggcuggggcu	I:5268019..5268104:-
+I_3460	19.2	71 +/- 6%	-	36	22	0	14	-	-	-	-	-	cgcgcgucgcuauguuuaacu	uuaaacgcagcggcgcgcggaac	cgcgcgucgcuauguuuaacucacagcgggcggagacagcucgccacgcccacaucgaguuaaacgcagcggcgcgcggaac	I:13988886..13988968:+
+IV_28292	19.2	71 +/- 6%	-	36	22	0	14	-	-	-	-	-	cgcgcgucgcuauguuuaacu	uuaaacgcagcggcgcgcggaac	cgcgcgucgcuauguuuaacucacagcgggcggagacagcucgccacgcccacaucgaguuaaacgcagcggcgcgcggaac	IV:15805327..15805409:+
+III_19417	18.6	71 +/- 6%	-	37	30	0	7	-	-	-	-	-	auuuauuauggaaacguagaaa	uucugcgacuucauaauaagcc	auuuauuauggaaacguagaaaaaagucccguuuuuucugcgacuucauaauaagcc	III:12422433..12422490:-
+III_15188	18.2	71 +/- 6%	-	42	39	0	3	-	-	-	-	-	accucuuucucgauuuga	guugucaacgaagaugaug	accucuuucucgauuugauguagaugguuuucuaaauguugucaacgaagaugaug	III:8316451..8316507:+
+V_42634	16.1	71 +/- 6%	-	32	22	4	6	-	-	-	-	-	ucagcaucuucgaacuccgcccacu	gugggcggagcaaaucgcugauu	ucagcaucuucgaacuccgcccacuccaucugauugguucaaaagugggcggagcaaaucgcugauu	V:4540018..4540085:+
+I_3603	15.9	71 +/- 6%	-	44	41	0	3	-	-	-	-	-	gaucgauucgucguugacgua	gugaacuucggaccguucgccg	gugaacuucggaccguucgccggcuuugaucgcccaagccaucucgaucgauucgucguugacgua	I:14707774..14707840:+
+II_9505	15.6	71 +/- 6%	-	34	27	0	7	-	-	-	-	-	gaagugaucguccuccucgga	aaucggaauggaacuucaugu	aaucggaauggaacuucauguccaaaguguugaauaucaugaagugaucguccuccucgga	II:11662192..11662253:+
+IV_30866	15.1	71 +/- 6%	-	31	27	0	4	-	-	-	-	-	uaagacagcgggcuccacuaca	uaguguagccuuccuucuuauu	uaguguagccuuccuucuuauucuccagugacgaucuguguugggauaagacagcgggcuccacuaca	IV:1021428..1021496:-
+IV_34339	15.1	71 +/- 6%	-	46	43	0	3	-	-	-	-	-	gauagacgauaucauacuuuggacu	guugcaugauuugagguucuuau	gauagacgauaucauacuuuggacuacuauaauaguugcaugauuugagguucuuau	IV:8656310..8656367:-
+IV_24895	14.6	71 +/- 6%	-	34	31	0	3	-	-	-	-	-	gauaguugugacaagaauugcc	acuuccagucauccaaacugu	acuuccagucauccaaacuguuaacaaauagacgauaguugugacaagaauugcc	IV:14113025..14113080:+
+I_6734	14.4	71 +/- 6%	-	34	14	16	4	-	-	-	-	-	acuucuauaaauugacggcu	guaugaauaucaaagugauagu	guaugaauaucaaagugauagucauauucuuugcuuugaccgguugcauuggaugugacuucuauaaauugacggcu	I:11726187..11726264:-
+I_439	14.1	71 +/- 6%	-	41	37	0	4	-	-	-	-	-	gcuuugaccguuuuggguccag	ggcuccucaaacggcgacuucugauc	ggcuccucaaacggcgacuucugauccuuuuccuuuacauuaggcuuugaccguuuuggguccag	I:2324376..2324441:+
+V_43035	13.8	71 +/- 6%	-	55	51	0	4	-	-	-	-	-	uuuuuaaaauuuaccugggc	ccggagcaaaugaugaagag	ccggagcaaaugaugaagaggacuuggauauugaugacauuuaauuguacagaugcuuuuuuaaaauuuaccugggc	V:7857628..7857705:+
+IV_35155	13.2	71 +/- 6%	-	28	25	0	3	-	-	-	-	-	aaggagaaaaguagaagacgauu	aacggcuucuucuuuucuucuuc	aaggagaaaaguagaagacgauucuguuauuuuuuggaacggcuucuucuuuucuucuuc	IV:11456063..11456123:-
+III_13457	13.1	71 +/- 6%	-	25	22	0	3	-	-	-	-	-	ucuacccuccaccacgcucucu	agaguguggggggaggggagacg	agaguguggggggaggggagacgcagcgcgggcucucugcgucuacccuccaccacgcucucu	III:1250073..1250136:+
+I_1388	12.4	71 +/- 6%	-	29	25	0	4	-	-	-	-	-	gaaucgacgauggacuucgc	gaauccugacguuguuug	gaaucgacgauggacuucgccgucuucucacuggugaauccugacguuguuug	I:5654316..5654369:+
+I_3053	10.8	71 +/- 6%	-	20	17	0	3	-	-	-	-	-	accaguggcgcagucgguaaga	uuaccgccugagccacugugugcc	uuaccgccugagccacugugugccgcgcgggcgcaccacaccgcgucaccaguggcgcagucgguaaga	I:11501929..11501998:+
+IV_20104	10.7	71 +/- 6%	-	31	15	12	4	-	-	-	-	-	gauaucagaucuuucggaauga	gcuuccgaaucgauccgguc	gauaucagaucuuucggaaugaucucauagaauccggugaggaacgcgucgagcugcuuccgaaucgauccgguc	IV:3034283..3034358:+
+V_44859	10.3	71 +/- 6%	-	21	14	0	7	-	-	-	-	-	aacggcaaaucggcaaauugu	aauuugcugauuugccgaau	aacggcaaaucggcaaauuguuggaaaauuggcaaaucggcaauuugcugauuugccgaau	V:1174135..1174196:-
+I_3943	8.6	71 +/- 6%	-	17	14	0	3	-	-	-	-	-	aauggcagaucaaaauuucgga	gaaauuuugaucugccauuac	aauggcagaucaaaauuucggaaaaaaagugaauuuuagcgaaaauucgccgugguuuuucgaaauuuugaucugccauuac	I:516103..516185:-
+II_12394	8.4	71 +/- 6%	-	23	20	0	3	-	-	-	-	-	gcacgaagacggucguagaca	gaauacgucgauccagugc	gaauacgucgauccagugcauuuuccgaucuuucaguuuccaugagaauugcacgaagacggucguagaca	II:11023707..11023778:-
+I_274	8	71 +/- 6%	-	22	19	0	3	-	-	-	-	-	uuuuccaaaacuuugaaccacc	gaaauucgguaguuuuggacc	uuuuccaaaacuuugaaccaccauaacuuuuuuuugagcaauuuucaaaagguuuaauuacgaaauucgguaguuuuggacc	I:1730484..1730566:+
+II_11329	7.9	71 +/- 6%	-	30	27	0	3	-	-	-	-	-	gaggguuugguugauuucugcacc	guagauuuuaugggccaccaucuggc	gaggguuugguugauuucugcaccgguugaagaucaguaaaaauucaaaaaaaaaugggaaggaguguagauuuuaugggccaccaucuggc	II:6373893..6373985:-
+I_1914	4.8	69 +/- 6%	-	28	23	0	5	-	-	-	-	-	cuauuuggauuggaguuuacaa	gugaauucugaauugagcaaga	cuauuuggauuggaguuuacaacauggaagugaauucugaauugagcaaga	I:7454810..7454861:+
+V_44495	1.9	37 +/- 6%	-	807	807	0	0	-	-	-	-	-	uaaacauagcggcgcgcggaacc	uuccgcgugccgcugcguuuaac	uuccgcgugccgcugcguuuaacucgcugugggcguggcgagcugucucggccugcugugaguuaaacauagcggcgcgcggaacc	V:17838546..17838632:+
+IV_36625	1.8	37 +/- 6%	-	830	807	0	23	-	-	-	-	-	uaaacauagcggcgcgcggaacc	cgcgcaccgcuauguuuaacuc	cgcgcaccgcuauguuuaacucgcagcgggcggagacagcucgccacacccacagcgaguuaaacauagcggcgcgcggaacc	IV:14240288..14240371:-
+I_438	1.8	37 +/- 6%	-	169	146	0	23	-	-	-	-	-	uuaaacauagcggcgcgcggaac	cgcgcaccgcuauguuuaacuc	cgcgcaccgcuauguuuaacucguugugggcgcggcaagcugucuccgcccgcugcgaguuaaacauagcggcgcgcggaac	I:2322813..2322895:+
+V_47058	1.8	37 +/- 6%	-	699	693	0	6	-	-	-	-	-	uaaacauagcggcgcgcggaacc	uccgcgcgccgcugcguuuaac	uccgcgcgccgcugcguuuaacucgcugugggcguggcgagcugucuccgccugcugcgaguuaaacauagcggcgcgcggaacc	V:16773374..16773459:-
+X_48199	1.8	37 +/- 6%	-	699	693	0	6	-	-	-	-	-	uaaacauagcggcgcgcggaacc	uccgcgcgccgcugcguuuaac	uccgcgcgccgcugcguuuaacucgcugugggcguggcgagcugucuccgcccgcugcgaguuaaacauagcggcgcgcggaacc	X:15777658..15777743:+
+IV_39757	1.8	37 +/- 6%	-	54	54	0	0	-	-	-	-	-	acguuuaacucgcagcgggcg	cccacugcgaguuaaacgcag	acguuuaacucgcagcgggcggagacagcucgucacgcccacugcgaguuaaacgcag	IV:15861700..15861758:-
+I_6509	1.8	37 +/- 6%	-	697	674	0	23	-	-	-	-	-	uaaacauagcggcgcgcggaacc	cgcgcaccgcuauguuuaacuc	cgcgcaccgcuauguuuaacucguuguggguguggcaagcugucuccgcccgcugcgagauaaacauagcggcgcgcggaacc	I:10594178..10594261:-
+IV_31212	1.6	37 +/- 6%	-	178	178	0	0	-	-	-	-	-	auuuuuguagaucacaccguga	acgguuugaucuacaaaaaauu	acgguuugaucuacaaaaaauucgagaguuuucucucauuucccgcauuuuuguagaucacaccguga	IV:3525907..3525975:-
+X_48190	1.5	37 +/- 6%	-	71	71	0	0	-	-	-	-	-	ugccugaggcaggcuaggucugc	aggcuaggucugccugaggcagg	aggcuaggucugccugaggcaggcuaggucugccugaggcaggcuaggucugc	X:15738753..15738806:+
+X_47670	1.5	37 +/- 6%	-	345	345	0	0	-	-	-	-	-	cgcgcgccgcuauguuuaacu	uuaaacgcagcagcgcgcuga	cgcgcgccgcuauguuuaacuugcagcgggcggagacagcucgccacgcccacagugaguuaaacgcagcagcgcgcuga	X:2633065..2633145:+
+IV_37442	1.5	37 +/- 6%	-	168	168	0	0	-	-	-	-	-	uuaaacauagcggcgcgcggaac	uccgcgcgccgcugcguuuaucu	uccgcgcgccgcugcguuuaucucgcagcggguggagacagcucgccacacccacugcgaguuaaacauagcggcgcgcggaac	IV:14648219..14648303:-
+III_13502	1.3	37 +/- 6%	-	12	12	0	0	-	-	-	-	-	agaaauacuguauuuauucaca	ugaauaaauaccguauuucugc	agaaauacuguauuuauucacauuuucagccuuaaaauggcugaaaaugugaauaaauaccguauuucugc	III:1863226..1863297:+
+X_49172	1.3	37 +/- 6%	-	21	21	0	0	-	-	-	-	-	ucccgaaagcgucgggggcugcc	cagcccccgacacuuuugggguu	cagcccccgacacuuuugggguuccgcacgggccggcggaaucccgaaagcgucgggggcugcc	X:17378478..17378542:-
+I_7122	1.3	37 +/- 6%	-	19	19	0	0	-	-	-	-	-	uuagaaauguuguaguuuguagc	uacaaacuacaaaauuuccagcc	uacaaacuacaaaauuuccagccucaaccauaguugagugagguuagaaauguuguaguuuguagc	I:14421769..14421835:-
+III_16821	1.3	37 +/- 6%	-	113	99	0	14	-	-	-	-	-	uaccugaaaguggucguuugucga	ucggcaaacggcaacuuucagg	uaccugaaaguggucguuugucgaaaaagugccauuaauaguuuuucggcaaacggcaacuuucagg	III:2508505..2508572:-
+X_47844	1.3	37 +/- 6%	-	45	45	0	0	-	-	-	-	-	uacauaucagugcugugcggc	cgcacagcacugguaca	uacauaucagugcugugcggcucuugaaaaaagucggcucucggcucgcgccgagaguugagagccgcacagcacugguaca	X:7414952..7415034:+
+I_3377	1.2	37 +/- 6%	-	166	166	0	0	-	-	-	-	-	uuaccuaucggcuuugaauguacu	uacauuuaucggcgauagguaacc	uacauuuaucggcgauagguaaccaaaaaucaucgaaauugguuaccuaucggcuuugaauguacu	I:13486491..13486557:+
+IV_39949	1.2	37 +/- 6%	-	345	345	0	0	-	-	-	-	-	cgcgcgccgcuauguuuaacu	uggaacgcaacggcgcgcgga	cgcgcgccgcuauguuuaacuugcaacaggcaggacagcucgccacgcccacagcgaguggaacgcaacggcgcgcgga	IV:15939358..15939437:-
+III_16408	1.2	37 +/- 6%	-	98	98	0	0	-	-	-	-	-	uggcgaugagugcucuagcaaga	uugcuagagcagucaucaccaau	uggcgaugagugcucuagcaagauauaucuaucuguaucuagcuagaucuugcuagagcagucaucaccaau	III:13259340..13259412:+
+II_10021	1.2	37 +/- 6%	-	42	42	0	0	-	-	-	-	-	uuggcugaaaagugggcggugcu	cccucccacuuuuccauuaauc	cccucccacuuuuccauuaaucagcagagcucgaagaugcugauuggcugaaaagugggcggugcu	II:13741617..13741683:+
+II_10264	1.2	37 +/- 6%	-	178	178	0	0	-	-	-	-	-	auuuuuguagaucacaccguga	acggguugauguacaagaaaugc	acggguugauguacaagaaaugcgggauuucugcgucucgcucaccgcauuuuuguagaucacaccguga	II:92343..92413:-
+V_42354	1.2	37 +/- 6%	-	83	83	0	0	-	-	-	-	-	cuugcaaccagugcugugcggc	cgcacagcacugcuugcauccc	cuugcaaccagugcugugcggcucucggcucucggcgcgcgucgagagccgacuuuuuucaagagccgcacagcacugcuugcauccc	V:1050359..1050447:+
+I_4957	1.1	37 +/- 6%	-	22	22	0	0	-	-	-	-	-	ucagcaucuucgaacuccgcccacu	ugggcggagcgaauugcugauu	ucagcaucuucgaacuccgcccacuucgucugauuggcuggaaaaugggcggagcgaauugcugauu	I:5157233..5157300:-
+I_3355	1.1	37 +/- 6%	-	48	48	0	0	-	-	-	-	-	gugaaauuucguggugggacc	uccuaccacgaaaguuucacca	uccuaccacgaaaguuucaccacacaaaagucgauucuaaaagacuuggugaaauuucguggugggacc	I:13291855..13291924:+
+IV_23390	1.1	37 +/- 6%	-	41	41	0	0	-	-	-	-	-	aggcaugaucucuagaccaga	uggucuagagaucuugccuag	aggcaugaucucuagaccagacuacgugguucuggucuagagaucuugccuag	IV:10345395..10345448:+
+III_19589	1.1	37 +/- 6%	-	161	161	0	0	-	-	-	-	-	auuggugaugacugcucuagca	cuagagcacucaucgccaauaa	auuggugaugacugcucuagcaagaucuagcuagauacagauagauauaucuugcuagagcacucaucgccaauaa	III:13259336..13259412:-
+I_7217	1.1	37 +/- 6%	-	19	19	0	0	-	-	-	-	-	uacauuauuuuccgucuauugc	aauagacgggaaauaauguaaa	uacauuauuuuccgucuauugccggguuucaccuggaaaaccugcaauagacgggaaauaauguaaa	I:15018083..15018150:-
+III_15650	1.1	37 +/- 6%	-	55	49	0	6	-	-	-	-	-	caaagagcgacuugguagguaaac	guuuaccuaccaagucgcucu	caaagagcgacuugguagguaaacuaaaauauuuaguuuaccuaccaagucgcucu	III:9792335..9792391:+
+V_47137	1.1	37 +/- 6%	-	46	46	0	0	-	-	-	-	-	aacgguuuuuugguaguuuaaauc	uuuaaacuaccaaaaaaccgguga	aacgguuuuuugguaguuuaaaucaaaaauaucaguuauuuuugauuuaaacuaccaaaaaaccgguga	V:18074135..18074204:-
+III_16144	1.1	37 +/- 6%	-	22	22	0	0	-	-	-	-	-	ucagcaucuucgaacuccgcccacu	ugggcggagcgaaucacugauu	ucagcaucuucgaacuccgcccacuccaccugauugguucgaaaaugggcggagcgaaucacugauu	III:11954330..11954397:+
+IV_19936	1.1	37 +/- 6%	-	31	31	0	0	-	-	-	-	-	uauuuaaaauucgauggacggc	cauccaucgauuuuuaaauacc	uauuuaaaauucgauggacggcgagauguuuaauuuuuuuaaaccaaaauucgccauccaucgauuuuuaaauacc	IV:2040077..2040153:+
+III_16832	1	37 +/- 6%	-	21	21	0	0	-	-	-	-	-	aaaacugggcguagcgaagcgc	gauucgcuccacccacuuucgg	gauucgcuccacccacuuucggaccaaucauugguccaaaacugggcguagcgaagcgc	III:2572864..2572923:-
+V_47134	1	37 +/- 6%	-	187	123	0	64	-	-	-	-	-	ucugccagacuacaaacuaca	uguaguuuguagucuggcagacc	uguaguuuguagucuggcagaccaaaggucuuccccauuggucugccagacuacaaacuaca	V:18042447..18042509:-
+I_4118	1	37 +/- 6%	-	38	38	0	0	-	-	-	-	-	ggaaccacgaaugugucggcc	ccgacacuuucaggguugcgc	ccgacacuuucaggguugcgcaauuacgcacacaccaagcuacuuaugacaagcugcggaaccacgaaugugucggcc	I:1722650..1722728:-
+II_7470	1	37 +/- 6%	-	13	13	0	0	-	-	-	-	-	ucuuagaucauggaguccuggga	cuagguuccaaggaucuauggcc	ucuuagaucauggaguccugggauccuaagcugcuaggcucuuggaauccuagguuccaaggaucuauggcc	II:876872..876944:+
+II_13123	1	37 +/- 6%	-	1493	1493	0	0	-	-	-	-	-	ucagcguccucgaacuccgcccacu	ugggcggggcgaaucucgcugauu	ucagcguccucgaacuccgcccacuuccucugauugguuggaaagugggcggggcgaaucucgcugauu	II:14269339..14269408:-
+III_19230	1	37 +/- 6%	-	33	30	3	0	-	-	-	-	-	ugggcggagcaaauugcugauu	ucagcgauucgcuccgcccacu	ucagcgauucgcuccgcccacuuuucaaccaaucagauggagugggcggagcaaauugcugauu	III:11095842..11095906:-
+X_48482	1	37 +/- 6%	-	17	17	0	0	-	-	-	-	-	acaguggagcgcggaacacggga	acguguuccgcgccccacuaugu	acguguuccgcgccccacuaugucuaccugugggagggacagcucgccacgcccacagcaaacuaaacacaguggagcgcggaacacggga	X:1310774..1310865:-
+IV_35561	1	37 +/- 6%	-	138	138	0	0	-	-	-	-	-	uucggcaaacucggcaaaucggc	cgguuugucgauuugccggaaa	uucggcaaacucggcaaaucggcaaaucagaaauuugccgguuugucgauuugccggaaa	IV:13326484..13326544:-
+III_18893	1	37 +/- 6%	-	55	49	0	6	-	-	-	-	-	caaagagcgacuugguagguaaac	guuuaccuaccaagucgcucu	caaagagcgacuugguagguaaacuaaauauuuuaguuuaccuaccaagucgcucu	III:9792338..9792394:-
+I_4213	0.9	0 +/- 0%	-	13	13	0	0	-	-	-	-	-	uuacacugaaucuugauaaaacu	uuuuauuaaauuucaguguaauu	uuacacugaaucuugauaaaacugcauggcaaaaauuccacagaguuuuauuaaauuucaguguaauu	I:2290086..2290154:-
+III_19560	0.9	0 +/- 0%	-	35	32	0	3	-	-	-	-	-	agcgaaucgcugauuggucaug	caaucagcgucuucgaacuccgc	caaucagcgucuucgaacuccgcccacuccuucugauuggcugaaaaggggccggagcgaaucgcugauuggucaug	III:13099615..13099692:-
+III_19283	0.9	0 +/- 0%	-	721	709	12	0	-	-	-	-	-	caauuugccgauuugccggaaau	uuuuggcaaauucggcaacucggc	uuuuggcaaauucggcaacucggcaauuugccgguuugccgauuugucggaauuuuucaauuccggcaguuugccaauuugccgauuugccggaaau	III:11384236..11384333:-
+IV_31333	0.9	0 +/- 0%	-	16	16	0	0	-	-	-	-	-	uucggagugucguuugaaaacc	uuuucaaacgacgcuccgauau	uucggagugucguuugaaaacccaaaaaauucgauuuucaaacgacgcuccgauau	IV:4176597..4176653:-
+III_16741	0.9	0 +/- 0%	-	12	12	0	0	-	-	-	-	-	agaaauacuguauuuauucaca	ugaauaaauacaguuuuuaugc	agaaauacuguauuuauucacauuuucagccaauuuaugacugaaaaugugaauaaauacaguuuuuaugc	III:1868048..1868119:-
+IV_24024	0.9	0 +/- 0%	-	94	94	0	0	-	-	-	-	-	ucccugauuuuauauuucggcu	cugaaauauaaaaucagggaaa	ucccugauuuuauauuucggcugaaaaucgcgauuuucauuucaagcugaaauauaaaaucagggaaa	IV:13315167..13315235:+
+I_3488	0.9	0 +/- 0%	-	42	42	0	0	-	-	-	-	-	uacggggauaucggagugucgua	cgacacuccgauguucccaggu	uacggggauaucggagugucguaaggggcguggccuaguacgacacuccgauguucccaggu	I:14195799..14195861:+
+II_10241	0.9	0 +/- 0%	-	709	709	0	0	-	-	-	-	-	caauuugccgauuugccggaaau	uuucggcaauucgccaauuugcc	caauuugccgauuugccggaaauuguuauuuucggcaauucgccaauuugcc	II:15219959..15220011:+
+V_42444	0.9	0 +/- 0%	-	16	16	0	0	-	-	-	-	-	uacauuauuuuccgucuauugc	aauaaacaggaaauaauguaaaa	uacauuauuuuccgucuauugcaggcuuuuuuccaguugaaacccggcaauaaacaggaaauaauguaaaa	V:1865971..1866042:+
+III_16363	0.9	0 +/- 0%	-	51	51	0	0	-	-	-	-	-	aaauuuugagaugugucgcaca	ugcggcaaauuucccgaauuugc	ugcggcaaauuucccgaauuugccguuugucaagcucggcaaauuuugagaugugucgcaca	III:13046096..13046158:+
+I_152	0.8	0 +/- 0%	-	14	14	0	0	-	-	-	-	-	aauggcagaucaaaauuucgga	cgaaauuuugaucugccauuaa	aauggcagaucaaaauuucggaaaaaggugaauuuuagcgaaaauucgccgugguuuuucgaaauuuugaucugccauuaa	I:515490..515571:+
+III_14129	0.8	0 +/- 0%	-	1675	1675	0	0	-	-	-	-	-	uuuaaaaucgugcggcaguugc	aacugccgcacgguuuuaaaau	aacugccgcacgguuuuaaaaucauuuuuucuuguuaauccucgcucuauugauaaaaauacaauuuuaaaaucgugcggcaguugc	III:4922167..4922254:+
+I_4360	0.8	0 +/- 0%	-	80	62	0	18	-	-	-	-	-	cccgcaauucugguagaucaaa	uuugaucuccgagaauugcgg	uuugaucuccgagaauugcgggaaauuuaaguuuuaugugacuauucccgcaauucugguagaucaaa	I:2835547..2835615:-
+X_48125	0.7	0 +/- 0%	-	23	23	0	0	-	-	-	-	-	cuaaacucggaaauugucugcc	ccgacaauuucugaguuuggcc	ccgacaauuucugaguuuggccacuuauuguacuuucaaucauauaauuucagaaggaguggcuaaacucggaaauugucugcc	X:14261929..14262013:+
+I_2383	0.7	0 +/- 0%	-	1721	1675	3	43	-	-	-	-	-	uuuaaaaucgugcggcaguugc	gccgcacaguuuuaaaacug	gccgcacaguuuuaaaacuguauuucucucaauagagcgagaaauaacaagaaaaaauaauuuuaaaaucgugcggcaguugc	I:9080770..9080853:+
+V_45213	0.7	0 +/- 0%	-	52	52	0	0	-	-	-	-	-	ugccuucuccucucucucucagu	ugagugagagagagagcgau	ugccuucuccucucucucucagucuauuuuccccuguuagccccccucgagagaaggagugagugagagagagagcgau	V:4499251..4499330:-
+II_7790	0.7	0 +/- 0%	-	54	54	0	0	-	-	-	-	-	uuaaaaaugaccugaaaauugcc	caauuuucaagccauuuuugagc	uuaaaaaugaccugaaaauugccaaaagcucgauaauucggcaauuggcaauuuucaagccauuuuugagc	II:4243715..4243786:+
+III_19398	0.7	0 +/- 0%	-	54	54	0	0	-	-	-	-	-	ggcaaccggcaacugucggcug	accggcaacugucggcugcuga	accggcaacugucggcugcugagauuacugcaauucuucggcaaccggcaacugucggcug	III:12305803..12305864:-
+I_4122	0.7	0 +/- 0%	-	35	35	0	0	-	-	-	-	-	gauccggagcugaagcuucuga	cugagcugaagcaucuggagcuc	cugagcugaagcaucuggagcucccgaagaauccggaacauccugaacuucuggagcuucuugauccggagcugaagcuucuga	I:1759032..1759116:-
+II_13004	0.7	0 +/- 0%	-	31	19	0	12	-	-	-	-	-	ucaauuugccggauugccggaaa	caauuugcgaauuugccggaaau	caauuugcgaauuugccggaaauguuuaauuccgucaauuugccggauugccggaaa	II:13738995..13739052:-
+III_15306	0.7	0 +/- 0%	-	57	57	0	0	-	-	-	-	-	ugugccuuucaggaguacugua	caguaccccuuaaaggcgcaua	ugugccuuucaggaguacuguaauuuucugcaacgaaagucugaaauuacaguaccccuuaaaggcgcaua	III:8694051..8694122:+
+III_16749	0.7	0 +/- 0%	-	13	13	0	0	-	-	-	-	-	gagcagcagcggcggcggc	ugcugcugcuguugcugag	gagcagcagcggcggcggcaaccugcugcugcuguugcugag	III:1936451..1936493:-
+V_44506	0.7	0 +/- 0%	-	158	158	0	0	-	-	-	-	-	uuugcguaguuuguagucuagc	caggcuacaaacuacacaaaaa	uuugcguaguuuguagucuagcagaccgaaaauaggaugcguuggucugccaggcuacaaacuacacaaaaa	V:18037200..18037272:+
+IV_20408	0.6	0 +/- 0%	-	16	16	0	0	-	-	-	-	-	ucccggcucuccuggacc	uccaggcauuccuggcuu	ucccggcucuccuggaccuccuggcguccccauugguccaggcauuccuggcuu	IV:4656018..4656072:+
+I_1090	0.6	0 +/- 0%	-	22	22	0	0	-	-	-	-	-	aguuggaacaauugaaaaagu	uuuuucaauuguuccaacuaa	aguuggaacaauugaaaaagugcucgagauuggaaaguuugaggacuuuuucaauuguuccaacuaa	I:4847604..4847671:+
+III_16743	0.6	0 +/- 0%	-	12	12	0	0	-	-	-	-	-	agaaauacuguauuuauucaca	ugaauaaauacaguuuuua	agaaauacuguauuuauucacauuuucagcucaauuuaagacugaaaaugugaauaaauacaguuuuua	III:1873492..1873561:-
+II_13034	0.6	0 +/- 0%	-	17	17	0	0	-	-	-	-	-	gugaccccaauuuucggagauc	ccucugaaaauugcgggaaacau	ccucugaaaauugcgggaaacauagacuucuauguacuuccagaaauguucugugugaccccaauuuucggagauc	II:13833810..13833886:-
+III_18538	0.6	0 +/- 0%	-	18	18	0	0	-	-	-	-	-	uuacaguacuccugaaaggcaca	cgccuuuaagggguacuguaauu	cgccuuuaagggguacuguaauuucagacuuucguugcagaaaauuacaguacuccugaaaggcaca	III:8694051..8694118:-
+II_9721	0.6	0 +/- 0%	-	16	13	0	3	-	-	-	-	-	gacagaauuuccuccucggaua	auuugggcgagcagcuucuucuuuu	auuugggcgagcagcuucuucuuuuucagcacuuuuucccgcucuuuugacagaauuuccuccucggaua	II:12276459..12276529:+
+II_9981	0.6	0 +/- 0%	-	88	88	0	0	-	-	-	-	-	uuuuaccccaacaaucggcaau	agcugauugguggugcaaaaauc	agcugauugguggugcaaaaaucgauuuuuaucgauuuuaccccaacaaucggcaau	II:13418554..13418611:+
+V_44507	0.6	0 +/- 0%	-	158	158	0	0	-	-	-	-	-	uuugcguaguuuguagucuagc	gagacuacaaacuacacaaauc	gagacuacaaacuacacaaaucacuagcagaccauacgguuuuuuuuuuugcguaguuuguagucuagc	V:18041513..18041582:+
+IV_41909	0.6	0 +/- 0%	-	12	12	0	0	-	-	-	-	-	uuuggaauuuucuagaaccuuc	accuucuggaaaauucgagaaa	uuuggaauuuucuagaaccuucuggaaaauucgagaaaguucuggaauuuucuagaaccuucuggaaaauucgagaaa	IV:17076178..17076256:-
+III_16662	0.6	0 +/- 0%	-	36	36	0	0	-	-	-	-	-	caaaacuuugagcggccguaac	gauggccucucaaaguuuugga	gauggccucucaaaguuuuggaaaaaauagaccauuuuuuacaaaacuuugagcggccguaac	III:1100583..1100646:-
+V_45290	0.6	0 +/- 0%	-	51	43	0	8	-	-	-	-	-	ucuugaauccguggugucccaaa	acaccacggauucaaaaucu	acaccacggauucaaaaucuggugggaucccguaucuacgauuuccggaucuugaauccguggugucccaaa	V:4820349..4820421:-
+II_10305	0.6	0 +/- 0%	-	18	18	0	0	-	-	-	-	-	uagugcaaacugucguaagaucu	auuuuacgacaaauugcacaaa	uagugcaaacugucguaagaucuggugucaaguaagacagcgccagauuuuacgacaaauugcacaaa	II:562936..563004:-
+I_7130	0.6	0 +/- 0%	-	42	42	0	0	-	-	-	-	-	uuucguauaaaugagcccucc	agggcacauuuauaaaacaug	agggcacauuuauaaaacaugguuucaccacgcgggaccauuucguauaaaugagcccucc	I:14459955..14460016:-
+V_44904	0.5	0 +/- 0%	-	244	244	0	0	-	-	-	-	-	uuuugaaaagaaccgugcugua	cagcuucgguuccguucaaaacc	cagcuucgguuccguucaaaaccagcagaugguucugguuuugaaaagaaccgugcugua	V:1576193..1576253:-
+III_15817	0.5	0 +/- 0%	-	1675	1675	0	0	-	-	-	-	-	uuuaaaaucgugcggcaguugc	aaccuccgcacgguuuuaaaau	aaccuccgcacgguuuuaaaauuauuuuuucuuguuauuucucgcucuauugagaaaaauacaguuuuaaaaucgugcggcaguugc	III:10320407..10320494:+
+IV_35256	0.5	0 +/- 0%	-	5487	5487	0	0	-	-	-	-	-	uuucugaauaacuucacgcgcc	cgcaugaauuuauucggauggg	cgcaugaauuuauucggaugggucucgcaaagagaaaaacuuucugaauaacuucacgcgcc	IV:11696655..11696717:-
+I_218	0.5	0 +/- 0%	-	34	34	0	0	-	-	-	-	-	gaacgauacgagggccacgaac	ucguugcgaagggcccgaucguucga	gaacgauacgagggccacgaacagugaaaauugggggaaauuagugagcugcugucguugcgaagggcccgaucguucga	I:1078144..1078224:+
+I_1653	0.5	0 +/- 0%	-	108	108	0	0	-	-	-	-	-	cagaaauuugaauuccggcaau	ugccggaauuuuucaauuccggc	ugccggaauuuuucaauuccggcaauuuuccgauuugccagaaauuugaauuccggcaau	I:6382825..6382885:+
+I_1060	0.5	0 +/- 0%	-	26	26	0	0	-	-	-	-	-	gaaucggaagugcucugcccu	gacagagcaucuucuccgaucau	gaaucggaagugcucugcccugagcaguaggacagagcaucuucuccgaucau	I:4761230..4761283:+
+V_42521	0.5	0 +/- 0%	-	70	70	0	0	-	-	-	-	-	gaugacgucaucauugagcucgagc	ucuuguucuugucgacgccauugg	ucuuguucuugucgacgccauugguuggcgauguggccgaugacgucaucauugagcucgagc	V:2664912..2664975:+
+III_19290	0.5	0 +/- 0%	-	29	29	0	0	-	-	-	-	-	aacccucuagaugucggacgcu	cacccgacaucuaccggguucc	cacccgacaucuaccggguuccgccacagaagcagcuggcgcuuggaacccucuagaugucggacgcu	III:11465444..11465512:-
+III_13449	0.5	0 +/- 0%	-	45	45	0	0	-	-	-	-	-	uugucaguugucaacuuuuuga	aaaaaguugaaaacuagagaaau	aaaaaguugaaaacuagagaaauaugcagaauuucaagagcuacaauuugucaguugucaacuuuuuga	III:1178388..1178457:+
+I_1062	0.5	0 +/- 0%	-	26	26	0	0	-	-	-	-	-	gaaucggaagugcucugcccu	gacagagcaucuucuccgaucau	gaaucggaagugcucugcccugagcaguaggacagagcaucuucuccgaucau	I:4762282..4762335:+
+X_48606	0.5	0 +/- 0%	-	24	24	0	0	-	-	-	-	-	aaggacgaugcccuaaaacggc	cguuuuagcgcauaguuauuuu	cguuuuagcgcauaguuauuuuccuuugcauugucaugugcggaaaugaaggacgaugcccuaaaacggc	X:3822047..3822117:-
+I_6748	0.5	0 +/- 0%	-	58	58	0	0	-	-	-	-	-	ugcacuuauagacugaaaaugu	auuuucagucuaaauuugcaca	auuuucagucuaaauuugcacaaauucaauaauuuuugugcacuuauagacugaaaaugu	I:11761068..11761128:-
+V_42566	0.4	0 +/- 0%	-	26	26	0	0	-	-	-	-	-	uucggcaacucggcaauuugcc	aaauuugccggcuugccggaaa	uucggcaacucggcaauuugccgguuugcagauuugccggaaauuugccggcuugccggaaa	V:3760836..3760898:+
+II_13103	0.4	0 +/- 0%	-	113	62	0	51	-	-	-	-	-	gaggccaucugccucgucgacu	gaaugaugcaucggagcc	gaggccaucugccucgucgacucucccgaaugaugcaucggagcc	II:14159513..14159558:-
+II_12689	0.4	0 +/- 0%	-	34	34	0	0	-	-	-	-	-	uaagccuaauucugagccuaagcc	ccuaagccucagccuaaggcuaagc	uaagccuaauucugagccuaagccuaagccuaagccuaggccuaagccucagccuaaggcuaagc	II:11924163..11924228:-
+II_13237	0.4	0 +/- 0%	-	22	22	0	0	-	-	-	-	-	cacagcgaucgacacuacacgg	gugaagcgucgggcgcuguaac	cacagcgaucgacacuacacggguaccaacaccgugaagcgucgggcgcuguaac	II:14789288..14789343:-
+II_10470	0.4	0 +/- 0%	-	15	12	3	0	-	-	-	-	-	augucguugugcugcuuccaga	cgggaugcgcggugcauua	cgggaugcgcggugcauuacgcguuggagcagugccggaagcuggaucugccggaggaugcgaaugucguugugcugcuuccaga	II:2220696..2220781:-
+I_137	0.4	0 +/- 0%	-	30	30	0	0	-	-	-	-	-	ugggcggagcaaauugcugauu	ucaacguuuucaaacuccgccuacu	ucaacguuuucaaacuccgccuacucugucugauugguaggaaaagugggcggagcaaauugcugauu	I:436189..436257:+
+III_15719	0.4	0 +/- 0%	-	27	27	0	0	-	-	-	-	-	uuuugagcgccgcgccgucgaga	uuguacggcccgugcucaucaagu	uuguacggcccgugcucaucaagugggucucucuccugccacuuuugagcgccgcgccgucgaga	III:9968572..9968637:+
+II_8675	0.4	0 +/- 0%	-	42	42	0	0	-	-	-	-	-	uuuucccuccucucgcugucgcc	cggcaguuggaaagaaaaaagg	cggcaguuggaaagaaaaaaggucucuccuuuucccuccucucgcugucgcc	II:8128956..8129008:+
+X_48314	0.4	0 +/- 0%	-	205	205	0	0	-	-	-	-	-	cguuuaaagccgauagguaacc	auaucuaugggcuuuaaaugua	cguuuaaagccgauagguaaccaauuuugaugacuuuugaauaucuaugggcuuuaaaugua	X:17295837..17295899:+
+II_9959	0.4	0 +/- 0%	-	108	87	0	21	-	-	-	-	-	caaauuugcagaucgccgaaau	uccggcaaaucggcaaauugc	uccggcaaaucggcaaauugccagaauuaaaaacuucuggcaaauuugcagaucgccgaaau	II:13171491..13171553:+
+I_6758	0.4	0 +/- 0%	-	12	12	0	0	-	-	-	-	-	cacauuuuucaaguugacaacu	uggucaacuagaaaaguguuua	uggucaacuagaaaaguguuuaaaaauuaauuuuacacauuuuucaaguugacaacu	I:11878009..11878066:-
+I_3001	0.4	0 +/- 0%	-	19	19	0	0	-	-	-	-	-	cuaacgaagcuuuguaguuugu	aaacuacaacuuuuauuagcc	aaacuacaacuuuuauuagccucaaccauacaaaaguugggcuaacgaagcuuuguaguuugu	I:11207232..11207295:+
+II_12846	0.4	0 +/- 0%	-	1399	1399	0	0	-	-	-	-	-	uuucggcccgcgaaaugucggc	cgacgccucgauggaucgcaaaag	cgacgccucgauggaucgcaaaagacucgcucaucuugauauuuuucggcccgcgaaaugucggc	II:12948434..12948499:-
+III_16271	0.4	0 +/- 0%	-	162	162	0	0	-	-	-	-	-	caauuugccuauuugucggaaau	uuuugauuuuuggggauuugcc	uuuugauuuuuggggauuugccggaaauuuugauuuuuggcaauuugccuauuugucggaaau	III:12722442..12722505:+
+I_4098	0.4	0 +/- 0%	-	22	22	0	0	-	-	-	-	-	cgaugaucgaugaagaacg	ggauccguccaugucgucguu	ggauccguccaugucgucguuuuugugcgaugaucgaugaagaacg	I:1550465..1550511:-
+V_45672	0.4	0 +/- 0%	-	14	14	0	0	-	-	-	-	-	ugacaggagguaguaggccaag	uggcguacuucuaacuguccauc	uggcguacuucuaacuguccaucuaaaacacaauuaugaugacaggagguaguaggccaag	V:7661078..7661139:-
+III_19210	0.3	0 +/- 0%	-	31	31	0	0	-	-	-	-	-	gaguggccggagaucaugagcu	cucugggcuccagcugcuccg	cucugggcuccagcugcuccgagcucuccugaaucgucugcugacgggcuucauggggugaguggccggagaucaugagcu	III:11064250..11064331:-
+IV_26357	0.3	0 +/- 0%	-	22	22	0	0	-	-	-	-	-	ucugcaaaauucaaggaucgau	ugauccuugaauuaugcaaaaa	ugauccuugaauuaugcaaaaacuuuugccacacguugccgcauuucugcaaaauucaaggaucgau	IV:14873435..14873502:+
+X_48151	0.3	0 +/- 0%	-	95	95	0	0	-	-	-	-	-	ggggacuguggccgauaaucc	auaaggccacguccgggc	auaaggccacguccgggccggggacuguggccgauaaucc	X:14833001..14833041:+
+III_16582	0.3	0 +/- 0%	-	96	96	0	0	-	-	-	-	-	gaacucuugccuaucuuuggccc	gcaaaagucaggcaagacuuugu	gcaaaagucaggcaagacuuugucaaaauuggauucaggccaaaguuugacccgaauuucaccgaacucuugccuaucuuuggccc	III:350949..351035:-
+V_47130	0.3	0 +/- 0%	-	116	116	0	0	-	-	-	-	-	ucugccagacuacaaacuaca	uaguuuguaguagccuggcagacc	uaguuuguaguagccuggcagaccaaugucaagcauuuugggucugccagacuacaaacuaca	V:18037362..18037425:-
+V_47193	0.3	0 +/- 0%	-	40	40	0	0	-	-	-	-	-	guaucgaucgccacuucuggac	cucuaaaagugcguuuucgacgcgg	guaucgaucgccacuucuggacgcucaaccgacauuuguugauuguaacgucucuaaaagugcguuuucgacgcgg	V:18437545..18437621:-
+III_16957	0.3	0 +/- 0%	-	68	35	0	33	-	-	-	-	-	gucugcggauggacuuggcuc	guuguagguucucuucuuggcaucu	gucugcggauggacuuggcuccccaguuguagguucucuucuuggcaucu	III:3528760..3528810:-
+IV_23984	0.3	0 +/- 0%	-	26	26	0	0	-	-	-	-	-	gguacguuuuauguugauuggc	cuaucaacuuaaaauguacuua	gguacguuuuauguugauuggcaugcaaaaauugugucuaucaacuuaaaauguacuua	IV:12806552..12806611:+
+II_9739	0.3	0 +/- 0%	-	49	49	0	0	-	-	-	-	-	acacaaagagccccggaggac	gcgaagggguuucuuuguggcg	gcgaagggguuucuuuguggcguuugguaggaacacacaaagagccccggaggac	II:12519095..12519150:+
+I_3599	0.2	0 +/- 0%	-	34	28	6	0	-	-	-	-	-	guuguugaagcagcuggagcc	cagcagcaggcgcaccgaagaggc	cagcagcaggcgcaccgaagaggccuccaggcuuuggagcagcagcagccguugagccaaaaagagguguuguugaagcagcuggagcc	I:14706405..14706494:+
+I_2745	0.2	0 +/- 0%	-	244	241	3	0	-	-	-	-	-	guauggacgcgcgaauuugacu	ccaauuucucguuccuuggca	ccaauuucucguuccuuggcacugugaccacgucgaaauaguauggacgcgcgaauuugacu	I:10418856..10418918:+
+IV_30984	0.2	0 +/- 0%	-	38	38	0	0	-	-	-	-	-	ccgacaacuuuguuagcucaua	ugggcuaacacaguuagucgaugca	ugggcuaacacaguuagucgaugcaccaugucuugccgacaacuuuguuagcucaua	IV:2278655..2278712:-
+X_48785	0.2	0 +/- 0%	-	45	45	0	0	-	-	-	-	-	uaaauaucagugcugugcggc	cgcacagcacugcuaaauauugaaa	uaaauaucagugcugugcggcuugcgccgagagccgacuuuuuucaagggccgcacagcacugcuaaauauugaaa	X:8700183..8700259:-
+V_42664	0.2	0 +/- 0%	-	15	12	3	0	-	-	-	-	-	uuuggaauuuucuagaaccuuc	accuucuggaaaauucgagaaa	uuuggaauuuucuagaaccuucuggaaaauucgagaaaauucuggaauguuucagaaccuucuggaaaauucgagaaa	V:4767672..4767750:+
+IV_20417	0.2	0 +/- 0%	-	166	166	0	0	-	-	-	-	-	uagccggagcgaaucgcugauu	ucagagauuugcgccgcccacu	ucagagauuugcgccgcccacuuuuccacuaaucagaggguugaaguagccggagcgaaucgcugauu	IV:4706055..4706123:+
+IV_31186	0.2	0 +/- 0%	-	244	241	3	0	-	-	-	-	-	guauggacgcgcgaauuugacu	ccaauuucucguuccuuggca	ccaauuucucguuccuuggcacugugaccacgucgaaauaguauggacgcgcgaauuugacu	IV:3322712..3322774:-
+I_6700	0.2	0 +/- 0%	-	22	22	0	0	-	-	-	-	-	ugccgccuacuacuacugga	cagucuuggugaccggcguc	cagucuuggugaccggcgucgucgucggcggagccgcucuucuggcgauugccgccuacuacuacugga	I:11513722..11513791:-
+III_19081	0.2	0 +/- 0%	-	57	45	12	0	-	-	-	-	-	caauuugucaauuugccggaaa	uccagcaauuugccaguuugcc	caauuugucaauuugccggaaaauucaauuccggcaauucgccgauuugccggaaauuuuaaauuccagcaauuugccaguuugcc	III:10489917..10490003:-
+V_45327	0.1	0 +/- 0%	-	40	40	0	0	-	-	-	-	-	guaucgaucgccacuucuggac	cuccuugagugcguuuucgacgcgg	guaucgaucgccacuucuggacgcucaaccgacauuuaucgauuuuaacgucuccuugagugcguuuucgacgcgg	V:5181070..5181146:-
+II_13247	0.1	0 +/- 0%	-	56	53	0	3	-	-	-	-	-	gucgaguugggcuucuguguc	ggcgucgaguugcucgcgauuc	gucgaguugggcuucuguguccacgccguuucgaagagagauucucucgucacggguggcgucgaguugcucgcgauuc	II:14797674..14797753:-
+IV_19762	0.1	0 +/- 0%	-	64	64	0	0	-	-	-	-	-	ugaggcccgcauuuccggacc	ucugguuuggguagguuuccac	ugaggcccgcauuuccggacccacaugucugguuuggguagguuuccac	IV:338389..338438:+
+X_48077	0.1	0 +/- 0%	-	52	52	0	0	-	-	-	-	-	guucucgucgucucauauccua	ggauuaugaagauuacggguacaa	ggauuaugaagauuacggguacaagucuuuuaaaaaagcaauguucucgucgucucauauccua	X:13145013..13145077:+
+II_11843	0.1	0 +/- 0%	-	16	16	0	0	-	-	-	-	-	guuccgccggauggaucuccc	gagcgacugguggagcau	guuccgccggauggaucucccgaagcagcacuugccgaaggugucgaagaagugggagcgacugguggagcau	II:8458611..8458684:-
+V_45292	0.1	0 +/- 0%	-	43	43	0	0	-	-	-	-	-	uaaaacgagccgaaauugaaga	uccaauuuuggcuauuuuuccg	uccaauuuuggcuauuuuuccgugucgcugcacguaaaacgagccgaaauugaaga	V:4822263..4822319:-
+I_5752	0.1	0 +/- 0%	-	276	276	0	0	-	-	-	-	-	gagacugcaguacuacuaauaga	uauuagugcugcaugcagcacua	uauuagugcugcaugcagcacuaauuucgaagcccuguuuaaaugcagcacuauuagagacugcaguacuacuaauaga	I:7761176..7761255:-
+V_46614	0.1	0 +/- 0%	-	24	24	0	0	-	-	-	-	-	gaaccgccggucgugcgacuag	agagcguggccguggcggucgca	agagcguggccguggcggucgcaaaaaccaggaaccgccggucgugcgacuag	V:14351149..14351202:-
+III_15345	0	0 +/- 0%	-	14199	14196	0	3	-	-	-	-	-	guucagaaucaugucgaaagcug	cggcuuucaacuaaugaucucaa	cggcuuucaacuaaugaucucaacaacaugggcuugcggauuguucagaaucaugucgaaagcug	III:8865285..8865350:+
+I_3862	0	0 +/- 0%	-	202	202	0	0	-	-	-	-	-	guucuugaucguuguauggucc	acaucaugaccauugggaacca	acaucaugaccauugggaaccaaguucuugaucguuguauggucc	I:187559..187604:-
+II_9602	0	0 +/- 0%	-	28	28	0	0	-	-	-	-	-	gaauugaucguuccaaccga	gguuggaauccaugu	gaauugaucguuccaaccgacagaguucaccuucucgcgacucguuucgguuggaauccaugu	II:11909954..11910017:+
+IV_20116	0	0 +/- 0%	-	25	22	0	3	-	-	-	-	-	gagcuucugucgucguucggc	guucugacgaugaagacugcuu	gagcuucugucgucguucggcggaucgcguucugacgaugaagacugcuu	IV:3039882..3039932:+
+IV_33740	0	0 +/- 0%	-	2012	2003	0	9	-	-	-	-	-	agagaucaggcaauagguucaaa	aaccuguugguugaucuccua	aaccuguugguugaucuccuaccaaauaauggauaagagaucaggcaauagguucaaa	IV:6660642..6660700:-
+III_16707	0	0 +/- 0%	-	19	19	0	0	-	-	-	-	-	gugagaauaucgucgagaaaa	uuguugugggcuccacuu	gugagaauaucgucgagaaaaucgguggcuccgcgagcuucugcuggagcuucugauguuguugugggcuccacuu	III:1503780..1503856:-
+IV_31361	0	0 +/- 0%	-	35	35	0	0	-	-	-	-	-	ggagacgauggagaguagacu	aaugcucccaguggaucccc	ggagacgauggagaguagacuccaggugacauuccuccauacgacggaguacgcggagacaaugcucccaguggaucccc	IV:4255253..4255333:-
+I_719	0	0 +/- 0%	-	32	32	0	0	-	-	-	-	-	gaagugccucgucgagaauga	ucuccggcggguuugucuc	ucuccggcggguuugucuccuucauauggcgaagugccucgucgagaauga	I:3510635..3510686:+
+I_6264	0	0 +/- 0%	-	202	202	0	0	-	-	-	-	-	guucuugaucguuguauggucc	acaucaugaccauugggaacca	acaucaugaccauugggaaccaaguucuugaucguuguauggucc	I:9681891..9681936:-
+I_3448	0	0 +/- 0%	-	101	101	0	0	-	-	-	-	-	gaugacguggcaccgccggac	augauagugugacgucaugaa	gaugacguggcaccgccggaccccgaugacguagaauuuguggaugauagugugacgucaugaa	I:13949573..13949637:+
+II_8386	0	0 +/- 0%	-	37	37	0	0	-	-	-	-	-	gcaucccggaucaauggau	ccauauggucuuccuggugcgg	gcaucccggaucaauggauguguuucgauuaacaaauccauauggucuuccuggugcgg	II:6518512..6518571:+
+IV_26208	0	0 +/- 0%	-	47	44	3	0	-	-	-	-	-	guccuuuaguuguuguugaacggc	ugaaaaacggugaaggaugg	guccuuuaguuguuguugaacggcuuccgaagcgugcauucaacgcugaaaagcugaaaaacggugaaggaugg	IV:14797411..14797485:+
+III_19172	0	0 +/- 0%	-	42	36	0	6	-	-	-	-	-	gaagugguuccagcgguucuga	gaucuggaauauggcgugagaa	gaucuggaauauggcgugagaacgcgacgaguucgcguuugccgaagugguuccagcgguucuga	III:10809958..10810023:-
+III_17825	0	0 +/- 0%	-	107	107	0	0	-	-	-	-	-	gagcugugugcauggaggaca	uucaccauggcacuuaugag	gagcugugugcauggaggacaguuuuguucaccauggcacuuaugag	III:6377503..6377550:-
+X_47553	0	0 +/- 0%	-	280	280	0	0	-	-	-	-	-	gaaaggcaagcgugaggugaac	acaccaaaccuuugacuuuucgc	acaccaaaccuuugacuuuucgcuauaguguacaaaugaggcgaaaggcaagcgugaggugaac	X:1536924..1536988:+
+III_17070	0	0 +/- 0%	-	139	139	0	0	-	-	-	-	-	cacccauuuucuuacaacucucu	agaguguguaagagaaacagggag	agaguguguaagagaaacagggagaaaaggaagaacacacuuuuuucacccauuuucuuacaacucucu	III:3887637..3887706:-
+IV_20173	0	0 +/- 0%	-	202	202	0	0	-	-	-	-	-	guucuugaucguuguauggucc	acaucaugaccauugggaacca	acaucaugaccauugggaaccaaguucuugaucguuguauggucc	IV:3499457..3499502:+
+V_44735	0	0 +/- 0%	-	202	202	0	0	-	-	-	-	-	guucuugaucguuguauggucc	acaucaugaccauugggaacca	acaucaugaccauugggaaccaaguucuugaucguuguauggucc	V:20510984..20511029:+
+V_45982	0	0 +/- 0%	-	78	78	0	0	-	-	-	-	-	ugauucgcaggucugcgcgacu	acacgcagaccucgcguucuucccu	acacgcagaccucgcguucuucccuccuuuauauacagcggacaaaucggugauucgcaggucugcgcgacu	V:9731201..9731273:-
+I_5091	0	0 +/- 0%	-	55	55	0	0	-	-	-	-	-	guagacgaugcagcaccugga	gugguagcugaaucggcag	guagacgaugcagcaccuggagccaagaaacuugugguagcugaaucggcag	I:5695291..5695343:-
+III_15347	0	0 +/- 0%	-	273	273	0	0	-	-	-	-	-	guugauaucgucguugaaagccgc	ggcauucaaacaacauaucaacac	ggcauucaaacaacauaucaacacgcaaaagugugaguugucgguugauaucgucguugaaagccgc	III:8874003..8874070:+
+X_48672	0	0 +/- 0%	-	29	29	0	0	-	-	-	-	-	uaaacaacgaggcagcgaggcug	gccucgccuccucauucuuuucc	gccucgccuccucauucuuuuccgagagauaaacccgguaaacaacgaggcagcgaggcug	X:5812142..5812203:-
+I_5792	0	0 +/- 0%	-	202	202	0	0	-	-	-	-	-	guucuugaucguuguauggucc	acaucaugaccauugggaacca	acaucaugaccauugggaaccaaguucuugaucguuguauggucc	I:7845173..7845218:-
+III_14456	0	0 +/- 0%	-	33	33	0	0	-	-	-	-	-	gaacaaguccguuggccuggca	cuagcacauuggcguucuc	gaacaaguccguuggccuggcagauagaagcguaucuggcuagcacauuggcguucuc	III:5875363..5875421:+
+
+
+
+mature miRBase miRNAs detected by miRDeep2
+tag id	miRDeep2 score	estimated probability that the miRNA is a true positive	rfam alert	total read count	mature read count	loop read count	star read count	significant randfold p-value	mature miRBase miRNA	example miRBase miRNA with the same seed	UCSC browser	NCBI blastn	consensus mature sequence	consensus star sequence	consensus precursor sequence	precursor coordinate
+X_48570	7830072.9	71 +/- 6%	-	15358352	15352810	0	5542	-	cel-miR-82-5p	-	-	-	ugagaucaucgugaaagccagu	cgguuuucucugugaucuacaga	cgguuuucucugugaucuacagaaugacagcuaaucgucugagaucaucgugaaagccagu	X:2435272..2435333:-
+II_7588	6380314.4	71 +/- 6%	-	12514712	12509237	491	4984	-	cel-miR-72-5p	-	-	-	aggcaagauguuggcauagcuga	agcuucgccacauucugccacg	aggcaagauguuggcauagcugaaugaucgcuauaacaacuaucagcuucgccacauucugccacg	II:2452853..2452919:+
+IV_21332	5759103.3	71 +/- 6%	-	11296233	11270843	177	25213	-	cel-miR-228-5p	-	-	-	aauggcacugcaugaauucacgg	gcggaucauacgguaccauagc	aauggcacugcaugaauucacggcuaugcauaacgacagaccgcggaucauacgguaccauagc	IV:5562039..5562103:+
+II_11647	5410612.9	71 +/- 6%	-	10612686	10611819	0	867	-	cel-miR-57-5p	-	-	-	uacccuguagaucgagcugugugu	acgagcuagacuacaaggugca	uacccuguagaucgagcuguguguuugaaacaaucauacacgagcuagacuacaaggugca	II:7850521..7850582:-
+II_12658	4723052.1	71 +/- 6%	-	9264063	9241475	226	22362	-	cel-miR-45-5p	-	-	-	ugacuagagacacauucagcu	cuggaugugcucguuagucaua	cuggaugugcucguuagucauaauauccuccacaaagcaaggacuaugacuagagacacauucagcu	II:11880958..11881025:-
+II_9585	4719175.7	71 +/- 6%	-	9256460	9241475	101	14884	-	cel-miR-44-5p	-	-	-	ugacuagagacacauucagcu	cuggaugugcucguuggucaua	cuggaugugcucguuggucauagacgucaacacgaacuguucauaugacuagagacacauucagcu	II:11890037..11890103:+
+III_18580	4553983	71 +/- 6%	-	8932444	8577355	1177	353912	-	cel-miR-80-5p	-	-	-	ugagaucauuaguugaaagccga	agcuuucgacaugauucugaac	agcuuucgacaugauucugaacaauccgcaagcccauguuguugagaucauuaguugaaagccga	III:8865284..8865349:-
+III_18586	4463180.8	71 +/- 6%	-	8754337	8749635	163	4539	-	cel-miR-90-5p	-	-	-	ugauauguuguuugaaugccccu	cggcuuucaacgacgauaucaac	cggcuuucaacgacgauaucaaccgacaacucacacuuuugcguguugauauguuguuugaaugccccu	III:8874000..8874069:-
+X_47880	3806649.6	71 +/- 6%	-	7466580	7451706	0	14874	-	cel-miR-237-5p	-	-	-	ucccugagaauucucgaacagcu	cugucgaguuuugucaaggacc	ucccugagaauucucgaacagcuucaaaguguucaagcugucgaguuuugucaaggacc	X:8154098..8154157:+
+IV_20139	3773171.2	71 +/- 6%	-	7400914	7347325	4677	48912	-	cel-miR-58a-5p	-	-	-	ugagaucguucaguacggcaa	ugcccuacucuucgcaucucauc	ugcccuacucuucgcaucucaucacuucguccaauaccauagggaugagaucguucaguacggcaa	IV:3233268..3233334:+
+V_45602	1966771	71 +/- 6%	-	3857739	3851829	0	5910	-	cel-miR-70-5p	-	-	-	uaauacgucguugguguuuccau	cgaaauacuaucgacgaauaaca	cgaaauacuaucgacgaauaacacuuaugaagaaauguaauacgucguugguguuuccau	V:6665551..6665611:-
+V_46619	1961120.5	71 +/- 6%	-	3846655	3802083	4	44568	-	cel-miR-48-5p	-	-	-	ugagguaggcucaguagaugcga	acauccaccagccuagcucgca	ugagguaggcucaguagaugcgaauugaacgguaucucacauccaccagccuagcucgca	V:14364434..14364494:-
+X_47661	1856888.3	71 +/- 6%	-	3642207	3634173	0	8034	-	cel-miR-81-5p	-	-	-	ugagaucaucgugaaagcuagu	cgguuuucaccgugaucugaga	cgguuuucaccgugaucugagagcaauccaaaaaugcuuuucugagaucaucgugaaagcuagu	X:2431095..2431159:+
+III_13526	1641734.2	71 +/- 6%	-	3220191	3215462	0	4729	-	cel-miR-65-5p	-	-	-	uaugacacugaagcguaaccgaa	cugcuacgcgcagugccaugcu	uaugacacugaagcguaaccgaacaccauauuuugagauucugcuacgcgcagugccaugcu	III:2173018..2173080:+
+III_13524	1632023.6	71 +/- 6%	-	3201145	3187462	1073	12610	-	cel-miR-64-5p	-	-	-	uaugacacugaagcguuaccgaa	cggugcaacgaucaguggcaugcu	uaugacacugaagcguuaccgaaccguuuucccacaccuggauucggugcaacgaucaguggcaugcu	III:2172868..2172936:+
+I_5252	1301654.9	71 +/- 6%	-	2553142	2551352	5	1785	-	cel-miR-235-5p	-	-	-	uauugcacucuccccggccuga	aggccuuggcugauugcaaaauu	aggccuuggcugauugcaaaauuguucaccgugaaaauuaaauauugcacucuccccggccuga	I:6162305..6162369:-
+V_46270	1076695.2	71 +/- 6%	-	2111891	2094586	0	17305	-	cel-miR-61-5p	-	-	-	ugacuagaaccguuacucauc	uggguuacggggcuuaguccuu	uggguuacggggcuuaguccuuccuccguauggcaaugacuagaaccguuacucauc	V:11770075..11770132:-
+III_18584	1061477.5	71 +/- 6%	-	2082043	2070261	666	11116	-	cel-miR-238-5p	-	-	-	uuuguacuccgaugccauucaga	uggauguucucggacguucaaagc	uggauguucucggacguucaaagcuacauccaacaaauugguagcuuuguacuccgaugccauucaga	III:8867342..8867410:-
+IV_24770	949104.9	71 +/- 6%	-	1861633	1777379	145	84109	-	cel-miR-52-5p	-	-	-	cacccguacauauguuuccgugcu	cacguuacaaugaaaggguagc	cacccguacauauguuuccgugcuugacagcgaagcucaaucacguuacaaugaaaggguagc	IV:14034023..14034086:+
+II_11474	800862.8	71 +/- 6%	-	1570859	1569901	216	742	-	cel-miR-236-5p	-	-	-	uaauacugucagguaaugacgcu	cgucuuaccuguucaauauuuaga	cgucuuaccuguucaauauuuagacugacuaucaaagagaucuaauacugucagguaaugacgcu	II:7030194..7030259:-
+III_13528	771021.7	71 +/- 6%	-	1512326	1503823	930	7573	-	cel-miR-66-5p	-	-	-	caugacacugauuagggauguga	aaauuccuaacggugucaaac	caugacacugauuagggaugugaugaauguuaagaucccgaucaaauuccuaacggugucaaac	III:2173123..2173187:+
+III_16515	725767.5	71 +/- 6%	-	1423562	1051104	832	371626	-	cel-miR-46-5p	-	-	-	ugucauggagucgcucucuuca	aagagagccgucuauugacagu	aagagagccgucuauugacaguucaagaccacgagucguugugugcugucauggagucgcucucuuca	III:13660528..13660596:+
+X_49045	630422.5	71 +/- 6%	-	1236547	1174085	3	62459	-	cel-let-7-5p	-	-	-	ugagguaguagguuguauaguu	cuaugcaauuuucuaccuuacc	ugagguaguagguuguauaguuuggaauauuaccaccggugaacuaugcaauuuucuaccuuacc	X:14744190..14744255:-
+X_48952	579949.1	71 +/- 6%	-	1137546	916810	28	220708	-	cel-miR-54-5p	-	-	-	uacccguaaucuucauaauccgag	aggauaugagacgacgagaaca	aggauaugagacgacgagaacauugcuuuuuuaaaagacuuguacccguaaucuucauaauccgag	X:13145010..13145076:-
+I_4825	523379.9	71 +/- 6%	-	1026588	1026408	0	180	-	cel-miR-244-5p	-	-	-	ucuuugguuguacaaagugguaug	uacugcuuuucagcuaaaggaa	ucuuugguuguacaaagugguauggcucaucgaauaagcacauacugcuuuucagcuaaaggaa	I:4684335..4684399:-
+X_47653	501715.3	71 +/- 6%	-	984094	983633	0	461	-	cel-miR-73-5p	-	-	-	uggcaagauguaggcaguucagu	uggacuuccauaucgagccacagc	uggacuuccauaucgagccacagcuaucaacgaauuugcuggcaagauguaggcaguucagu	X:2368786..2368848:+
+I_6145	448743	71 +/- 6%	-	880191	731496	0	148695	-	cel-miR-71-5p	-	-	-	ugaaagacauggguagugagacg	uaucacuauucuguuuuucgcc	ugaaagacauggguagugagacgucggagccucgucguaucacuauucuguuuuucgcc	I:9379946..9380005:-
+X_48950	326913.7	71 +/- 6%	-	641228	633031	0	8197	-	cel-miR-55-5p	-	-	-	uacccguauaaguuucugcugag	cggcagaaaccuaucgguuaua	cggcagaaaccuaucgguuauacuuuuuggauaugcuauacccguauaaguuucugcugag	X:13144841..13144902:-
+II_8749	301192	71 +/- 6%	-	590776	587631	322	2823	-	cel-miR-85-5p	-	-	-	uacaaaguauuugaaaagucgugc	ccgauuuuucaauaguuugaaac	ccgauuuuucaauaguuugaaaccaguguacacauaaaugguuacaaaguauuugaaaagucgugc	II:8393574..8393640:+
+II_9741	290285	71 +/- 6%	-	569383	486741	0	82642	-	cel-miR-77-5p	-	-	-	uucaucaggccauagcugucca	gaugguugugcucugaggaaau	gaugguugugcucugaggaaauacgcacagaaugucauuucaucaggccauagcugucca	II:12519290..12519350:+
+X_48105	282999.6	71 +/- 6%	-	555092	521436	448	33208	-	cel-miR-47-5p	-	-	-	ugucauggaggcgcucucuuca	aagagagcagucuauugacagu	aagagagcagucuauugacagucgguuacucgaaaucuuuacugucauggaggcgcucucuuca	X:13921267..13921331:+
+III_19355	277715.8	71 +/- 6%	-	544728	472808	1956	69964	-	cel-miR-86-5p	-	-	-	uaagugaaugcuuugccacaguc	cugggcucagauucgcuuaggc	uaagugaaugcuuugccacagucuucgauguucugaaaugaagccugggcucagauucgcuuaggc	III:11936653..11936719:-
+X_47776	271952.9	71 +/- 6%	-	533425	448021	73	85331	-	cel-miR-230-5p	-	-	-	acuuggucggcgauuuaauauua	guauuaguugugcgaccaggaga	acuuggucggcgauuuaauauuaucagaacauaggaaauuguuaguauuaguugugcgaccaggaga	X:5803907..5803974:+
+II_8234	269158.8	71 +/- 6%	-	527944	509691	162	18091	-	cel-lin-4-5p	-	-	-	ucccugagaccucaaguguga	acaccugggcucuccggguacc	ucccugagaccucaagugugaguguacuauugaugcuucacaccugggcucuccggguacc	II:5902268..5902329:+
+X_47866	264717.9	71 +/- 6%	-	519243	462487	0	56756	-	cel-miR-240-5p	-	-	-	cgaggauuuugagacuagaaugc	auacuggcccccaaaucuucgcu	cgaggauuuugagacuagaaugcuugaauuguacuagcauacuggcccccaaaucuucgcu	X:7882642..7882703:+
+II_11316	251293.4	71 +/- 6%	-	492902	480025	23	12854	-	cel-miR-60-5p	-	-	-	uauuaugcacauuuucuaguuca	aacuggaagagugccauaaaauc	aacuggaagagugccauaaaaucaugacaaaguacgugauauuaugcacauuuucuaguuca	II:6328716..6328778:-
+V_46268	231767.6	71 +/- 6%	-	454603	434034	241	20328	-	cel-miR-250-5p	-	-	-	aaucacagucaacuguuggca	ccuucaguugccucgugauccg	ccuucaguugccucgugauccgccaaacacaauaaauggacgaaucacagucaacuguuggca	V:11769935..11769998:-
+IV_35110	219089.5	71 +/- 6%	-	429735	428144	826	765	-	cel-miR-59-5p	-	-	-	ucgaaucguuuaucaggaugaug	ucguccugaaaacgaaacgga	ucguccugaaaacgaaacggaacaaaaguucaagauauugauuucgaaucguuuaucaggaugaug	IV:11309168..11309234:-
+I_6144	186884.5	71 +/- 6%	-	366567	361571	105	4891	-	cel-miR-2-5p	-	-	-	uaucacagccagcuuugaugugc	caucaaagcggugguugaug	caucaaagcggugguugauguguugcaaauuaugacuuucauaucacagccagcuuugaugugc	I:9372782..9372846:-
+I_276	182623.4	71 +/- 6%	-	358207	356166	35	2006	-	cel-miR-50-5p	-	-	-	ugauaugucugguauucuugggu	cccgcauauuagacguaucgac	ugauaugucugguauucuuggguuugaacuuccagcguugaacccgcauauuagacguaucgac	I:1738649..1738713:+
+IV_35007	139998.9	71 +/- 6%	-	274603	271392	44	3167	-	cel-miR-51-5p	-	-	-	uacccguagcuccuauccauguu	cauggaagcagguacaggugca	uacccguagcuccuauccauguuacuggucaaaaagugaacauggaagcagguacaggugca	IV:11026034..11026096:-
+X_48771	138893.3	71 +/- 6%	-	272434	262814	0	9620	-	cel-miR-788-5p	-	-	-	uccgcuucuaacuuccauuugcag	ggaaauggauuagaaucguggaaa	uccgcuucuaacuuccauuugcagaguucaaguaaucuggaaauggauuagaaucguggaaa	X:8485300..8485362:-
+X_48948	127061	71 +/- 6%	-	249225	193556	8687	46982	-	cel-miR-56-5p	-	-	-	uacccguaauguuuccgcugag	uggcggauccauuuuggguuguacc	uggcggauccauuuuggguuguaccucauccuaaauuugacgguacccguaauguuuccgcugag	X:13144705..13144770:-
+V_46621	117972.5	71 +/- 6%	-	231399	178839	305	52255	-	cel-miR-241-5p	-	-	-	ugagguaggugcgagaaauga	auugucucucagcugcuucauc	ugagguaggugcgagaaaugacggcauccauauaguaaucguucauugucucucagcugcuucauc	V:14366202..14366268:-
+II_9449	117676.1	71 +/- 6%	-	230816	230682	0	134	-	cel-miR-35-5p	-	-	-	ucaccggguggaaacuagcagu	ugcugguuucuuccacaguggua	ugcugguuucuuccacagugguacuuuccauuagaacuaucaccggguggaaacuagcagu	II:11537628..11537689:+
+I_5254	111370	71 +/- 6%	-	218448	205408	1059	11981	-	cel-miR-1-5p	-	-	-	uggaauguaaagaaguaugua	cauacuuccuuacaugcccaua	cauacuuccuuacaugcccauacuauaucauaaauggauauggaauguaaagaaguaugua	I:6172676..6172737:-
+X_48560	106643.3	71 +/- 6%	-	209178	209175	0	3	-	cel-miR-248	-	-	-	auacacgugcacggauaacgcuca	agcgguauccagccgauguuuuc	agcgguauccagccgauguuuucaauacugcauuugaauacacgugcacggauaacgcuca	X:2262387..2262448:-
+X_48590	94212.9	71 +/- 6%	-	184796	116370	0	68426	-	cel-miR-34-5p	-	-	-	acggcuaccuucacugccaccc	aggcagugugguuagcugguug	aggcagugugguuagcugguugcauauuuccuugacaacggcuaccuucacugccaccc	X:2969774..2969833:-
+I_2447	91739.1	71 +/- 6%	-	179944	170278	431	9235	-	cel-miR-79-5p	-	-	-	auaaagcuagguuaccaaagcu	cuuuggugauucagcuucaauga	cuuuggugauucagcuucaaugauuggcuacagguuucuuucauaaagcuagguuaccaaagcu	I:9332963..9333027:+
+X_49180	86551	71 +/- 6%	-	169767	149119	37	20611	-	cel-miR-63-5p	-	-	-	uaugacacugaagcgaguuggaaa	ucuaacucgucgguagucaucgu	ucuaacucgucgguagucaucguucuagcugaaaaggacacuaugacacugaagcgaguuggaaa	X:17598784..17598849:-
+X_48099	82385.3	71 +/- 6%	-	161597	161540	0	57	-	cel-miR-793	-	-	-	ugagguaucuuaguuagacaga	uguuuaacuauuguacaucaca	uguuuaacuauuguacaucacaauuuucacugcgaaaaauugagguaucuuaguuagacaga	X:13857976..13858038:+
+II_9453	80435.5	71 +/- 6%	-	157771	156184	0	1587	-	cel-miR-37-5p	-	-	-	ucaccgggugaacacuugcagu	uguggguguccguugcggugcua	uguggguguccguugcggugcuacauucucuaaucuguaucaccgggugaacacuugcagu	II:11537853..11537914:+
+IV_20373	68769.7	71 +/- 6%	-	134888	55877	4	79007	-	cel-miR-243-5p	-	-	-	cgguacgaucgcggcgggauauc	uaucucggugcgaucguaccgua	uaucucggugcgaucguaccguaucgcucacacuuagauuacgguacgaucgcggcgggauauc	IV:4450797..4450861:+
+II_9457	67709.3	71 +/- 6%	-	132809	129516	0	3293	-	cel-miR-39-5p	-	-	-	ucaccggguguaaaucagcuug	agcugauuucgucuugguaaua	agcugauuucgucuugguaauaagcucgucauugagauuaucaccggguguaaaucagcuug	II:11538102..11538164:+
+IV_35011	61179.3	71 +/- 6%	-	120003	118386	3	1614	-	cel-miR-53-5p	-	-	-	cacccguacauuuguuuccgugcu	cacggcacaauauaugggucgc	cacccguacauuuguuuccgugcuugacuucaaagcucaaucacggcacaauauaugggucgc	IV:11027613..11027676:-
+V_46308	58349.9	71 +/- 6%	-	114451	103606	221	10624	-	cel-miR-87-5p	-	-	-	gugagcaaaguuucaggugugc	cgccugauacuuucgucucaaccu	cgccugauacuuucgucucaaccucgcugucagauuggucguaggugagcaaaguuucaggugugc	V:12038699..12038765:-
+II_9459	47205.3	71 +/- 6%	-	92591	92561	0	30	-	cel-miR-40-5p	-	-	-	ucaccggguguacaucagcuaa	aguggauguaugccaugaugaua	aguggauguaugccaugaugauaagauaucagaaauccuaucaccggguguacaucagcuaa	II:11538198..11538260:+
+X_47679	46557.5	71 +/- 6%	-	91321	91318	0	3	-	cel-miR-785-5p	-	-	-	uaagugaauuguuuuguguaga	agcacagaauuuuucgcuaac	agcacagaauuuuucgcuaacagaaaccucaaaacaauguaagugaauuguuuuguguaga	X:3004686..3004747:+
+I_3226	33276.4	71 +/- 6%	-	65271	58530	0	6741	-	cel-miR-795-5p	-	-	-	ugagguagauugaucagcgagcuu	aaucgugaucaguauacuucguc	ugagguagauugaucagcgagcuugauaccccguucaaaaucgugaucaguauacuucguc	I:12594582..12594643:+
+II_9451	32411.7	71 +/- 6%	-	63574	62784	0	790	-	cel-miR-36-5p	-	-	-	ucaccgggugaaaauucgcaug	cgccaauuuucgcuucagugcua	cgccaauuuucgcuucagugcuagaccauccaaagugucuaucaccgggugaaaauucgcaug	II:11537731..11537794:+
+X_48008	27862.3	71 +/- 6%	-	54653	47514	3	7136	-	cel-miR-239a-5p	-	-	-	uuuguacuacacauagguacug	agugucuagucuagugcaaaca	uuuguacuacacauagguacuggacaauuuucaaaauauauccagugucuagucuagugcaaaca	X:11792459..11792524:+
+X_47655	26561.6	71 +/- 6%	-	52100	27889	2755	21456	-	cel-miR-74-5p	-	-	-	uggcaagaaauggcagucuaca	cgggcuuccaucucuuucccagc	cgggcuuccaucucuuucccagccuacaucucaaccugggcuggcaagaaauggcagucuaca	X:2369061..2369124:+
+X_48592	26047.1	71 +/- 6%	-	51091	51048	0	43	-	cel-miR-249-5p	-	-	-	ucacaggacuuuugagcguugcc	caacgcacaaacgucuucugug	caacgcacaaacgucuucugugcgacaacaucugaauguuugucacaggacuuuugagcguugcc	X:3006453..3006518:-
+IV_22703	25670.9	71 +/- 6%	-	50356	48584	227	1545	-	cel-miR-83-5p	-	-	-	uagcaccauauaaauucaguaa	acugaauuuauguguguacuuga	acugaauuuauguguguacuugacggccaacaagagcaucgaucuagcaccauauaaauucaguaa	IV:7841646..7841712:+
+X_48902	24982	71 +/- 6%	-	49002	48640	0	362	-	cel-miR-233-5p	-	-	-	uugagcaaugcgcaugugcggga	ucgcccaucccguugcuccaaua	ucgcccaucccguugcuccaauauucuaacaacaagugauuauugagcaaugcgcaugugcggga	X:12078601..12078666:-
+X_48709	23031.9	71 +/- 6%	-	45179	45088	0	91	-	cel-miR-1022-5p	-	-	-	aagaucauuguuaggacgccaucu	ugauaguccaaugaugauccagc	aagaucauuguuaggacgccaucuugaagcaauauaaagaugauaguccaaugaugauccagc	X:6435435..6435498:-
+V_45766	19797.5	71 +/- 6%	-	38833	38278	40	515	-	cel-miR-357-5p	-	-	-	aaaugccagucguugcaggagu	cccuacaacgcugcgcauaug	cccuacaacgcugcgcauaugcaugaacacaaugaaaauguaaaugccagucguugcaggagu	V:8580564..8580627:-
+I_3228	18120.3	71 +/- 6%	-	35545	35170	0	375	-	cel-miR-794-5p	-	-	-	ugagguaaucaucguugucacu	ugaaaacguugucuaucucgaa	ugagguaaucaucguugucacuucgcaaaguuggaauugaaaacguugucuaucucgaa	I:12595703..12595762:+
+IV_35004	17265.7	71 +/- 6%	-	33867	32341	6	1520	-	cel-miR-232-5p	-	-	-	uaaaugcaucuuaacugcgguga	ccugcaguuucgaugauuuuauc	ccugcaguuucgaugauuuuauccuuaauucugaagaugugauaaaugcaucuuaacugcgguga	IV:10994183..10994248:-
+X_47955	16517.1	71 +/- 6%	-	32398	18307	0	14091	-	cel-miR-49-5p	-	-	-	aagcaccacgagaagcugcaga	cgcaguuuguugugaugugcucc	cgcaguuuguugugaugugcuccaagcaaucaugagucugaagcaccacgagaagcugcaga	X:9989301..9989363:+
+X_47657	14672.3	71 +/- 6%	-	28781	26645	3	2133	-	cel-miR-75-5p	-	-	-	uuaaagcuaccaaccggcuuca	cagucgguugcaagcuuaaaua	cagucgguugcaagcuuaaauacaaauccgaauuguuauuaaagcuaccaaccggcuuca	X:2372474..2372534:+
+II_10748	14354.4	71 +/- 6%	-	28155	21185	387	6583	-	cel-miR-1830-5p	-	-	-	ccuaggaaaugagaaaacucggc	cgagguuucacguuuucuaggcc	cgagguuucacguuuucuaggccacgccgcaaauagccagcuuguggccuaggaaaugagaaaacucggc	II:4371837..4371907:-
+V_45768	13104.1	71 +/- 6%	-	25705	21043	0	4662	-	cel-miR-358-5p	-	-	-	auugguaucccugucaaggucu	accuggccaggcauuccaacug	accuggccaggcauuccaacugucaaacuuacaaagcuuucucgacaauugguaucccugucaaggucu	V:8580879..8580948:-
+X_48884	13059.6	71 +/- 6%	-	25616	25558	0	58	-	cel-miR-254-5p	-	-	-	ugcaaaucuuucgcgacuguagg	uacagaagcauagauuuccaca	uacagaagcauagauuuccacaaaccauucgagguguuugugcaaaucuuucgcgacuguagg	X:11333549..11333612:-
+II_12463	12706.6	71 +/- 6%	-	24925	24838	0	87	-	cel-miR-252-5p	-	-	-	auaaguaguagugccgcagguaa	accuacugccuucugcuuaaaa	auaaguaguagugccgcagguaaccgccagucuaaaaggcuuaccuacugccuucugcuuaaaa	II:11446876..11446940:-
+V_45470	11217.7	71 +/- 6%	-	22003	21775	52	176	-	cel-miR-253-5p	-	-	-	uuaguaggcguugugggaaggg	cuuuucacacaccucacuaaca	cuuuucacacaccucacuaacacugaccaccgaugcauagauguuaguaggcguugugggaaggg	V:5780531..5780596:-
+III_17698	11175.1	71 +/- 6%	-	21921	19276	6	2639	-	cel-miR-67-5p	-	-	-	ucacaaccuccuagaaagaguaga	cgcucauucugccgguuguuaug	cgcucauucugccgguuguuaugcuauuaucagauuaagcaucacaaccuccuagaaagaguaga	III:5931363..5931428:-
+V_46087	8716.8	71 +/- 6%	-	17099	10117	0	6982	-	cel-miR-259-5p	-	-	-	aaaucucauccuaaucugguagca	ccaccgauuuggcaugggauugac	aaaucucauccuaaucugguagcaucuuucgaaccuugccaccgauuuggcaugggauugac	V:10539045..10539107:-
+II_9583	8309.7	71 +/- 6%	-	16299	11935	479	3885	-	cel-miR-42-5p	-	-	-	ucaccggguuaacaucuacaga	uguggguguuugcuuuuucggugaag	uguggguguuugcuuuuucggugaaguugucuuccguagcuucuucuucaccggguuaacaucuacaga	II:11889822..11889891:+
+X_47867	8050.1	71 +/- 6%	-	15791	14116	0	1675	-	cel-miR-786-5p	-	-	-	uaaugcccugaaugauguucaau	cgaauaucaguugggguauuua	cgaauaucaguugggguauuuacaaaaagacaaaauuguaaugcccugaaugauguucaau	X:7882765..7882826:+
+I_1581	6817.4	71 +/- 6%	-	13377	10745	0	2632	-	cel-miR-4816-5p	-	-	-	aucuacaauuuucgcacuuacag	guaagugguuuuuguagauca	guaagugguuuuuguagaucaaaauaguuaagaaauuuuuugaucuacaauuuucgcacuuacag	I:6185079..6185144:+
+III_18154	6743.7	71 +/- 6%	-	13229	12050	0	1179	-	cel-miR-231-5p	-	-	-	uaagcucgugaucaacaggcagaa	cugacuguuucaaaagcuugu	cugacuguuucaaaagcuuguaguaucuuaauaaauaaacauauaagcucgugaucaacaggcagaa	III:7545071..7545138:-
+X_47741	5981.1	71 +/- 6%	-	11733	11296	0	437	-	cel-miR-247-5p	-	-	-	ugacuagagccuauucucuucu	uagagaaaaguuucuaauuacc	uagagaaaaguuucuaauuacccaucaugcacaaauguggugacuagagccuauucucuucu	X:4756990..4757052:+
+I_6589	5753.3	71 +/- 6%	-	11290	11275	0	15	-	cel-miR-1817	-	-	-	uagccaaugucuucucuaucaug	ugauagugaaauauuugcuucc	uagccaaugucuucucuaucaugcauuuuacaaauaaugaguacaugauagugaaauauuugcuucc	I:10869387..10869454:-
+III_18212	5688.3	71 +/- 6%	-	11159	10820	0	339	-	cel-miR-356b-5p	-	-	-	uuuguucgcguugcucaaccaca	uggugagacacgucguaacgaauc	uggugagacacgucguaacgaauccgcugaaauuuacauugaugauuuguucgcguugcucaaccaca	III:7860166..7860234:-
+IV_21339	5448.5	71 +/- 6%	-	10688	7886	0	2802	-	cel-miR-790-5p	-	-	-	cggcguuagcucugugucaaacc	cuuggcacucgcgaacaccgcg	cuuggcacucgcgaacaccgcgauuucacuuauaacucgcggcguuagcucugugucaaacc	IV:5566426..5566488:+
+IV_23759	5311.2	71 +/- 6%	-	10418	10245	0	173	-	cel-miR-124-5p	-	-	-	uaaggcacgcggugaaugcca	gcaugcacccuagugacuuuagu	gcaugcacccuagugacuuuaguggacaucuaagucuuccaacuaaggcacgcggugaaugcca	IV:11871754..11871818:+
+X_47743	5244.3	71 +/- 6%	-	10289	6090	0	4199	-	cel-miR-797-5p	-	-	-	uuuucauugguuucugugaaauc	uaucacagcaaucacaaugagaaga	uaucacagcaaucacaaugagaagaauacaucuagauacucuuuucauugguuucugugaaauc	X:4757122..4757186:+
+V_43447	5103.1	71 +/- 6%	-	10012	10004	0	8	-	cel-lsy-6-5p	-	-	-	uuuuguaugagacgcauuucga	aaaugcgucuaguaucaaaauc	aaaugcgucuaguaucaaaaucauguaaaaacuguaaaacagauuuuguaugagacgcauuucga	V:10647236..10647301:+
+II_13190	4102.9	71 +/- 6%	-	8051	8024	0	27	-	cel-miR-234-5p	-	-	-	uuauugcucgagaauacccuu	cgguauuccagaguugauaaua	cgguauuccagaguugauaauaaaaaugcgucaguccgcaaucuauuauugcucgagaauacccuu	II:14466277..14466343:-
+X_47778	3438.6	71 +/- 6%	-	6746	5636	11	1099	-	cel-miR-791-5p	-	-	-	accuuauccguuguagccaaagu	uuuggcacuccgcagauaaggcaa	accuuauccguuguagccaaaguucaacgaagcggcaacuuuggcacuccgcagauaaggcaa	X:5809360..5809423:+
+II_8255	3161.1	71 +/- 6%	-	6203	5658	0	545	-	cel-miR-1822-5p	-	-	-	cgagcugcccucagaaaaacucu	aguuucucugggaaagcuaucggcc	aguuucucugggaaagcuaucggccaaauuuaacuguccgagcugcccucagaaaaacucu	II:6015551..6015612:+
+X_48438	2782.7	71 +/- 6%	-	5457	3930	12	1515	-	cel-miR-800-5p	-	-	-	gccaaacucggaaauugucugc	ugacaauuuccgaguuaggcc	ugacaauuuccgaguuaggccacucuuauaaucaguggccaaacucggaaauugucugc	X:380924..380983:-
+X_48083	2393.1	71 +/- 6%	-	4695	4549	0	146	-	cel-miR-392-5p	-	-	-	uaucaucgaucacgugugauga	agcauucgugguugaggauauc	agcauucgugguugaggauaucgaacacaaaaaaagauaucaucgaucacgugugauga	X:13597260..13597319:+
+V_45042	2102.5	71 +/- 6%	-	4128	4109	0	19	-	cel-miR-1821-5p	-	-	-	ugaggucuuauaguuagguaga	ugcccaacuugcagacuuuucaau	ugcccaacuugcagacuuuucaauuuucggcaaguggaauugaggucuuauaguuagguaga	V:3042551..3042613:-
+III_16120	1702.7	71 +/- 6%	-	3339	2371	0	968	-	cel-miR-1832a-5p	-	-	-	ucagcgauucgaacuccgcccacu	ugggcggagcgaaucgaugauu	ucagcgauucgaacuccgcccacugcaccugauugguugacaagugggcggagcgaaucgaugauu	III:11829246..11829312:+
+I_2836	1672.9	71 +/- 6%	-	3282	2087	0	1195	-	cel-miR-1828	-	-	-	ugaucacuuuuaucgguuccgguc	acuggaagcauuuaagugauagu	ugaucacuuuuaucgguuccggucccucugcaaaaaaguggacuggaagcauuuaagugauagu	I:10600461..10600525:+
+IV_23130	1375.2	71 +/- 6%	-	2700	2697	0	3	-	cel-miR-5551-5p	-	-	-	uguaaaugguuggaaucugguau	uaccaauuucuuaccauuagcauc	uguaaaugguuggaaucugguauaauggcuucgagacuuuuuauaccaauuucuuaccauuagcauc	IV:9757529..9757596:+
+V_42721	1362.2	71 +/- 6%	-	2677	2399	0	278	-	cel-miR-255-5p	-	-	-	aaacugaagagauuuuuuacag	guaagaaaucuuuguaguucuc	guaagaaaucuuuguaguucuccguauugugacgugaaaacugaagagauuuuuuacag	V:5440662..5440721:+
+X_48748	1196.7	71 +/- 6%	-	2351	2119	0	232	-	cel-miR-784-5p	-	-	-	uauguacaaauguugcgcugcc	uggcacaaucugcguacguaga	uggcacaaucugcguacguagaaagaucaaaaagucacuucuauguacaaauguugcgcugcc	X:8074933..8074996:-
+I_478	914.9	71 +/- 6%	-	1794	1784	0	10	-	cel-miR-8193-5p	-	-	-	cgcgggacuagucaagugucggc	cgacacuuuccgguuuugcgaa	cgcgggacuagucaagugucggcugcaaccagagcagccgacacuuuccgguuuugcgaa	I:2538610..2538670:+
+II_9716	896	71 +/- 6%	-	1757	960	45	752	-	cel-miR-5547-5p	-	-	-	caacuuuuagaccaauaggcauc	ugccuaucggccuaaaaguuguc	caacuuuuagaccaauaggcauccaaaaaugaucaaaauuggaugccuaucggccuaaaaguuguc	II:12238624..12238690:+
+II_12367	880.1	71 +/- 6%	-	1726	1606	0	120	-	cel-miR-2216-5p	-	-	-	gcacauuuuaagucgguaggcg	cuaucuacuuaaaaugugccu	gcacauuuuaagucgguaggcguccaauuuugaugccuaucuacuuaaaaugugccu	II:10867115..10867172:-
+III_17756	583.4	71 +/- 6%	-	1145	1070	0	75	-	cel-miR-8206-5p	-	-	-	uuucagauuacauucuauagg	uauauaauguaaucugaaauca	uauauaauguaaucugaaaucacauuauuuuucgggauuucagauuacauucuauagg	III:6194848..6194906:-
+X_49062	545.5	71 +/- 6%	-	1076	1069	0	7	-	cel-miR-1829b-3p	-	-	-	caaccacuggaauuucucuauu	aagugaaguucaagaugguugua	aagugaaguucaagaugguuguaaaacauugaguacuacaaccacuggaauuucucuauu	X:15237168..15237228:-
+IV_23489	541.8	71 +/- 6%	-	1069	1033	0	36	-	cel-miR-2210-5p	-	-	-	uaaagucgauugcucuacccac	aggcagaucaaucaauuuuuagg	aggcagaucaaucaauuuuuagguuuauauaaauaauccuaaagucgauugcucuacccac	IV:10914617..10914678:+
+II_8442	510.3	71 +/- 6%	-	1007	624	0	383	-	cel-miR-2953-5p	-	-	-	uacagaaguguucgugaaaaua	ugaucacuagcucuucuguagc	uacagaaguguucgugaaaauaaauauguguuuuuuuuaugaucacuagcucuucuguagc	II:6747181..6747242:+
+II_12761	441.4	71 +/- 6%	-	865	615	0	250	-	cel-miR-4806-5p	-	-	-	cacuuaccggcugagccaugc	auagcucagccgguaagaggc	cacuuaccggcugagccaugcgcgcugcgcugcauagcucagccgguaagaggc	II:12346311..12346365:-
+X_48229	425.7	71 +/- 6%	-	838	592	0	246	-	cel-miR-1819-5p	-	-	-	uggaaugauugagcuugaugga	aaucaugcucaaaacauucgaca	aaucaugcucaaaacauucgacauaacuuaauuucuuuguggaaugauugagcuugaugga	X:16207965..16208026:+
+II_7770	402.3	71 +/- 6%	-	790	401	0	389	-	cel-miR-2217a-3p	-	-	-	agagugggcagucggugucgacc	ucgacccuugugccuguuucggu	agagugggcagucggugucgaccuacaucauucgcaggucgacccuugugccuguuucggu	II:4058312..4058373:+
+X_47786	324.9	71 +/- 6%	-	638	572	39	27	-	cel-miR-360-5p	-	-	-	uugugaccguuguuacgguca	accguaaucccguucacaaua	uugugaccguuguuacggucaauuugcaaauugaaaaaaugaccguaaucccguucacaaua	X:5919173..5919235:+
+I_3382	309.8	71 +/- 6%	-	609	429	0	180	-	cel-miR-1824-5p	-	-	-	uggcaguguuucucccccaacuu	guuggccguggugaacacuuccgcc	uggcaguguuucucccccaacuuuuguuacagaauugcaaaaauguuggccguggugaacacuuccgcc	I:13513966..13514035:+
+IV_19850	273.1	71 +/- 6%	-	535	401	0	134	-	cel-miR-2208b-5p	-	-	-	aaguguacccggaucugauaucc	augcagauuuugguacacuucac	aaguguacccggaucugauauccuaucaccaaaaagaggaugcagauuuugguacacuucac	IV:1026579..1026641:+
+IV_22060	266.5	71 +/- 6%	-	523	427	0	96	-	cel-miR-8201-5p	-	-	-	ucuggaucgauaauguaaaccu	aauuacauuauugauccagaga	ucuggaucgauaauguaaaccuauugaaucuauagaauuacauuauugauccagaga	IV:6294578..6294635:+
+III_19717	213.7	71 +/- 6%	-	418	314	0	104	-	cel-miR-4814-5p	-	-	-	uucucaaccaacuuuggccacu	ugggcaaaguugguugagaagu	uucucaaccaacuuuggccacuuuucaacugccauucacagaagugggcaaaguugguugagaagu	III:13728429..13728495:-
+IV_19939	171.3	71 +/- 6%	-	335	313	0	22	-	cel-miR-8189-5p	-	-	-	auggccuaguggauaagaggga	ucucuuauccacuaggccacga	ucucuuauccacuaggccacgagugccagcgcccucaaggagucggguccgcauggccuaguggauaagaggga	IV:2079008..2079082:+
+IV_19937	171.1	71 +/- 6%	-	335	313	0	22	-	cel-miR-8189-5p	-	-	-	auggccuaguggauaagaggga	ucucuuauccacuaggccacga	ucucuuauccacuaggccacgaguuuccgcgucacccgggugucuggaaauuccggugcccgcgcauggccuaguggauaagaggga	IV:2076241..2076328:+
+IV_23477	168.3	71 +/- 6%	-	330	304	0	26	-	cel-miR-8208-5p	-	-	-	uugguucaggaaugggcggaacu	uccgcccacaguugaaccaauu	uccgcccacaguugaaccaauuagcgaccccacuucuaauugguucaggaaugggcggaacu	IV:10856118..10856180:+
+II_9461	150.1	71 +/- 6%	-	295	181	24	90	-	cel-miR-41-5p	-	-	-	ucaccgggugaaaaaucaccua	ggugguuuuucucugcagugaua	ggugguuuuucucugcagugauagauacuucuaacaacucgcuaucaccgggugaaaaaucaccua	II:11538323..11538389:+
+X_47611	101.5	71 +/- 6%	-	202	199	0	3	-	cel-miR-4809-5p	-	-	-	uaauacaacuucugggcuucca	guaaguucagaguugaauuauc	guaaguucagaguugaauuaucuugaucauauuugauaauacaacuucugggcuucca	X:1873645..1873703:+
+IV_34201	79.1	71 +/- 6%	-	177	172	0	5	-	cel-miR-4920	-	-	-	guaaggaaaacuuuugaauuu	auucauuugugauucuuuucag	guaaggaaaacuuuugaauuucuuuugagagaaaauucauuugugauucuuuucag	IV:8133416..8133472:-
+II_7326	73.5	71 +/- 6%	-	143	103	0	40	-	cel-miR-8186-5p	-	-	-	acugcucaaaggacuuugcugc	cagcaaaguccuuugagcagu	acugcucaaaggacuuugcugcaaacauacucaaauuugcagcaaaguccuuugagcagu	II:18637..18697:+
+II_12612	47.2	71 +/- 6%	-	93	70	0	23	-	cel-miR-5594-5p	-	-	-	aagaguacuguaguuucaaaauu	uuugaacuacaguacucuuca	aagaguacuguaguuucaaaauuucauugauuaaaauuuugaacuacaguacucuuca	II:11865129..11865187:-
+X_47527	27.8	71 +/- 6%	-	55	47	0	8	-	cel-miR-2221	-	-	-	caagugauaccagaccgcuagu	uggcgguuugcauucacuuaca	uggcgguuugcauucacuuacauuuauaagacaaaaaugcaagugauaccagaccgcuagu	X:1390878..1390939:+
+IV_34953	9	70 +/- 6%	-	41	30	0	11	-	cel-miR-4924	-	-	-	guaaguaucaucaauauuaaua	uuaguauuggauaaacuuaaga	guaaguaucaucaauauuaauaauugauaauuauuaguauuggauaaacuuaaga	IV:10840861..10840916:-
+IV_42163	1.3	37 +/- 6%	-	25139	24471	3	665	-	cel-miR-789-2-5p	-	-	-	aauugaugacucaggcagggacu	ccugggucaccaauugucggcc	aauugaugacucaggcagggacuaaucaugauugucgauuuagucccugccugggucaccaauugucggcc	IV:17309316..17309387:-
+IV_19848	1	37 +/- 6%	-	16	16	0	0	-	cel-miR-2208a-5p	-	-	-	aaguguacccgaaucugauaucc	augcaguuucugguauacuuca	aaguguacccgaaucugauauccuaucaucugaaaaaggaugcaguuucugguauacuuca	IV:1021771..1021832:+
+I_687	1	37 +/- 6%	-	37	37	0	0	-	cel-miR-4805-5p	-	-	-	caauuuugagauuugccgcaca	ugcggcaaauuugccgaauuugc	ugcggcaaauuugccgaauuugccgagcucggccaauuuugagauuugccgcaca	I:3332340..3332395:+
+II_12964	1	37 +/- 6%	-	22	22	0	0	-	cel-miR-2215-5p	-	-	-	gaaucguagcgcguguuguuua	aacagcacguguuacgaugcuc	aacagcacguguuacgaugcuccguuaguucggaguuuuuacggagaaucguagcgcguguuguuua	II:13333761..13333828:-
+IV_41477	0.9	0 +/- 0%	-	25952	25287	0	665	-	cel-miR-789-5p	-	-	-	aauugaugacccagacaaggacu	ccugggucaccaauugucggcc	aauugaugacccagacaaggacuaaucaagauugucgaucuagucccugccugggucaccaauugucggcc	IV:16740702..16740773:-
+II_9455	0.9	0 +/- 0%	-	13923	13923	0	0	-	cel-miR-38-5p	-	-	-	ucaccgggagaaaaacuggagu	uccgguuuuuuccguggugaua	uccgguuuuuuccguggugauaacgcauccaaaagucucuaucaccgggagaaaaacuggagu	II:11537948..11538011:+
+V_45035	0.9	0 +/- 0%	-	100	96	0	4	-	cel-miR-2219-5p	-	-	-	uuucucucgcacaucgucagcu	cgaagugcgagggaaagcugaag	uuucucucgcacaucgucagcuagauuugaacucuguaugaaagcugacgaagugcgagggaaagcugaag	V:2924579..2924650:-
+V_46968	0.9	0 +/- 0%	-	313	313	0	0	-	cel-miR-8189-3p	-	-	-	auggccuaguggauaagaggga	uguuuuauccacuaggccacca	uguuuuauccacuaggccaccagugcaagccaccucaggaaacgggggcccgcgguguccucauggccuaguggauaagaggga	V:15878519..15878603:-
+II_7795	0.8	0 +/- 0%	-	968	968	0	0	-	cel-miR-1832a-3p	-	-	-	ugggcggagcgaaucgaugauu	ucagcguuuucgaacuccgcccaau	ucagcguuuucgaacuccgcccaauccaucuaauugguuggaaagugggcggagcgaaucgaugauu	II:4284455..4284522:+
+X_48749	0.8	0 +/- 0%	-	118	85	0	33	-	cel-miR-5553-5p	-	-	-	ugccacgcgccauccauugauu	aauggguagcacguggcaagacu	ugccacgcgccauccauugauuuuuaaaucuuuuuuaaucaauggguagcacguggcaagacu	X:8077574..8077637:-
+X_47987	0.8	0 +/- 0%	-	16946	16946	0	0	-	cel-miR-787-5p	-	-	-	uaagcucguuuuaguaucuuucg	aaagauacauacgaucuuaca	aaagauacauacgaucuuacaucuucaaaaugguauguaagcucguuuuaguaucuuucg	X:11294723..11294783:+
+II_13175	0.8	0 +/- 0%	-	30	30	0	0	-	cel-miR-5595-5p	-	-	-	ucucuuuuuucucgcaugccaucu	agagcguguggagaagagagacg	ucucuuuuuucucgcaugccaucucaaaacaucgauggcgagagagcguguggagaagagagacg	II:14399564..14399629:-
+III_13574	0.8	0 +/- 0%	-	2378	2371	0	7	-	cel-miR-1832a-5p	-	-	-	ucagcgauucgaacuccgcccacu	aaugggcggagcaaaucgcugau	ucagcgauucgaacuccgcccacuccauuugauugguugaaaaaugggcggagcaaaucgcugau	III:2864832..2864897:+
+II_8471	0.8	0 +/- 0%	-	404	329	0	75	-	cel-miR-8192-5p	-	-	-	aaagagacucauugggccugcuc	cggucgagcgagucucagucggc	cggucgagcgagucucagucggccguggcggugcguugaugccugcuuguguggccgaaagagacucauugggccugcuc	II:6943940..6944020:+
+II_7481	0.8	0 +/- 0%	-	221	221	0	0	-	cel-miR-4805-5p	-	-	-	aaauuuugagauuuuccgcac	gcggcaaauuugccgaauuugc	gcggcaaauuugccgaauuugccguuugucgagcucggcaaauuuugagauuuuccgcac	II:1061665..1061725:+
+X_48329	0.7	0 +/- 0%	-	731	731	0	0	-	cel-miR-2217b-1-5p	-	-	-	uugacccuugugcuuguuucggc	cagagcgggcagucggugucaauc	cagagcgggcagucggugucaaucugcaacaauagcagguugacccuugugcuuguuucggc	X:17608226..17608288:+
+IV_30864	0.6	0 +/- 0%	-	20	20	0	0	-	cel-miR-2209b-5p	-	-	-	agagaugagcgguugugcuuc	aguguaacaacucuucuccuuc	aguguaacaacucuucuccuuccgaaaaccaauaaucgagaagagaugagcgguugugcuuc	IV:1021303..1021365:-
+IV_37062	0.6	0 +/- 0%	-	731	731	0	0	-	cel-miR-2217b-5p	-	-	-	uugacccuugugcuuguuucggc	cagagugggcagucggugucaauc	cagagugggcagucggugucaaucugcaacaauagcagguugacccuugugcuuguuucggc	IV:14452440..14452502:-
+II_12992	0.5	0 +/- 0%	-	741	741	0	0	-	cel-miR-2217b-5p	-	-	-	uugacccuugugcuuguuucggc	cagagugggcagucggugucaauc	cagagugggcagucggugucaaucugcaacaaaagcaguuugacccuugugcuuguuucggc	II:13619492..13619554:-
+III_13601	0.5	0 +/- 0%	-	64836	64836	0	0	-	cel-miR-76-5p	-	-	-	uucguuguugaugaagccuuga	ugggcuucacaauagucgaaua	ugggcuucacaauagucgaauaccuuaaauuucaaaauuuggauauucguuguugaugaagccuuga	III:3142059..3142126:+
+III_19357	0.5	0 +/- 0%	-	148	92	0	56	-	cel-miR-8211-5p	-	-	-	acucgaggccggugagcugcgu	acggcucgccgagcuucgagaac	acucgaggccggugagcugcgugaaauggccggcuaucuauuacggcucgccgagcuucgagaac	III:11936915..11936980:-
+IV_39646	0.5	0 +/- 0%	-	731	731	0	0	-	cel-miR-2217b-5p	-	-	-	uugacccuugugcuuguuucggc	cagagugggcagucggugucaauc	cagagugggcagucggugucaaucugcaacaauagcagguugacccuugugcuuguuucggc	IV:15799051..15799113:-
+III_13997	0.5	0 +/- 0%	-	13058	11456	0	1602	-	cel-miR-4813-5p	-	-	-	uucaauauaccggauggucu	agacuaucuaggaaauauugaacu	agacuaucuaggaaauauugaacuaauacaaauuuuaguucaauauaccggauggucu	III:4571647..4571705:+
+X_48889	0.5	0 +/- 0%	-	42894	42700	194	0	-	cel-miR-239b-5p	-	-	-	uuuguacuacacaaaaguacug	gcacuuuuguggugugcaaaaa	uuuguacuacacaaaaguacuggucauuuaaguugaggcucagcacuuuuguggugugcaaaaa	X:11791320..11791384:-
+I_4374	0.4	0 +/- 0%	-	81	81	0	0	-	cel-miR-5546-5p	-	-	-	gaaaaauugcgcgcauggguug	acccuuucgccaauuuuuuucgu	acccuuucgccaauuuuuuucgugaaaaaacguguaauuuuacgaaaaauugcgcgcauggguug	I:2888469..2888534:-
+I_7058	0.4	0 +/- 0%	-	50	50	0	0	-	cel-miR-1818	-	-	-	aaucauaguuuggaaaccucgac	uguggucuucaugccaugauuuu	uguggucuucaugccaugauuuuaucacucaaacugauaaaaucauaguuuggaaaccucgac	I:13980873..13980936:-
+IV_19851	0.4	0 +/- 0%	-	4127	4127	0	0	-	cel-miR-2209a-5p	-	-	-	agagaucagcgguuacacuaca	gaguguaaccacucuucuccuuc	gaguguaaccacucuucuccuuccgaguauugauuaucgagaagagaucagcgguuacacuaca	IV:1027100..1027164:+
+X_47677	0.3	0 +/- 0%	-	6537	6537	0	0	-	cel-miR-359	-	-	-	ucacuggucuuucucugacgaa	cguuagaguaacacacaguuaca	cguuagaguaacacacaguuacacgaccucaucaaucgugucacuggucuuucucugacgaa	X:3004311..3004373:+
+IV_19853	0.3	0 +/- 0%	-	21	21	0	0	-	cel-miR-2209c-5p	-	-	-	aaaagaccaccgguuacacuaca	gaguguaaccgcacgucuuguuu	gaguguaaccgcacgucuuguuucaaaacucaauauauggaaaaagaccaccgguuacacuaca	IV:1027217..1027281:+
+IV_32244	0.3	0 +/- 0%	-	389	389	0	0	-	cel-miR-2217a-5p	-	-	-	ucgacccuugugccuguuucggu	cagagugggcagucggugucgauc	cagagugggcagucggugucgaucuacaucauucgcaggucgacccuugugccuguuucggu	IV:5280074..5280136:-
+IV_20314	0.1	0 +/- 0%	-	123262	123216	0	46	-	cel-miR-242	-	-	-	uugcguaggccuuugcuucgaga	gcagcaauauccuccgcaaaa	uugcguaggccuuugcuucgagagagaagcuucaguucgcagcaauauccuccgcaaaa	IV:4274261..4274320:+
+X_47623	0.1	0 +/- 0%	-	8890	8890	0	0	-	cel-miR-1018	-	-	-	agagagaucauuggacuuacag	guaaguucaugauuucuccca	guaaguucaugauuucucccauauauuuuucaugagagagaucauuggacuuacag	X:1879457..1879513:+
+II_9469	0.1	0 +/- 0%	-	389	389	0	0	-	cel-miR-8212-5p	-	-	-	uucgagacaguuuuugagcaacu	uugcucaaaaauuacuucaaagu	uugcucaaaaauuacuucaaagucgaucggcucauugcgacuucgagacaguuuuugagcaacu	II:11603571..11603635:+
+I_2973	0	0 +/- 0%	-	115	115	0	0	-	cel-miR-8190-5p	-	-	-	auuccuaccgauuuucagcg	cgggaaaucgcuuuggaaucc	cgggaaaucgcuuuggaauccaggaaauccgggaauuucgggauuccuaccgauuuucagcg	I:11096993..11097055:+
+II_12595	0	0 +/- 0%	-	17188	17188	0	0	-	cel-miR-355-5p	-	-	-	uuuguuuuagccugagcuaug	uagcuucuugcuaaaacaugcc	uuuguuuuagccugagcuaugagucaucggaauaugcauagcuucuugcuaaaacaugcc	II:11833563..11833623:-
+V_43188	0	0 +/- 0%	-	314	314	0	0	-	cel-miR-4814-5p	-	-	-	uucucaaccaacuuuggccacu	ugggcaaaguuggugaaag	uucucaaccaacuuuggccacuuuucaacugccauucacagaagugggcaaaguuggugaaag	V:8746637..8746700:+
+X_47978	0	0 +/- 0%	-	2550	2547	3	0	-	cel-miR-251	-	-	-	uuaaguaguggugccgcucuuauu	uaagaguaguucacuacuuauca	uuaaguaguggugccgcucuuauuagguugaaaaguaauaagaguaguucacuacuuauca	X:11004745..11004806:+
+X_48537	0	0 +/- 0%	-	18	18	0	0	-	cel-miR-796	-	-	-	uggaauguaguugagguuaguaa	acaaaccuugccacguuccgac	uggaauguaguugagguuaguaaaagcacuauacuuguuacaaaccuugccacguuccgac	X:1798940..1799001:-
+IV_33738	0	0 +/- 0%	-	107	101	0	6	-	cel-miR-58b-5p	-	-	-	agagaucaaccauugagauccaaa	gacucggugugugaucucuua	gacucggugugugaucucuuaccguuuuauggauaagagaucaaccauugagauccaaa	IV:6660459..6660518:-
+V_45040	-0.1	0 +/- 0%	-	1781	1781	0	0	-	cel-miR-792-5p	-	-	-	uugaaaucucuucaacuuucaga	ugagaguucaaaagauuuagcaauu	ugagaguucaaaagauuuagcaauuuuauacgagugaaauugaaaucucuucaacuuucaga	V:3042104..3042166:-
+IV_23723	-0.2	0 +/- 0%	-	106	106	0	0	-	cel-miR-8207-5p	-	-	-	cauuggaagaaaagagaacgaga	uuguccucuuuucucucauuugca	uuguccucuuuucucucauuugcacauuuuauugauauucaaauauugaugcauuggaagaaaagagaacgaga	IV:11722092..11722166:+
+V_46705	-0.3	0 +/- 0%	-	476	438	0	38	-	cel-miR-8210-5p	-	-	-	ugccuucuuuccuugugucgccgac	acgaaaaaaagaaagaaagaaag	ugccuucuuuccuugugucgccgacaaaucgccacaauccgucgacgaaaaaaagaaagaaagaaag	V:14656545..14656612:-
+IV_31831	-0.3	0 +/- 0%	-	243	243	0	0	-	cel-miR-8191-5p	-	-	-	ccccugccugggucacca	guauccaaguaguccaagggac	ccccugccugggucaccaaauguuggcacgguugccaacaguuuucguauccaaguaguccaagggac	IV:5022927..5022995:-
+III_14762	-0.4	0 +/- 0%	-	19	19	0	0	-	cel-miR-2213-5p	-	-	-	auuggcggacucuucacaguuuga	aagcuguaagaggacugccuaaau	auuggcggacucuucacaguuugaccucggagaucaagcuguaagaggacugccuaaau	III:6968867..6968926:+
+X_47605	-0.5	0 +/- 0%	-	194	194	0	0	-	cel-miR-4807	-	-	-	aaaugcgacuucugggcuuacagu	ugugaguucaaaguuacauuuuc	ugugaguucaaaguuacauuuucaauauaucuauuuugaaaaugcgacuucugggcuuacagu	X:1872464..1872527:+
+X_48228	-0.5	0 +/- 0%	-	9819	9819	0	0	-	cel-miR-2212-5p	-	-	-	uggcagaucauaggcugacuuugc	aaaguggcauuugauaagccauc	uggcagaucauaggcugacuuugcaagcauuuuauacaaaguggcauuugauaagccauc	X:16207828..16207888:+
+I_2025	-0.6	0 +/- 0%	-	1039585	1039546	0	39	-	cel-miR-245-5p	-	-	-	auugguccccuccaaguagcuc	uauuugcaagguaccuaauug	uauuugcaagguaccuaauuguuugauuauugauucucaauugguccccuccaaguagcuc	I:7887391..7887452:+
+IV_30891	-0.7	0 +/- 0%	-	134	134	0	0	-	cel-miR-4937	-	-	-	cuggguagagguugggcggugga	cgagguucgaacccccgggg	cuggguagagguugggcgguggaucgcagguccgagguucgaacccccgggg	IV:1381740..1381792:-
+X_48724	-0.8	0 +/- 0%	-	275	275	0	0	-	cel-miR-4811-5p	-	-	-	uauaacacucguauuguucgcu	ugaacaauaccuguguuaaaag	ugaacaauaccuguguuaaaagacauacauagcagcaccuuauaacacucguauuguucgcu	X:7185354..7185416:-
+X_48774	-1	0 +/- 0%	-	1889	1889	0	0	-	cel-miR-799	-	-	-	ugaacccugauaaagcuagugg	accgguuuuaaaaagugguuucaca	accgguuuuaaaaagugguuucacauucaauaaagacaugugaacccugauaaagcuagugg	X:8600656..8600718:-
+IV_20374	-1.1	0 +/- 0%	-	55877	55877	0	0	-	cel-miR-243-3p	-	-	-	cgguacgaucgcggcgggauauc	gauuucgcugcgagacccaa	cgguacgaucgcggcgggauaucagguacgugauuggaagcugugcaauucugcggaaagugcucuuggauuucgcugcgagacccaa	IV:4450838..4450926:+
+X_47615	-1.5	0 +/- 0%	-	28	28	0	0	-	cel-miR-4810b-5p	-	-	-	ugacuaucucaucaacuuacag	guagguucaugaguagucaua	guagguucaugaguagucauauagguauauuguacguaugacuaucucaucaacuuacag	X:1874015..1874075:+
+X_47627	-1.6	0 +/- 0%	-	15	15	0	0	-	cel-miR-4923a	-	-	-	aaaagagagccuuuuguuuacag	guaagcaauugcuucucauuuuc	guaagcaauugcuucucauuuucagaaauuguaugugaaaaagagagccuuuuguuuacag	X:1879875..1879936:+
+I_3233	-1.8	0 +/- 0%	-	21	21	0	0	-	cel-miR-1823-5p	-	-	-	uacuggaaguguuuaggaguaa	accccuaacccuaugcaguauu	accccuaacccuaugcaguauuuggagcucauaaaauacuggaaguguuuaggaguaa	I:12608634..12608692:+
+V_45469	-1.8	0 +/- 0%	-	21775	21775	0	0	-	cel-miR-253-3p	-	-	-	uuaguaggcguugugggaaggg	uuucucauuauaaauuacuacug	uuaguaggcguugugggaagggcggcgacagugaacgucguuucucauuauaaauuacuacug	V:5780490..5780553:-
+II_9454	-1.9	0 +/- 0%	-	156336	156184	152	0	-	cel-miR-37-3p	-	-	-	ucaccgggugaacacuugcagu	uguuccgguuuuuuccguggugaua	ucaccgggugaacacuugcagugguccucgugguuucucugugagccagguccuguuccgguuuuuuccguggugaua	II:11537892..11537970:+
+II_12968	-2	0 +/- 0%	-	499	499	0	0	-	cel-miR-4929	-	-	-	aaugcaccacaucuuacgcuca	cgcguaagauaaaaugcacugc	cgcguaagauaaaaugcacugcacacaaaugcacacaaugcaccacaucuuacgcuca	II:13461776..13461834:-
+V_46622	-2.3	0 +/- 0%	-	178839	178839	0	0	-	cel-miR-241-5p	-	-	-	ugagguaggugcgagaaauga	ucuuuuuguaccaaaccgcggg	ucuuuuuguaccaaaccgcgggggugucaaaguugagguaggugcgagaaauga	V:14366247..14366301:-
+X_47613	-2.7	0 +/- 0%	-	721	721	0	0	-	cel-miR-2220-5p	-	-	-	ucaauuguuuguggacuuacagg	aguaagaccauaaacuauuuauc	aguaagaccauaaacuauuuaucaauucaucauuugaucaauuguuuguggacuuacagg	X:1873825..1873885:+
+IV_35109	-2.9	0 +/- 0%	-	428144	428144	0	0	-	cel-miR-59-3p	-	-	-	ucgaaucguuuaucaggaugaug	ucggacgguaagcgagaguuu	ucgaaucguuuaucaggaugaugugauuaaaaucaacucggacgguaagcgagaguuu	IV:11309133..11309191:-
+III_18000	-2.9	0 +/- 0%	-	33	33	0	0	-	cel-miR-5549-5p	-	-	-	ucauguugguuuuuuguuggu	cuugugaaauuaacgugagu	cuugugaaauuaacgugaguuuucuggucaucugacuaaucauguugguuuuuuguuggu	III:6971998..6972058:-
+X_47625	-3.9	0 +/- 0%	-	46	46	0	0	-	cel-miR-4925	-	-	-	uuucgaaaacauugcauuuacag	guaagugcauauguuucaaaaac	guaagugcauauguuucaaaaacuuguucaaauuguuuucgaaaacauugcauuuacag	X:1879561..1879620:+
+X_48949	-3.9	0 +/- 0%	-	633031	633031	0	0	-	cel-miR-55-3p	-	-	-	uacccguauaaguuucugcugag	caguaggugaguuggaacggagcca	uacccguauaaguuucugcugagccccuuauuccuguuuggcgcuucaagcuaucuaacaguaggugaguuggaacggagcca	X:13144781..13144864:-
+X_47662	-4	0 +/- 0%	-	3634173	3634173	0	0	-	cel-miR-81-3p	-	-	-	ugagaucaucgugaaagcuagu	gggcuuuugcgaaauacucgaa	ugagaucaucgugaaagcuaguuguuggucuacgggcuuuugcgaaauacucgaa	X:2431137..2431192:+
+X_47619	-4.1	0 +/- 0%	-	228	228	0	0	-	cel-miR-4810a	-	-	-	ugaguaucgcaucaacuuacag	guaaguucaugaguucucuuaua	guaaguucaugaguucucuuauaaaaagguuuuuaugaguaucgcaucaacuuacag	X:1875737..1875794:+
+IV_23129	-4.2	0 +/- 0%	-	2697	2697	0	0	-	cel-miR-5551-5p	-	-	-	uguaaaugguuggaaucugguau	accuuuuguuuggaacuguucgcggg	accuuuuguuuggaacuguucgcggguuucaaauuuucggaauuaauuauuuuuggaguggagcuguaaaugguuggaaucugguau	IV:9757465..9757552:+
+V_45066	-4.6	0 +/- 0%	-	46	46	0	0	-	cel-miR-4922	-	-	-	uauauaacuguucuauucacag	gugaguaggacaauucauauugaa	gugaguaggacaauucauauugaaaauauugucuuuuauauaacuguucuauucacag	V:3304832..3304890:-
+X_47650	-5.1	0 +/- 0%	-	6212	6212	0	0	-	cel-miR-8196a-5p	-	-	-	uguguuuuuuguugagguauc	uauaucaauaaugaauaaugu	uguguuuuuuguugagguaucuuuauaucaauaaugaauaaugu	X:2328988..2329032:+
+I_2451	-6.1	0 +/- 0%	-	67	67	0	0	-	cel-miR-1019-5p	-	-	-	gugagcauuguucgaguuucauuuu	aauuagcuucagcaaugaacuuccg	aauuagcuucagcaaugaacuuccguuuccaacaaguuguagcaacaccaauggaacaggugagcauuguucgaguuucauuuu	I:9361537..9361621:+
+IV_40692	-6.9	0 +/- 0%	-	88	88	0	0	-	cel-miR-8198-5p	-	-	-	uaauuacggauacuguucaaa	ugaacaguuucaauuugu	ugaacaguuucaauuuguuuuuaaauuguucuacaacaauuuuuaagaauuaauuacggauacuguucaaa	IV:16214389..16214460:-
+III_17755	-7.9	0 +/- 0%	-	1070	1070	0	0	-	cel-miR-8206-3p	-	-	-	uuucagauuacauucuauagg	uauggaacuucagagauu	uuucagauuacauucuauaggagccuaucgauauggaacuucagagauu	III:6194820..6194869:-
+I_3234	-7.9	0 +/- 0%	-	21	21	0	0	-	cel-miR-1823-3p	-	-	-	uacuggaaguguuuaggaguaa	aaauacuugauuauuauccaguuga	uacuggaaguguuuaggaguaaugcucaguugucagaauuugugaaacuuauuaaauacuugauuauuauccaguuga	I:12608670..12608748:+
+X_47614	-7.9	0 +/- 0%	-	721	721	0	0	-	cel-miR-2220-3p	-	-	-	ucaauuguuuguggacuuacagg	uguauggaaagguagcagaaauuggaa	ucaauuguuuguggacuuacaggcugcaaaauuugaaguacacuguauggaaagguagcagaaauuggaa	X:1873862..1873932:+
+I_2452	-8	0 +/- 0%	-	67	67	0	0	-	cel-miR-1019-5p	-	-	-	gugagcauuguucgaguuucauuuu	aacuguaauuccacauugcuuucca	gugagcauuguucgaguuucauuuuuaauaaaauuuauuuaaaaacuguaauuccacauugcuuucca	I:9361596..9361664:+
+X_49179	-8.2	0 +/- 0%	-	149119	149119	0	0	-	cel-miR-63-3p	-	-	-	uaugacacugaagcgaguuggaaa	ugaaauuggauuacagagauuauaac	uaugacacugaagcgaguuggaaauagugguucuacuugagcaaaacuguugaaauuggauuacagagauuauaac	X:17598732..17598808:-
+IV_23498	-8.8	0 +/- 0%	-	1597064	1597064	0	0	-	cel-miR-246-3p	-	-	-	uuacauguuucggguaggagcu	cucuuauuuuaaaggaacauucgguu	uuacauguuucggguaggagcuguucaaacuuuggacauuggcaucucuuauuuuaaaggaacauucgguu	IV:10940193..10940264:+
+X_48538	-9.3	0 +/- 0%	-	18	18	0	0	-	cel-miR-796	-	-	-	uggaauguaguugagguuaguaa	acuaacucucaaaaugaauuccauc	acuaacucucaaaaugaauuccaucguuuaaauacuucagauacucuaaugacaagcuggaauguaguugagguuaguaa	X:1798978..1799058:-
+IV_33405	-9.4	0 +/- 0%	-	85	85	0	0	-	cel-miR-8202-5p	-	-	-	ugaacagaaaaagucgugugu	agagacauuuuggacaau	ugaacagaaaaagucguguguuucaagaagucgauaauauucaagacuuaauuuuuuuguugcagagacauuuuggacaau	IV:6178150..6178231:-
+X_48230	-9.9	0 +/- 0%	-	592	592	0	0	-	cel-miR-1819-3p	-	-	-	uggaaugauugagcuugaugga	caagggcaucaaguuaccaua	uggaaugauugagcuugauggaucgaugaaagaguacacauuuuucuacaaaacgguuuccaagggcaucaaguuaccaua	X:16208004..16208085:+
+IV_36688	-10.5	0.00 +/- 0.00	-	1056	1056	0	0	-	cel-miR-798	-	-	-	uaagccuuacauauugacuga	auguagguguuaaaguuugua	auguagguguuaaaguuuguacaagaaguuaguuuucuguuaagccuuacauauugacuga	IV:14277317..14277378:-
+II_9742	-12.5	0.00 +/- 0.00	-	486741	486741	0	0	-	cel-miR-77-3p	-	-	-	uucaucaggccauagcugucca	gaauguugaaucaguuauuggagu	uucaucaggccauagcuguccaaauugguauagaguuuggaauguugaaucaguuauuggagu	II:12519328..12519391:+
+III_13602	-12.5	0.00 +/- 0.00	-	64836	64836	0	0	-	cel-miR-76-3p	-	-	-	uucguuguugaugaagccuuga	aaauuuucaaauaagaaca	uucguuguugaugaagccuugaugggggugagaaagaaguuugcuuagcucaauuuucaaauuuucaaauaagaaca	III:3142104..3142181:+
+III_18153	-13.4	0.00 +/- 0.00	-	12050	12050	0	0	-	cel-miR-231-3p	-	-	-	uaagcucgugaucaacaggcagaa	uugugugcacgcugauccuaaugua	uaagcucgugaucaacaggcagaacaacucgguuuugugugcacgcugauccuaaugua	III:7545036..7545095:-
+X_47868	-13.4	0.00 +/- 0.00	-	14116	14116	0	0	-	cel-miR-786-3p	-	-	-	uaaugcccugaaugauguucaau	ugaaucucauuuuuuauugug	uaaugcccugaaugauguucaaucggugaugaaucucauuuuuuauugug	X:7882803..7882853:+
+II_8750	-14.8	0.00 +/- 0.00	-	587631	587631	0	0	-	cel-miR-85-3p	-	-	-	uacaaaguauuugaaaagucgugc	augaucuucuucucccgauaaaugcugau	uacaaaguauuugaaaagucgugcucugaaaaugaauucuuacaugaucuucuucucccgauaaaugcugau	II:8393616..8393688:+
+IV_26953	-17	0.00 +/- 0.00	-	1510	1510	0	0	-	cel-miR-78	-	-	-	uggaggccugguuguuugugc	aaaauaacuagauuuauuu	aaaauaacuagauuuauuuuguaaaaacuauuggaggccugguuguuugugc	IV:15165675..15165727:+
+III_18211	-19.8	0.00 +/- 0.00	-	10820	10820	0	0	-	cel-miR-356b-3p	-	-	-	uuuguucgcguugcucaaccaca	acaaugaguggaggcuaacaaaac	uuuguucgcguugcucaaccacauuguucucaaggaaacuuuaacuguuuauuaauaaaagaagaaaacaaugaguggaggcuaacaaaac	III:7860098..7860189:-
+III_17999	-29.2	0.00 +/- 0.00	-	33	33	0	0	-	cel-miR-5549-3p	-	-	-	ucauguugguuuuuuguuggu	uuuaugaauuuauaaugagg	ucauguugguuuuuuguugguuuauuuuguuuuuaucuuuguuuuuauccagauuaggaaauuuaaauuuuaugaauuuauaaugagg	III:6971931..6972019:-
+
+#miRBase miRNAs not detected by miRDeep2
+miRBase precursor id	total read count	5p read counts	3p read counts	remaining reads	UCSC browser	NCBI blastn	miRBase 5p sequence(s)	miRBase 3p sequence(s)	miRBase precursor sequence
+2427834	2427822	0	12	-	-	aaugacacugguuaucuuuuccaucg	-	cgccggcaaugacacugguuaucuuuuccaucguggaaugccccccauugauuuuuuccc	
+1044263	1043564	0	699	-	-	ugagguaguauguaauauuguaga	-	guggcaucugagguaguauguaauauuguagacugucuauaauguccacaauguuucaac	
+109965	107793	2172	0	-	-	aagcgaucuucuagaugguugua	caaccacuggaauuucucuauu	caaccacuggaauuucucuauu	aagcgaucuucuagaugguuguaaaacaucgaguauuacaaccacuggaauuucucuauu	
+100668	98496	2172	0	-	-	aagcgaaauucaagaugguugua	caaccacuggaauuucucuauu	caaccacuggaauuucucuauu	aagcgaaauucaagaugguuguaaaacaucgaguacuacaaccacuggaauuucucuauu	
+68947	66462	0	2485	-	-	cggcccuuaccguuuaauacaug	-	cggcccuuaccguuuaauacauggugcaucgaccgggaacauguauuaaacgguaagggc	
+16542	16542	0	0	-	-	uuuugauuguuuuucgaugauguucg	-	uucaaaaauugcauuuuccaucuuuugauuguuuuucgaugauguucguuaaaucgguau	
+12782	11013	1766	3	-	-	aaggggacuucuaauuguuugua	caaccauuggaauuucucuauu	aaggggacuucuaauuguuuguaaaaaaucgaguauuacaaccauuggaauuucucuauu	
+10572	0	10492	80	-	-	-	ugauauguaaucuagcuuacag	gugaguuagaucucauauccuuccgcaaaauggaaaugauauguaaucuagcuuacag	
+8176	8166	0	10	-	-	cgccuaaccguugucauguaaua	-	aucugaauuauaaaacaucgccuaaccguugucauguaauauuucccagagaaaaugaua	
+2119	2119	0	0	-	-	aagagcgcuuguagugaguugu	-	agaaguaagagcgcuuguagugaguugucaaaaauugaguaugacaaccacugcaauuuc	
+1626	1620	0	6	-	-	gacaucaagaaacuagugauuaug	-	uauuggcacuagucgcccgugacaucaagaaacuagugauuaugccaaaccacagggaca	
+123	120	0	3	-	-	uguaguuuguagucuagcagacc	-	ggucugcuaauuauuuuuguaguuuguagucuagcagaccaauaccaaaagcuuuggguc	
+103	103	0	0	-	-	ccccgcccaagauuucauuugc	-	ugacacuccaccguuucuaaaccccgcccaagauuucauuugcacugaaaugugucggcc	
+106	93	0	13	-	-	gccgguuugaucuacaaaaaaugc	-	ggugaggggugugucccaugccgguuugaucuacaaaaaaugcgggagcauagaaaaauc	
+54	54	0	0	-	-	guaaguguuacagaauaaucuu	-	guaaguguuacagaauaaucuuagacaaaacaacuaaaauuaaugaaaaauuauucugug	
+52	11	41	0	-	-	guaagauagauuagugcuuuc	aagcucuauucucucuuacag	guaagauagauuagugcuuucaauuauuucaaacgaaagcucuauucucucuuacag	
+40	40	0	0	-	-	gauggcuggaauaucgguauuc	-	gauggcuggaauaucgguauucucggcugaaacaugcacuaaauaccgcauuccaaccaa	
+19	0	19	0	-	-	caaacuacaaguuuuaagccuca	aggccagaauaguguaguuugua	caaacuacaaguuuuaagccucaccaaaaguugggugaggccagaauaguguaguuugua	
+13	13	0	0	-	-	ugugaauugagacuguguauaag	-	ugugaauugagacuguguauaagaauguaaggaggagaggggccguucguaucguucguc	
+12	0	12	0	-	-	ccuccaucuauucuccaucugacg	ucagguagaauuuagaggagaaa	ccuccaucuauucuccaucugacgacgucccgucccgucagguagaauuuagaggagaaa	
+19	9	0	10	-	-	ggcaagacucuggcaaaacu	-	gggcaaaaguugggcaagacucuggcaaaacuuggauuuaugcugcgccaaaguuuaacc	
+8	8	0	0	-	-	uggcagacuucguugaggcua	-	uggcagacuucguugaggcuaugacuacaaacuacaauuuucguuuagccucacccaguu	
+10	7	0	3	-	-	guaggagugaauuuugauuuu	-	guaggagugaauuuugauuuuuuauauguaaauuuaaaauuuauucuuacag	
+7	7	0	0	-	-	uggucucaccacgcguuacucauu	-	uggucucaccacgcguuacucauuaauguuuuuuuuuuucaaucaauggguugcgcguag	
+6	6	0	0	-	-	ugaacaucauucagggcauuac	-	ugaacaucauucagggcauuacaauuuugucuuuuuguaaauaccccaacugauauucga	
+8	3	5	0	-	-	aaaacgaagaaagaagaagaa	ucuucuucucccuucguuuccc	aaaacgaagaaagaagaagaagcauaguguugucuucuucuucucccuucguuuccc	
+5	5	0	0	-	-	cagcgaaucgcucggcccacuuu	-	cagcgaaucgcucggcccacuuuugugaaccaaucagcgucaaaagugggcagagcgauu	
+4	4	0	0	-	-	uggcucaaaucuccagucagacc	ucugacgggagauuugagccauc	uggcucaaaucuccagucagacccugaugugggucugacgggagauuugagccauc	
+4	0	4	0	-	-	-	aacggcggcaauuuguuuacag	guaagcaaauucccgucauuuucuggaaauauuuugaaacggcggcaauuuguuuacag	
+
+
+
+7	0	0	7	-	-	uggcagugaccuauucuggcca	-	cucgugagcuugccagaaucgguggcagugaccuauucuggccagaucuagccagguugg	
+6	0	0	6	-	-	aggcaagacuuuggcaaagc	-	ugucuaaacuugggcaaaaguuaggcaagacuuuggcaaagcuugaauccaaguuuugcc	
+
+
+
+
+
+3	0	0	3	-	-	ggggaucaacgaaaaggggauc	-	gugcaaaaagggaucugggaagggggaucaacgaaaaggggaucuggcacagugccagau	
+
+10	0	0	10	-	-	gucgagcuguccguacucgucg	-	gucgagcuguccguacucgucgacuauaaccgacgccaaguagagguacgagcugugacg	
+
+
+
+
+
+
+
+
