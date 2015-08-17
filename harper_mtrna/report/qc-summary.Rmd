@@ -275,6 +275,7 @@ dds = DESeqDataSetFromMatrix(countData=counts,
     colData=summarydata[colnames(counts),], design = design)
 dds = DESeq(dds)
 size_factor = sizeFactors(dds)
+write.table(size_factor,"~/orch/groups/harper_rnaseq/mtrna/merged/size_factor.tsv", quote=F)
 ```
 
 ## Effect of variance stabilization
