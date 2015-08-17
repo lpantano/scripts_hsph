@@ -28,7 +28,7 @@ For replication [go here](http://seqcluster.readthedocs.org/example_pipeline.htm
 
 Document with R code [go here](http://github.com/lpantano/seqcluster/docs/post/mirqc/report_with_code.md)
 
-```{r setup}
+```{r setup, message="FALSE"}
 
 library(ggplot2)
 library(reshape)
@@ -40,7 +40,7 @@ library(gridExtra)
 library(devtools)
 library(dplyr)
 library(isomiRs)
-
+library(edgeR)
 
 root_file = paste0(root_path,"/report/")
 
@@ -55,9 +55,7 @@ library(knitrBootstrap)
 
 # Overview
 
-mirRQC project
-
-[paper](http://www.nature.com/nmeth/journal/v11/n8/full/nmeth.3014.html)
+mirRQC project [paper](http://www.nature.com/nmeth/journal/v11/n8/full/nmeth.3014.html)
 
 samples overview:
 
@@ -399,7 +397,7 @@ kable(t(as.matrix(summary(mirqca[top_a]-mirqcd[top_a]))))
 
 ```
 
-the logFC is 0.5 that is a FC of log2(1/0.75)=0.5 that should be D according to description
+the logFC is 0.5 that is similar to the expected FC = log2(1/0.75)=0.5
 
 
 ratio expression summary of A/C
@@ -409,7 +407,7 @@ kable(t(as.matrix(summary(mirqca[top_a]-mirqcc[top_a]))))
       
 ```
 
-the logFC is 1.6 that is a FC of log2(1/0.25)=2 that should be C according to description
+the logFC is 1.6 that is similar to the expected FC = log2(1/0.25)=2
 
 Same happens when comparing B vs D 
 
@@ -521,7 +519,9 @@ keep_d = grepl("miRQC", rownames(design))
 dge = DGEList(clus_ma[,keep])
 dge = calcNormFactors(dge,method = 'upperquartile')
 clus_ma_norm = cpm(dge, normalized.lib.sizes = T, log = T)
-clus_ma_norm = clus_ma_norm[rowMedians(clus_ma_norm)>5,]
+enough = rowMedians(clus_ma_norm)>5
+clus_ma_norm = clus_ma_norm[enough,]
+is_mi = grepl("miRNA", ann)
 ```
 
 ### Matrix correlation among samples
@@ -545,8 +545,9 @@ top_b = mirqca < mirqcb
 conc_b = top_b & mirqcb > mirqcc & mirqcc > mirqcd
 ```
 
-clusters which mirqca > mirqcd > mrqcc are `r sum(conc_a)` out of `r sum(top_a)`
-clusters which mirqcb > mirqcc > mrqcd are `r sum(conc_b)` out of `r sum(top_b)`
+clusters which mirqca > mirqcd > mrqcc are `r sum(conc_a)` (`r sum(is_mi[enough] & conc_a)` are miRNAs) out of `r sum(top_a)`
+
+clusters which mirqcb > mirqcc > mrqcd are `r sum(conc_b)` (`r sum(is_mi[enough] & conc_b)` out of `r sum(top_b)`
 
 ratio expression summary of A/D
 
@@ -555,7 +556,7 @@ kable(t(as.matrix(summary(mirqca[top_a]-mirqcd[top_a]))))
 
 ```
 
-the logFC is 0.5 that is a FC of log2(1/0.75)=0.5 that should be D
+the average logFC is 0.3 that is similar to the expected FC = log2(1/0.75)=0.41 
 
 
 ratio expression summary of A/C
@@ -565,7 +566,7 @@ kable(t(as.matrix(summary(mirqca[top_a]-mirqcc[top_a]))))
 
 ```
 
-the logFC is 1.6 that is a FC of log2(1/0.25)=2 that should be C
+the logFC is 1.6 that is similar to the expected FC = log2(1/0.25) = 2
 
 Same happens when comparing B vs D 
 
