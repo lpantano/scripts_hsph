@@ -1,0 +1,101 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+Report done by Lorena Pantano, last update  `r date()`
+
+# enhancer activity detection
+
+```{r setup}
+library(knitr)
+
+library(ggplot2)
+library(reshape)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(Biostrings)
+source("~/repos/myRfunctions/transactions.R")
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heigh=6,
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+```
+
+
+```{r render, eval=FALSE, echo=FALSE}
+library(rmarkdown)
+library(knitrBootstrap)
+render_2_drop("qc_pilot2.rmd",dn = "sui_enhancer/pilot2")
+```
+
+
+```{r samples}
+sw = list()
+sw[['l1']] = read.table("~/orch/scratch/sui_enhancer/pilot2/res/L1_S3.R1_counts.tsv")
+sw[['l2']] = read.table("~/orch/scratch/sui_enhancer/pilot2/res/L2_S4.R1_counts.tsv")
+sw[['l3']] = read.table("~/orch/scratch/sui_enhancer/pilot2/res/L3_S5.R1_counts.tsv")
+sw[['l4']] = read.table("~/orch/scratch/sui_enhancer/pilot2/res/L4_S6.R1_counts.tsv")
+```
+
+## General stats of novel vs known barcodes
+
+```{r known_vs_novel}
+detection = lapply(names(sw), function(x){
+    sw[[x]] %>% group_by(V2) %>% dplyr::summarise(counts=n(),abundance=sum(V3)) %>% mutate(experiment=x)
+})
+dd = do.call(rbind, detection)
+
+ggplot(dd, aes(x=experiment, y=counts, fill=V2)) +
+    geom_bar(stat = 'identity', position = 'dodge') +
+    scale_y_log10() +
+    scale_fill_brewer("", palette = "Set1")
+
+ggplot(dd, aes(x=experiment, y=abundance, fill=V2)) +
+    geom_bar(stat = 'identity', position = 'dodge') +
+    scale_y_log10() +
+    scale_fill_brewer("", palette = "Set1")
+
+```
+
+## top different barcodes
+
+```{r norm}
+library(edgeR)
+library(plyr)
+cleaned = lapply(names(sw), function(x){
+    sw[[x]] %>% filter(V3>1) %>% select(V1, V3) %>% mutate(experiment=x)
+})
+
+dd = do.call(rbind, cleaned)
+mat = reshape(dd, direction = 'wide', idvar = 'V1', timevar = 'experiment')
+mat[is.na(mat)] = 0 
+dge = edgeR::DGEList(mat[,2:5], genes = mat$V1)
+norm = cpm(dge, normalized.lib.sizes = TRUE, log = TRUE)
+rownames(norm) = dge$genes$genes
+# pheatmap::pheatmap(norm)
+```
+
+```{r select}
+mm = apply(norm, 1, min)
+mx = apply(norm, 1, max)
+
+keep = mx - mm > 10
+pheatmap::pheatmap(norm[keep,], show_rownames=FALSE)
+
+write.table(norm[keep,], "pilot2_difference.tsv", quote=F, sep="\t")
+```
+
+
+Download [file](`r get_report_links("pilot2_difference.tsv")`)
+
+
