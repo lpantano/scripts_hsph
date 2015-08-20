@@ -39,13 +39,14 @@ render_2_drop("qc_pilot2.rmd",dn = "sui_enhancer/pilot2")
 ```
 
 
-```{r samples}
+```{r samples-pilot2}
 sw = list()
 sw[['l1']] = read.table("~/orch/scratch/sui_enhancer/pilot2/res/L1_S3.R1_counts.tsv")
 sw[['l2']] = read.table("~/orch/scratch/sui_enhancer/pilot2/res/L2_S4.R1_counts.tsv")
 sw[['l3']] = read.table("~/orch/scratch/sui_enhancer/pilot2/res/L3_S5.R1_counts.tsv")
 sw[['l4']] = read.table("~/orch/scratch/sui_enhancer/pilot2/res/L4_S6.R1_counts.tsv")
 ```
+
 
 ## General stats of novel vs known barcodes
 
@@ -73,7 +74,7 @@ ggplot(dd, aes(x=experiment, y=abundance, fill=V2)) +
 library(edgeR)
 library(plyr)
 cleaned = lapply(names(sw), function(x){
-    sw[[x]] %>% filter(V3>1) %>% select(V1, V3) %>% mutate(experiment=x)
+    sw[[x]] %>% filter(V3>1) %>% dplyr::select(V1, V3) %>% mutate(experiment=x)
 })
 
 dd = do.call(rbind, cleaned)
@@ -98,4 +99,40 @@ write.table(norm[keep,], "pilot2_difference.tsv", quote=F, sep="\t")
 
 Download [file](`r get_report_links("pilot2_difference.tsv")`)
 
+# Both pilots
+
+```{r samples-pilot1}
+# sw = list()
+sw[['sw1']] = read.table("~/orch/scratch/sui_enhancer/pilot1/res9/052715_SW1_ATCACG_L001_R1_001_counts.tsv")
+sw[['sw2']] = read.table("~/orch/scratch/sui_enhancer/pilot1/res25/052715_SW2_CGATGT_L001_R1_001_counts.tsv")
+sw[['sw3']] = read.table("~/orch/scratch/sui_enhancer/pilot1/res25/052715_SW3_TTAGGC_L001_R1_001_counts.tsv")
+sw[['sw4']] = read.table("~/orch/scratch/sui_enhancer/pilot1/res25/052715_SW4_TGACCA_L001_R1_001_counts.tsv")
+```
+
+## table with all samples
+
+```{r edger.all}
+cleaned = lapply(names(sw), function(x){
+    sw[[x]] %>% filter(V3>1) %>% dplyr::select(V1, V3) %>% mutate(experiment=x)
+})
+
+dd = do.call(rbind, cleaned)
+mat = reshape(dd, direction = 'wide', idvar = 'V1', timevar = 'experiment')
+mat[is.na(mat)] = 0 
+dge = edgeR::DGEList(mat[,2:9], genes = mat$V1)
+norm = cpm(dge, normalized.lib.sizes = TRUE)
+rownames(norm) = dge$genes$genes
+sort.avg = sort(rowMeans(norm),decreasing = T, index.return=TRUE)
+write.table( cbind(barcode=as.character(dge$genes$genes[sort.avg$ix]), round(norm[sort.avg$ix, ])), "matrix_all_norm.tsv", row.names=F, sep="\t", quote=F )
+
+raw = dge$counts
+sort.avg = sort(rowMeans(raw),decreasing = T, index.return=TRUE)
+write.table( cbind(barcode=as.character(dge$genes$genes[sort.avg$ix]), raw[sort.avg$ix, ]), "matrix_all_raw.tsv", row.names=F, sep="\t", quote=F )
+
+```
+
+
+Download all raw data [file](`r get_report_links("matrix_all_raw.tsv")`)
+
+Download all normalized data [file](`r get_report_links("matrix_all_norm.tsv")`)
 
