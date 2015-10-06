@@ -10,12 +10,20 @@ output:
     highlight: zenburn
 ---
 
-Last updated `r date()`
+Last updated `r date()` by Lorena Pantano
 
 ```{r setup, echo=FALSE}
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+options(bitmapType = "cairo")
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 9,
                cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                message=FALSE, prompt=TRUE, comment='', fig.cap='')
+```
+
+```{r render}
+library(rmarkdown)
+library(knitrBootstrap)
+source("~/repos/myRfunctions/transactions.R")
+# render_2_drop("qc-summary.Rmd", dn = "jeffrey_chron_w_snps")
 ```
 
 # Overview
@@ -27,6 +35,9 @@ library(gplots)
 library(edgeR)
 library(CHBUtils)
 library(pheatmap)
+library(gridExtra)
+library(dplyr)
+library(knitr)
 project_summary = "/home/lpantano/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/project-summary.csv"
 counts_file = "/home/lpantano/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/combined.counts"
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
@@ -226,16 +237,12 @@ library(DEGreport)
 library(vsn)
 ```
 
-# Differential expression
-
-## Genes different expressed between 4h and 0h
-
 ```{r time-deseq}
 summarydata$covariate = paste0(summarydata$time, summarydata$condition, summarydata$genotype)
 
 ```
 
-```{r time-deseq2-expression-analysis, results='asis'}
+```{r time-deseq2-expression-analysis, results='asis', cache=T}
 counts <- counts[rowSums(counts>1)>2,]
 dds = DESeqDataSetFromMatrix(countData=counts,
     colData=summarydata, design = ~ covariate)
@@ -243,15 +250,16 @@ dds = DESeq(dds)
 rld = rlog(dds)
 ```
 
-### Dispersion estimates
+## Dispersion estimates
 
 ```{r time-dispersion-estimate}
 plotDispEsts(dds)
 ```
-### PCAplot
+
+## PCAplot of 50 most variant genes
 
 ```{r time-pca}
-plotPCA(rld, "covariate")
+plotPCA(rld, "covariate", n=100)
 ```
 
 ```{r time-deseq2-handler}
@@ -284,8 +292,65 @@ handle_deseq2 = function(dds, summarydata, column, all_combs) {
     total_genes[,nc] <- as.integer(total_genes[,nc])
   total_genes  
 }
+library(clusterProfiler)
+
+reduce = function(genes){
+  seen = c()
+  idx = sapply(genes, function(x){
+    here = as.character(as.vector(unlist(strsplit(x, split = "/"))))
+    if (length(here)>100){
+      return(FALSE)
+    }
+    c = intersect(seen, here)
+    seen <<- unique(c(seen, here))
+    score = 0.6 * length(here)
+    if (length(c) < score)
+      return(TRUE)
+    FALSE
+  })
+  idx
+}
+
+goenrichment = function(g){
+  select_entrez = .ens2entrez(g)
+  ego= enrichGO(gene = select_entrez, organism = "human", ont = "BP", pAdjustMethod = "BH",
+  pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
+
+  if (nrow(summary(ego))>0){
+    idx =reduce(summary(ego)$geneID)
+    
+    cat("GO enrichment for Biological processes:\n\n")
+    
+    print(kable(summary(ego)[idx, 1:7]))
+    
+    cat("\n\n")
+  }  
+}
+  
+library(org.Hs.eg.db)
+.ens2name = function(x){
+    symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(x), "SYMBOL", keytype="ENSEMBL")
+    symbol = symbol %>% distinct(SYMBOL)
+    idx = match(x, symbol$ENSEMBL)
+    # symbol$ENTREZID[!is.na(symbol$ENTREZID)]
+    symbol$SYMBOL[idx]
+}
+
+.ens2entrez = function(x){
+    symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(x), "ENTREZID", keytype="ENSEMBL")
+    symbol = symbol %>% distinct(ENTREZID)
+    symbol$ENTREZID
+}
 
 ```
+
+## Differentially expressed genes between 4h and 0h
+
+comparisons:
+
+* Wt 4h vs 0h = 4hwtnon vs 0hwtnon
+* Cd with snp 4h vs 0h = 4hcdsnp vs 0hcdsnp
+* Cd without snp 4h vs 0h = 4hcdnon vs 0hcdnon
 
 ### MA-plots
 
@@ -298,23 +363,12 @@ len = length(all_results)
 nr = ceiling( len / 3 )
 nc = ceiling( len / nr )
 par(mfrow=c(nr,nc))
+scale_factor=9
 for(i in seq(length(all_results))) {
   DESeq2::plotMA(all_results[[i]])
   title(paste("MA plot for contrast", names(all_results)[i]))
 }
 ```
-
-### Volcano-plots
-
-```{r time-DESeq-volcano}
-for(i in seq(length(all_results))) {
-  stats = as.data.frame(all_results[[i]][,c(2,6)])
-  p = volcano_density_plot(stats, title=names(all_results)[i], lfc.cutoff=1.5)
-  print(p)
-}
-```
-
-### DEGreport
 
 ```{r time-get-groups}
 get_groups <- function(d, comp, condition)
@@ -339,28 +393,47 @@ for(i in seq(length(all_results))) {
 do.call(grid.arrange,plots)
 ```
 
-```{r time-DESeq-tables, results='asis'}
+### Differentially expressed genes tables
+
+FDR < 1% and abs(log2FC) > 2
+
+```{r time-DESeq-tables, results='asis', cache=T}
 ma = list()
 for(i in seq(length(all_results))) {
-  cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
+  cat(paste("\n\nLowest adjusted p-value hits for", names(all_results)[i]),"\n\n")
   out_df = all_results[[i]]
+  print(summary(out_df,alpha=0.01))
+  cat("\n\n")
+  out_df$name = .ens2name(rownames(out_df))
   genes = as.data.frame(out_df) %>% mutate(ensembl=rownames(out_df)) %>% filter(abs(log2FoldChange)>2 & padj<0.01)
   ma[[paste0("c",names(all_results)[i])]] = genes$ensembl
   
-  print(knitr::kable(head(out_df)))
+  print(knitr::kable(head(out_df,20)))
   write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
+  
+  goenrichment(genes$ensembl)
+  
 }
 ```
 
-```{r time-upset}
+### Common genes between comparisons
 
+```{r time-upset}
+library(UpSetR)
+de_genes = c(unlist(ma))
 binary_ma=.make_binary_matrix(ma)
 upset(binary_ma, sets = names(ma))
 ```
 
-## Genes different expressed between groups at 0h
+## Differentially expressed genes between groups at 0h
+
+comparisons:
+
+* Wt vs Cd with snp at 0h = 0hwtnon vs 0hcdsnp
+* Wt vs Cd without snp at 0h = 0hwtnon vs 0hcdnon
+* Cd with snp vs Cd without snp at 0h = 0hcdsnp vs 0hcdnon
 
 ### MA-plots
 
@@ -394,28 +467,45 @@ do.call(grid.arrange,plots)
 
 ### Differentially expressed genes
 
-```{r group-DESeq-tables, results='asis'}
+FDR < 1% and abs(log2FC) > 1
+
+```{r group-DESeq-tables, results='asis', cache=T}
 ma = list()
 for(i in seq(length(all_results))) {
-  cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
+  cat(paste("\n\nLowest adjusted p-value hits for", names(all_results)[i]), "\n\n")
   out_df = all_results[[i]]
-  genes = as.data.frame(out_df) %>% mutate(ensembl=rownames(out_df)) %>% filter(abs(log2FoldChange)>2 & padj<0.01)
+  print(summary(out_df,alpha=0.01))
+  cat("\n\n")
+  out_df$name = .ens2name(rownames(out_df))
+  genes = as.data.frame(out_df) %>% mutate(ensembl=rownames(out_df)) %>% filter(abs(log2FoldChange)>1 & padj<0.01)
   ma[[paste0("c",names(all_results)[i])]] = genes$ensembl
   
-  print(knitr::kable(head(out_df)))
+  print(knitr::kable(head(out_df,20)))
   write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
+  
+  goenrichment(genes$ensembl)
+  
+  
 }
 ```
 
-```{r group-upset}
+### Common genes between comparisons
 
+```{r group-upset}
+de_genes = c(de_genes, unlist(ma))
 binary_ma=.make_binary_matrix(ma)
 upset(binary_ma, sets = names(ma))
 ```
 
-## Genes different expressed between groups at 4h
+## Differentially expressed genes between groups at 4h
+
+comparisons:
+
+* Wt vs Cd with snp at 4h = 4hwtnon vs 4hcdsnp
+* Wt vs Cd without snp at 4h = 4hwtnon vs 4hcdnon
+* Cd with snp vs Cd without snp at 4h = 4hcdsnp vs 4hcdnon
 
 ### MA-plots
 
@@ -449,24 +539,51 @@ do.call(grid.arrange,plots)
 
 ### Differentially expressed genes
 
-```{r group4h-DESeq-tables, results='asis'}
+FDR < 1% and abs(log2FC) > 1
+
+```{r group4h-DESeq-tables, results='asis', cache=T}
 ma = list()
 for(i in seq(length(all_results))) {
-  cat(paste("Lowest adjusted p-value hits for", names(all_results)[i]))
+  cat(paste("\n\nLowest adjusted p-value hits for", names(all_results)[i]),"\n\n")
   out_df = all_results[[i]]
-  genes = as.data.frame(out_df) %>% mutate(ensembl=rownames(out_df)) %>% filter(abs(log2FoldChange)>2 & padj<0.01)
+  print(summary(out_df,alpha=0.01))
+  cat("\n\n")
+  genes = as.data.frame(out_df) %>% mutate(ensembl=rownames(out_df)) %>% filter(abs(log2FoldChange)>1 & padj<0.01)
   ma[[paste0("c",names(all_results)[i])]] = genes$ensembl
+  out_df$name = .ens2name(rownames(out_df))
   
-  print(knitr::kable(head(out_df)))
+  print(knitr::kable(head(out_df,20)))
   write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
+  
+  goenrichment(genes$ensembl)
+  
 }
 ```
 
-```{r group4h-upset}
+### Common genes between comparisons
 
+```{r group4h-upset}
+de_genes = c(de_genes, unlist(ma))
 binary_ma=.make_binary_matrix(ma)
 upset(binary_ma, sets = names(ma))
+```
+
+## Heatmap with all DE genes
+
+```{r heatmpa-all}
+heatmap_fn(as.matrix(assay(rld)[de_genes,]), scale='row',show_rownames=F)
+```
+
+
+# Files
+
+```{r files, results='asis'}
+fn = list.files(".", pattern="tsv")
+for (f in fn){
+  link=get_report_links(f)
+  cat(sep="", "[",f,"]","(",link,")\n\n")
+}
 ```
 
