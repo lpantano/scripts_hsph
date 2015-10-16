@@ -1,0 +1,700 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+Last updated `r date()` by Lorena Pantano
+
+```{r setup-opts, echo=FALSE}
+options(bitmapType = "cairo")
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 9,
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='')
+```
+
+```{r render,echo=F}
+library(rmarkdown)
+library(knitrBootstrap)
+source("~/repos/myRfunctions/transactions.R")
+# render_2_drop("ready_report_qc.rmd", dn = "vishal_mirna_pilot2")
+```
+
+```{r setup}
+library(knitr)
+
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(isomiRs)
+library(pheatmap)
+
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=9,fig.heigh=6,
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+
+root_path = "~/orch/scratch/vishal_mirna_kidney/mirna_kidney_pilot2/work/report"
+root_file = file.path(root_path)
+
+condition = "condition"
+```
+
+```{r load}
+# setwd(root_path)
+files = read.table(file.path(root_path, "summary_re.csv"), sep=",",header=T,colClasses = "character")
+
+metadata = read.csv("~/orch/scratch/vishal_mirna_kidney/mirna_kidney_pilot2/metadata.csv")
+
+samples = files[,"sample_id"]
+
+names_stats = files[,"size_stats"]
+names(names_stats) = samples
+
+groups = files[,"group"]
+names(groups) = samples
+
+summarydata = data.frame(row.names=samples,samples=samples,group=groups)
+design <- data.frame(row.names=files$sample_id, condition=files$group)
+
+```
+
+# Exploratory analysis
+
+In this section we will see descriptive figures about quality of the data, 
+reads with adapter, reads mapped to miRNAs, reads mapped to other small RNAs. 
+
+## size distribution
+
+After adapter removal, we can plot the size distribution of the small RNAs.
+aki4 samples didn't get sequenced enough.
+
+```{r adapter,fig.width=10}
+tab = data.frame()
+for (sample in samples){
+    d = read.table(file.path(root_path,names_stats[sample]), sep=" ")
+    tab = rbind(tab, d %>% mutate(sample=sample, group=groups[sample]))
+}
+
+
+reads_adapter = tab %>% group_by(sample, group) %>% summarise(total=sum(V2))
+ggplot(reads_adapter, aes(x=sample,y=total,fill=group)) +
+    geom_bar(stat="identity", position = "dodge") +
+    ggtitle("total number of reads with adapter") +
+    ylab("# reads") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+ggplot(tab, aes(x=V1,y=V2,fill=sample)) +
+    geom_bar(stat="identity", position = "dodge") +
+    facet_wrap(~group, ncol=2,scales = "free_y")+
+    scale_fill_discrete(guide=FALSE) +
+    ggtitle("size distribution") +
+    ylab("# reads") + xlab("size") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+## miRNA
+
+### total miRNA expression annotated with mirbase
+
+```{r mirna,results='hide', cache=T}
+mi_files = file.path(root_path,files[,"miraligner"])
+row.names(design) = samples
+
+# obj <- IsomirDataSeqFromFiles(files = mi_files, design = design ,header = T, cov = 1)
+# save(obj, file="obj.rda")
+load("obj.rda")
+```
+
+
+```{r mirna-mirbase}
+ggplot( data.frame(sample=colnames(counts(obj)), total=colSums(counts(obj)))) +
+    geom_bar(aes(x=sample,y=total), stat='identity')+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+mirna_step <- as.data.frame(colSums(counts(obj)))
+```
+
+### Distribution of mirna expression
+
+```{r depth}
+ggplot(melt(counts(obj))) +
+    geom_boxplot(aes(x=X2,y=value))+
+    scale_y_log10()+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+### cumulative distribution of miRNAs
+
+```{r cum}
+cs <- as.data.frame(apply(counts(obj),2,function(x){cumsum(sort(x, decreasing = T))}))
+cs$pos <- 1:nrow(cs)
+
+ggplot((melt(cs,id.vars = "pos")))+
+    geom_line(aes(x=pos,y=value,color=variable))+
+    scale_y_log10()
+```
+
+### complexity
+
+Number of miRNAs with > 3 counts.
+
+```{r complexity}
+
+kable(as.data.frame(colSums(counts(obj)>10)))
+
+```
+
+### Clustering
+```{r raw-mirna-clustering}
+obj <- isoNorm(obj)
+ma = counts(obj, norm=T)
+ma = ma[rowSums(ma>2)>3,]
+pheatmap(ma, show_rownames = F, clustering_method = "ward.D")
+```
+
+## Others small RNA
+
+The data was analyzed with [seqcluster](http://seqcluster.readthedocs.org/)
+
+This tools used all reads, uniquely mapped and multi-mapped reads. The first
+step is to cluster sequences in all locations they overlap. The second step is to 
+create meta-clusters: is the unit that merge all clusters that share the 
+same sequences. This way the output are meta-clusters, common sequences that could
+come from different region of the genome.
+
+
+### genome covered
+
+In this table 1 means % of the genome with at least 1 read, and 0 means %
+of the genome without reads.
+
+```{r genome-covered, results='asis'}
+cov_stats <- read.table(file.path(root_path, "..", "align", "seqs_rmlw.bam_cov.tsv"),sep="\t",check.names = F)
+
+kable(cov_stats[cov_stats$V1=="genome",] %>%  dplyr::select(coverage=V2,ratio_genome=V5), row.names = FALSE)
+
+```
+
+The normal value for human data with strong small RNA signal is: 0.0002.
+This will change for smaller genomes.
+
+### classification
+
+Number of reads in the data after each step:
+
+* raw: initial reads
+* cluster: after cluster detection
+* multimap: after meta-cluster detection
+
+```{r reads-track}
+reads_stats <- read.table(file.path(root_path, "..","seqcluster", "cluster", "read_stats.tsv"),sep="\t",check.names = F)
+ggplot(reads_stats, aes(x=V2, y=V1, fill=V3)) + 
+    geom_bar(stat = 'identity', position = 'dodge') +
+    labs(list(x="samples", y="reads")) +
+    scale_fill_brewer("steps", palette = 'Set1')+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+```{r cluster}
+clus <- read.table(file.path(root_path, "..", "seqcluster", "cluster", "counts.tsv"),header=T,sep="\t",row.names=1, check.names = FALSE)
+ann <- clus[,2]
+toomany <- clus[,1]
+clus_ma <- clus[,3:ncol(clus)]
+clus_ma = clus_ma[,row.names(design)]
+```
+
+
+Check complex meta-clusters: This kind of events happen when there are small RNA over the whole genome, and all
+repetitive small rnas map to thousands of places and sharing many sequences in many positions.
+If any meta-cluster is > 40% of the total data, maybe it is worth to add some filters
+like: minimum number of counts `-e` or `--min--shared` in `seqcluster prepare`
+
+
+```{r complex-meta-clusters}
+library(edgeR)
+clus_ma_norm = cpm(DGEList(clus_ma),normalized.lib.sizes = TRUE)
+head(clus_ma_norm[toomany>0,])
+```
+
+### complexity
+
+Number of miRNAs with > 10 counts.
+
+```{r complexity-clus}
+
+kable(as.data.frame(colSums(clus_ma>10)))
+
+```
+
+### Contribution by class
+
+```{r cluster_type}
+rRNA <- colSums(clus_ma[grepl("rRNA",ann) & grepl("miRNA",ann)==F,])
+miRNA <- colSums(clus_ma[grepl("miRNA",ann),])
+tRNA <- colSums(clus_ma[grepl("tRNA",ann) & grepl("rRNA",ann)==F & grepl("ncRNA",ann)==F & grepl("miRNA",ann)==F,])
+rmsk <- colSums(clus_ma[grepl("ncRNA",ann) & grepl("rRNA",ann)==F & grepl("miRNA",ann)==F,])
+total <- colSums(clus_ma)
+
+dd <- data.frame(samples=names(rRNA),
+                 rRNA=rRNA,
+                 miRNA=miRNA,
+                 tRNA=tRNA,
+                 ncRNA=rmsk,
+                total=total)
+ggplot(melt(dd)) +
+    geom_bar(aes(x=samples,y=value,fill=variable),
+             stat='identity',
+             position="dodge")+
+    scale_fill_brewer(palette = "Set1")+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+dd_norm = dd
+dd_norm[,2:5] = sweep(dd[,2:5],1,dd[,6],"/")
+ggplot(melt(dd_norm[,1:5])) +
+    geom_bar(aes(x=samples,y=value,fill=variable),
+             stat='identity',
+             position="dodge")+
+    scale_fill_brewer(palette = "Set1")+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    labs(list(title="relative proportion of small RNAs",y="% reads"))
+```
+
+```{r clus-size-by-class}
+size_clus <- read.table(file.path(root_path, "..", "seqcluster", "cluster", "size_counts.tsv"),sep="\t",check.names = F)
+```
+
+
+# Differentail expression
+
+We merge same samples together. And removed ak4 because the sequencing was wrong both times.
+
+[DESeq2](http://bioconductor.org/packages/release/bioc/html/DESeq2.html) is used for this analysis.
+
+```{r de-setup}
+library(DESeq2)
+library(DEGreport)
+library(vsn)
+```
+
+```{r deseq2-handler}
+
+filter_handle <- function(res){
+    res_nona <- res[!is.na(res$padj),]
+    keep <- res_nona$padj < 0.1 
+    res_nona[keep,]
+}
+
+handle_deseq2 = function(dds, summarydata, column) {
+  all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="_vs_")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+
+plot_MA = function(res){
+    for(i in seq(length(res))) {
+        DESeq2::plotMA(res[[i]])
+        title(paste("MA plot for contrast", names(res)[i]))
+    }
+}
+
+plot_volcano = function(res){
+    for(i in seq(length(res))) {
+        stats = as.data.frame(res[[i]][,c(2,6)])
+        p = volcano_density_plot(stats, title=names(res)[i], lfc.cutoff=1)
+        print(p)
+    }
+}
+
+do_de = function(raw, summarydata, formula, minc=3){
+    dss = DESeqDataSetFromMatrix(countData = raw[rowMeans(raw)>minc,],
+                       colData = summarydata,
+                       design = formula)
+    dss = DESeq(dss)
+    plotDispEsts(dss)
+    dss
+}
+
+.add_average = function(ma,groups){
+  for (l in names(groups)){
+    
+    ma = cbind(ma , counts = rowMeans(ma[,groups[[l]]]))
+    colnames(ma)[ncol(ma)] = l
+  }
+  return(ma)
+}
+
+do_norm = function(dss, root_path, prefix, by_groups=NULL){
+    rlog_ma = assay(rlog(dss))
+    count_ma = counts(dss, normalized=TRUE)
+    raw = counts(dss, normalized=FALSE)
+    if (!is.null(by_groups)){
+      rlog_ma = .add_average(rlog_ma, by_groups)
+      count_ma = .add_average(count_ma, by_groups)
+      raw = .add_average(raw, by_groups)
+    }
+    fn_log = paste0( prefix, "log_matrix.txt")
+    write.table(rlog_ma,fn_log,sep="\t")
+    fn_count = paste0(prefix, "count_matrix.txt")
+    write.table(count_ma,fn_count,sep="\t")
+    fn_raw = paste0(prefix, "raw_matrix.txt")
+    write.table(count_ma,fn_raw,sep="\t")
+}
+
+plot_gene = function(name, d){
+  design = colData(d)
+  ggplot(plotCounts(d, name, returnData=TRUE) %>% mutate(gender=design$gender, age=as.factor(design$age)), aes(x=condition,y=count,color=age,shape=gender)) + 
+    geom_point(size=3) +
+    ggtitle(name) + 
+    scale_color_brewer(palette = "Set1")
+}
+
+```
+
+## Analysis for miRNAs
+
+```{r de}
+ref = isoCounts(obj)
+counts = counts(ref)
+samples = metadata$X
+.list = list()
+for (s in samples){
+  .idx = which(grepl(s, colnames(counts)))
+  if (length(.idx) == 1){
+    .list[[s]] = counts[,.idx]
+  }else{
+  .c = counts[,.idx[1]] + counts[,.idx[2]]
+  .list[[s]] = .c
+  }
+}
+ma = do.call(cbind, .list)
+designma = metadata %>% mutate (age=round(AGE/10)*10, gender=GENDER, condition=X.1, diagnosis=SAMPLEDIAGNOSIS ) %>% dplyr::select(diagnosis, age, gender, condition)
+rownames(designma) = colnames(ma)
+
+keep = lapply(unique(designma$condition), function(g){
+  .idx = rownames(designma[designma$condition==g,])
+  # print(ma[,.idx])
+  .keep = rowSums(ma[,.idx]>10)>3
+})
+keep = keep[[1]] | keep[[2]] | keep[[3]]
+ma = ma[keep,-14]
+designma = designma[-14,]
+dds = do_de(ma, designma, ~ age + gender + condition)
+```
+
+```{r tables}
+groups = list(Healthy = grepl("Healthy", designma$condition),
+              CKD = grepl("CKD", designma$condition),
+              AKI = grepl("AKI", designma$condition))
+do_norm(dds, root_path, "mirna_", groups)
+```
+
+### Clustering
+```{r mirna-clustering}
+mat = rlog(dds)
+pheatmap(assay(mat), clustering_distance_cols = "correlation", show_rownames = F, clustering_method = "ward.D2", annotation = designma)
+plotPCA(mat)
+# ref = isoNorm(ref)
+# pls = isoPLSDA(ref,"condition",nperm = 100,vip = 2)
+# isoPLSDAplot(pls)
+# pheatmap(assay(mat)[as.character(pls$vip$variable),], clustering_distance_cols = "correlation", show_rownames = F, clustering_method = "ward.D2", annotation = designma)
+
+```
+
+Based on that the groups are quite noisy and not clustering together what
+means another unknown variable is driven this.
+
+### MA-plots
+
+The MA-plots seem ok telling us that normalization is working.
+
+```{r DESeq-output, results='asis', fig.height=9}
+all_results = handle_deseq2(dds, designma, "condition")
+plot_MA(all_results)
+
+for (i in names(all_results)){
+  cat("\n\n Top 10 at: ",i,"\n\n")
+  print(kable(head(all_results[[i]],20)))
+  # top = (all_results[[i]] %>% mutate(mir=rownames(all_results[[i]])) %>% filter(padj<0.1))[,1:5]
+  cat("\n\n") 
+  .plots = lapply(rownames(all_results[[i]][1:5,]), plot_gene, dds)
+  do.call(grid.arrange, .plots)
+  
+  write.table(as.data.frame(all_results[[i]]),paste0(i,"_mirna_de.tsv"),sep="\t",quote=F)
+  write.table(row.names(subset(all_results[[i]],padj<0.01)),paste0(i,"_mirna_sign.tsv"),sep="\t",quote=F, row.names=F)
+}
+
+```
+
+### target enrichment
+
+It was used last version of targetscan 7 and the top 100 targets according to the database.
+All miRNA with FDR < 1% were choosen to get the targets.
+
+```{r fn-enrichment}
+library(clusterProfiler)
+reduce = function(genes){
+  seen = c()
+  idx = sapply(genes, function(x){
+    here = as.character(as.vector(unlist(strsplit(x, split = "/"))))
+    if (length(here)>100){
+      return(FALSE)
+    }
+    c = intersect(seen, here)
+    seen <<- unique(c(seen, here))
+    score = 0.6 * length(here)
+    if (length(c) < score)
+      return(TRUE)
+    FALSE
+  })
+  idx
+}
+
+goenrichment = function(g){
+  # select_entrez = .ens2entrez(g)
+  ego= enrichGO(gene = g, organism = "human", ont = "BP", pAdjustMethod = "BH",
+  pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
+
+  if (nrow(summary(ego))>0){
+    idx =reduce(summary(ego)$geneID)
+    
+    cat("GO enrichment for Biological processes:\n\n")
+    
+    print(kable(summary(ego)[idx, 1:7]))
+    
+    cat("\n\n")
+  } 
+  summary(ego)
+}
+  
+library(org.Hs.eg.db)
+.name2entrez = function(x){
+    symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(x), "ENTREZID", keytype="SYMBOL")
+    symbol = symbol %>% distinct(ENTREZID)
+    # idx = match(x, symbol$SYMBOL)
+    symbol$ENTREZID[!is.na(symbol$ENTREZID)]
+    # symbol$ENTREZID
+}
+
+.ens2entrez = function(x){
+    symbol = AnnotationDbi::select(org.Hs.eg.db, as.character(x), "ENTREZID", keytype="ENSEMBL")
+    symbol = symbol %>% distinct(ENTREZID)
+    symbol$ENTREZID
+}
+
+```
+
+* AKI vs CDK
+
+```{r aki_vs_cdk, results='asis', cache=T}
+tar_aki_ckd = read.table(file.path(root_path,"AKI_vs_CDK/pairs.tsv"), sep="\t")
+genes = unique(as.character(tar_aki_ckd[tar_aki_ckd$V2>1,"V5"]))
+sel = .name2entrez(genes)
+sign = goenrichment(sel)
+```
+
+with `r length(genes)` genes 
+
+* AKI vs Healthy
+
+```{r aki_vs_health, results='asis', cache=T}
+tar_aki_h = read.table(file.path(root_path,"AKI_vs_Healthy/pairs.tsv"), sep="\t")
+genes = unique(as.character(tar_aki_h[tar_aki_h$V2>1,"V5"]))
+sel = .name2entrez(genes)
+sign = goenrichment(sel)
+```
+with `r length(genes)` genes 
+
+* Only in AKI vs Healthy
+
+```{r only_vs_helth, results='asis', cache=T}
+genes = setdiff(c(as.character(tar_aki_h[tar_aki_h$V2>1,"V5"])),as.character(tar_aki_ckd[tar_aki_ckd$V2>1,"V5"]))
+sel = .name2entrez(genes)
+sign = goenrichment(sel)
+```
+
+with `r length(genes)` genes being only in AKI vs Healthy
+
+* Only in AKI vs CKD
+
+```{r only_vs_cdk, results='asis', cache=T}
+genes = setdiff(c(as.character(tar_aki_ckd[tar_aki_ckd$V2>1,"V5"])),as.character(tar_aki_h[tar_aki_h$V2>1,"V5"]))
+sel = .name2entrez(genes)
+sign = goenrichment(sel)
+```
+
+with `r length(genes)` genes being only in AKI vs CKD
+
+
+## Analysis of isomiRs
+
+isomiRs are variants of miRNAs. Information about the software and the naming can be found here:
+
+[isomirs](http://seqcluster.readthedocs.org/mirna_annotation.html)
+
+[naming](http://lpantano.github.io/isomiRs/vignettes/isomiR-intro.pdf)
+
+```{r de-iso}
+obj = isoCounts(obj,ref = T,iso5 = T,seed = T, iso3=T, add=T, subs = T,  minc=0 )
+counts = counts(obj)
+samples = metadata$X
+.list = list()
+for (s in samples){
+  .idx = which(grepl(s, colnames(counts)))
+  if (length(.idx) == 1){
+    .list[[s]] = counts[,.idx]
+  }else{
+  .c = counts[,.idx[1]] + counts[,.idx[2]]
+  .list[[s]] = .c
+  }
+}
+ma = do.call(cbind, .list)
+designma = metadata %>% mutate (age=round(AGE/10)*10, gender=GENDER, condition=X.1) %>% dplyr::select(age, gender, condition)
+rownames(designma) = colnames(ma)
+
+keep = lapply(unique(designma$condition), function(g){
+  .idx = rownames(designma[designma$condition==g,])
+  # print(ma[,.idx])
+  .keep = rowSums(ma[,.idx]>10)>3
+})
+keep = keep[[1]] | keep[[2]] | keep[[3]]
+ma = ma[keep,-14]
+designma = designma[-14,]
+dds = do_de(ma, designma, ~ age + gender + condition)
+```
+
+```{r tables-iso}
+do_norm(dds, root_path, "isomirna_", groups)
+```
+
+### General description
+These plots show amount of reads and amount of different sequences with variants
+respect to miRBase annotation.
+
+```{r plotiso}
+obj = isoPlot(obj, type = "iso5")
+obj = isoPlot(obj, type = "iso3")
+obj = isoPlot(obj, type = "add")
+obj = isoPlot(obj, type = "subs")
+isoPlotPosition(obj)
+```
+
+
+### Clustering
+```{r iso-clustering}
+mat = rlog(dds)
+pheatmap(assay(mat), clustering_distance_cols = "correlation", show_rownames = F, clustering_method = "ward.D", annotation = designma)
+plotPCA(mat)
+```
+
+
+### MA-plots
+  
+```{r DESeq-iso-output, results='asis', fig.height=9}
+all_results = handle_deseq2(dds, designma, "condition")
+plot_MA(all_results)
+
+for (i in names(all_results)){
+  cat("\n\n Top 20 at: ",i,"\n\n")
+  print(kable(head(all_results[[i]],20)))
+  
+  cat("\n\n") 
+  .plots = lapply(rownames(all_results[[i]][1:5,]), plot_gene, dds)
+  do.call(grid.arrange, .plots)
+  
+  write.table(as.data.frame(all_results[[i]]),paste0(i,"_isomirna_de.tsv"),sep="\t",quote=F)
+}
+
+```
+
+```{r, eval=FALSE, echo=FALSE}
+
+ma_del = ma[,]
+designma_del = designma[,]
+dds_d = do_de(ma_del, designma_del, ~ age + gender + condition)
+
+col=ifelse(mcols(dds_d)$dispGeneEst > 1 & mcols(dds_d)$baseMean > 200, "red", "black")
+plot(mcols(dds_d)$baseMean, mcols(dds_d)$dispGeneEst, log="xy", col=col, cex=.5)
+plotDispEsts(dds_d)
+.plotDE(dds_d)
+
+.plotDE <- function( object, ymin,
+  genecol = "black", fitcol = "red", finalcol = "dodgerblue",
+  legend=TRUE, xlab, ylab, log = "xy", cex = 0.45, ... )
+{
+  if (missing(xlab)) xlab <- "mean of normalized counts"
+  if (missing(ylab)) ylab <- "dispersion"
+  
+  px = mcols(object)$baseMean
+  sel = (px>0)
+  px = px[sel]
+
+  py = mcols(object)$dispGeneEst[sel]
+  if(missing(ymin))
+      ymin = 10^floor(log10(min(py[py>0], na.rm=TRUE))-0.1)
+
+  plot(px, pmax(py, ymin), xlab=xlab, ylab=ylab,
+    log=log, pch=ifelse(py<ymin, 6, 20), col=genecol, cex=cex, ... )
+
+  # use a circle over outliers
+  pchOutlier <- ifelse(mcols(object)$dispOutlier[sel],1,16)
+  cexOutlier <- ifelse(mcols(object)$dispOutlier[sel],2*cex,cex)
+  lwdOutlier <- ifelse(mcols(object)$dispOutlier[sel],2,1)
+
+  if (legend) {
+    legend("bottomright",c("gene-est","fitted","final"),pch=16,
+           col=c(genecol,fitcol,finalcol),bg="white")
+  }
+}
+
+
+idx = mcols(dds_d)$dispGeneEst > 1 & mcols(dds_d)$baseMean > 200
+pheatmap(as.data.frame(counts(dds_d, normalized=TRUE)[idx,]), annotation=designma_del, scale='row')
+
+
+idx_good = mcols(dds_d)$dispGeneEst < 1 
+pheatmap(as.data.frame(counts(dds_d, normalized=TRUE)[idx_good,]), annotation=designma_del, scale='row')
+
+```
+
+
+# Files
+
+```{r files, results='asis'}
+fn = list.files(".", pattern="tsv")
+for (f in fn){
+  link=get_report_links(f)
+  cat(sep="", "[",f,"]","(",link,")\n\n")
+}
+```
+
+```{r files-counts, results='asis'}
+fn = list.files(".", pattern="txt")
+for (f in fn){
+  link=get_report_links(f)
+  cat(sep="", "[",f,"]","(",link,")\n\n")
+}
+```
+
