@@ -66,12 +66,12 @@ ggplot(df, aes(x=samples,y=counts,fill=treatment)) +
   geom_bar(stat="identity")
 ```
 
-## Clustering
+## Clustering of raw counts
 ```{r raw-mds}
 mds(raw,d = "cor",condition = meta$Treatment)
 ```
 
-## Heatmap
+## Heatmap of raw counts
 ```{r raw-heatmap}
 pheatmap(log2(raw+0.5), annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2",labels_row = "")
 
@@ -94,7 +94,7 @@ Remove miRNAs with average counts < 70
 library(DESeq2)
 raw_f = raw[rowMeans(raw)>70,]
 mirs = grepl("miR", rownames(raw_f)) | grepl("let", rownames(raw_f))
-dse = DESeqDataSetFromMatrix(raw_f, meta,~ Run + Treatment)
+dse = DESeqDataSetFromMatrix(raw_f, meta,~ Treatment)
 dse = estimateSizeFactors(dse)
 rlg = rlog(dse)
 # 
@@ -145,6 +145,7 @@ pool_cpm = ma[mirs, pooled]
 pool_meta = meta[pooled,]
 pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
 pheatmap(pool_sort, annotation = pool_meta, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+pheatmap(pool_sort, annotation = pool_meta[,"Treatment", drop=F], cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
 ```
 
 ### Each condition
@@ -154,7 +155,8 @@ for (cond in unique(pool_meta$Treatment)){
   .pool_cpm = pool_cpm[,.cond]
   .pool_meta = pool_meta[.cond,]
   .pool_sort = .pool_cpm[order(rowMeans(.pool_cpm),decreasing = TRUE),]
-  pheatmap(.pool_sort, annotation = .pool_meta, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+  pheatmap(.pool_sort, annotation = .pool_meta, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
+  pheatmap(.pool_sort, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
 }
 ```
 
@@ -167,6 +169,7 @@ pool_cpm = ma[mirs, pooled]
 pool_meta = meta[pooled,]
 # pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
 pheatmap(pool_cpm, annotation = pool_meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+pheatmap(pool_cpm, annotation = pool_meta[,"Treatment", drop=F], clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
 ```
 
 ### Each condition
@@ -176,7 +179,8 @@ for (cond in unique(pool_meta$Treatment)){
   .pool_cpm = pool_cpm[,.cond]
   .pool_meta = pool_meta[.cond,]
   # .pool_sort = .pool_cpm[order(rowMeans(.pool_cpm),decreasing = TRUE),]
-  pheatmap(.pool_cpm, annotation = .pool_meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+  pheatmap(.pool_cpm, annotation = .pool_meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
+   pheatmap(.pool_cpm, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
 }
 ```
 
@@ -245,12 +249,16 @@ for (i in names(res)){
   
   stats = as.data.frame(res[[i]][,c(2,6)])
   p = volcano_density_plot(stats, title=i, lfc.cutoff=1)
-  print(p)      
+  # suppressMessages(print(p))
   cat("\n\n")
   
   .plots = lapply(rownames(res[[i]][1:6,]), plot_gene, dse)
   do.call(grid.arrange, .plots)
-  write.table(as.data.frame(res[[i]]),paste0(i,"_mirna_de.tsv"),sep="\t",quote=F)
+  i = gsub(" ","", i)
+  res_tab = cbind(id=rownames(as.data.frame(res[[i]])),as.data.frame(res[[i]]))
+  write.table(res_tab,paste0(i,"_mirna_de.tsv"),sep="\t",quote=F, row.names=F)
+  cat("\n\n") 
+  cat("[Download file](",get_report_links(paste0(i,"_mirna_de.tsv")),")", sep = "")
   cat("\n\n") 
 }
 
