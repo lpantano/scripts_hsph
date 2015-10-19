@@ -1,0 +1,259 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+Last updated `r date()` by Lorena Pantano
+
+```{r setup-opts, echo=FALSE}
+options(bitmapType = "cairo")
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 9,
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='')
+```
+
+```{r render,echo=F}
+library(rmarkdown)
+library(knitrBootstrap)
+source("~/repos/myRfunctions/transactions.R")
+# render_2_drop("qc_de_analysis.Rmd", dn = "Fichorova_EdgeSeq_miRNA_analysis")
+```
+
+```{r setup}
+library(knitr)
+
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(pheatmap)
+
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=9,fig.heigh=6,
+               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+
+```
+
+
+```{r load}
+raw = read.table("BWH_3_Plate_parsed_QualityControlled.csv", header=T,sep="\t", row.names=1)
+raw = raw[2:nrow(raw),]
+raw = raw[rowSums(raw)>0,]
+meta = read.table("metadata.csv", header=T,sep="\t")
+row.names(meta) = colnames(raw)
+meta = meta[,c(2,6,8)]
+```
+
+
+# QC plots of raw data
+
+## Total counts for each sample
+```{r total}
+df = data.frame(counts=colSums(raw),samples=colnames(raw), treatment=meta$Treatment)
+ggplot(df, aes(x=samples,y=counts,fill=treatment)) +
+  geom_bar(stat="identity")
+```
+
+## Clustering
+```{r raw-mds}
+mds(raw,d = "cor",condition = meta$Treatment)
+```
+
+## Heatmap
+```{r raw-heatmap}
+pheatmap(log2(raw+0.5), annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2",labels_row = "")
+
+positive = grepl("POS", rownames(raw))
+negative = grepl("ANT", rownames(raw))
+hk = grepl("HK", rownames(raw))
+mirs = grepl("miR", rownames(raw)) | grepl("let", rownames(raw))
+
+# pheatmap(raw[positive,], annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2")
+# pheatmap(raw[negative,], annotation = meta, cluster_rows = FALSE, cluster_cols = FALSE)
+# pheatmap(raw[hk,], annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2")
+
+```
+
+
+# Normalization
+
+Remove miRNAs with average counts < 70
+```{r deseq2, cache=TRUE}
+library(DESeq2)
+raw_f = raw[rowMeans(raw)>70,]
+mirs = grepl("miR", rownames(raw_f)) | grepl("let", rownames(raw_f))
+dse = DESeqDataSetFromMatrix(raw_f, meta,~ Run + Treatment)
+dse = estimateSizeFactors(dse)
+rlg = rlog(dse)
+# 
+# save(rlg,file="rlg.rda")
+# load("rls.rda")
+```
+
+Total mirnas `r nrow(raw_f)`
+
+
+```{r edgeR, echo=FALSE, eval=FALSE}
+library(edgeR)
+raw_f = raw[rowSums(raw>70)>10,]
+dge = DGEList(raw_f)
+dge = calcNormFactors(dge)
+lcpm = cpm(dge,normalized.lib.sizes = TRUE,log = TRUE)
+```
+
+## Distribution
+```{r rlg-dist}
+df = melt(assay(rlg))
+df$group = meta$Treatment[match(df$X2,rownames(meta))]
+ggplot(df, aes(x=value,group=X2,color=group)) + geom_density() + facet_wrap(~group)
+```
+
+## Clustering
+```{r rlg-mds}
+ma = assay(rlg)
+mds(ma[mirs,] ,d = "cor",condition = meta$Treatment)
+```
+
+## Heatmap
+```{r rlg-heatmap}
+meta$Total = log10(colSums(raw_f))
+
+pheatmap(ma[mirs,], annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+# pheatmap(ma[positive,], annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2")
+```
+
+## Pooled samples
+
+Sorted by average expression.
+
+### All conditions
+```{r heatmap-pooled}
+pooled = grepl("Pool", meta$Experimentdate)
+pool_cpm = ma[mirs, pooled]
+pool_meta = meta[pooled,]
+pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
+pheatmap(pool_sort, annotation = pool_meta, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+```
+
+### Each condition
+```{r heatmap-pooled-condition}
+for (cond in unique(pool_meta$Treatment)){
+  .cond = grepl(cond, pool_meta$Treatment)
+  .pool_cpm = pool_cpm[,.cond]
+  .pool_meta = pool_meta[.cond,]
+  .pool_sort = .pool_cpm[order(rowMeans(.pool_cpm),decreasing = TRUE),]
+  pheatmap(.pool_sort, annotation = .pool_meta, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+}
+```
+
+## Not pooled samples
+
+### All
+```{r heatmap-nopooled}
+pooled = !grepl("Pool", meta$Experimentdate)
+pool_cpm = ma[mirs, pooled]
+pool_meta = meta[pooled,]
+# pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
+pheatmap(pool_cpm, annotation = pool_meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+```
+
+### Each condition
+```{r heatmap-nopooled-condition}
+for (cond in unique(pool_meta$Treatment)){
+  .cond = grepl(cond, pool_meta$Treatment)
+  .pool_cpm = pool_cpm[,.cond]
+  .pool_meta = pool_meta[.cond,]
+  # .pool_sort = .pool_cpm[order(rowMeans(.pool_cpm),decreasing = TRUE),]
+  pheatmap(.pool_cpm, annotation = .pool_meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+}
+```
+
+## Differential expression
+```{r fn}
+handle_deseq2 = function(dds, summarydata, column) {
+  all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="_vs_")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+
+plot_MA = function(res){
+    for(i in seq(length(res))) {
+        DESeq2::plotMA(res[[i]])
+        title(paste("MA plot for contrast", names(res)[i]))
+    }
+}
+
+plot_volcano = function(res){
+    for(i in seq(length(res))) {
+        stats = as.data.frame(res[[i]][,c(2,6)])
+        p = volcano_density_plot(stats, title=names(res)[i], lfc.cutoff=1)
+        print(p)
+    }
+}
+plot_gene = function(name, d){
+  design = colData(d)
+  ggplot(plotCounts(d, name, returnData=TRUE, intgroup = "Treatment",transform = TRUE) %>% mutate(run=as.factor(design$Run)), aes(x=Treatment,y=count, color=run)) + 
+    geom_point(size=3) +
+    ggtitle(name) + 
+    scale_color_brewer(palette = "Set1")
+}
+
+```
+
+
+* Not including pooled samples
+
+```{r de}
+no_pooled = !grepl("Pool", meta$Experimentdate)
+
+dse = DESeqDataSetFromMatrix(raw_f[,no_pooled], meta[no_pooled,],~ Treatment)
+dse = DESeq(dse)
+plotDispEsts(dse)
+res = handle_deseq2(dse,colData(dse),"Treatment")
+plot_MA(res)
+```
+
+
+```{r tables, results='asis'}
+for (i in names(res)){
+  cat("\n\n###Top 20 at: ",i,"\n\n")
+  print(kable(head(res[[i]],20)))
+  # top = (all_results[[i]] %>% mutate(mir=rownames(all_results[[i]])) %>% filter(padj<0.1))[,1:5]
+  cat("\n\n") 
+  
+  stats = as.data.frame(res[[i]][,c(2,6)])
+  p = volcano_density_plot(stats, title=i, lfc.cutoff=1)
+  print(p)      
+  cat("\n\n")
+  
+  .plots = lapply(rownames(res[[i]][1:6,]), plot_gene, dse)
+  do.call(grid.arrange, .plots)
+  write.table(as.data.frame(res[[i]]),paste0(i,"_mirna_de.tsv"),sep="\t",quote=F)
+  cat("\n\n") 
+}
+
+```
+
+
