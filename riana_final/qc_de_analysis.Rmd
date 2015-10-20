@@ -72,6 +72,9 @@ mds(raw,d = "cor",condition = meta$Treatment)
 ```
 
 ## Heatmap of raw counts
+
+below are the boxplot of the raw counts for positve and negative probes.
+
 ```{r raw-heatmap}
 pheatmap(log2(raw+0.5), annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2",labels_row = "")
 
@@ -80,12 +83,15 @@ negative = grepl("ANT", rownames(raw))
 hk = grepl("HK", rownames(raw))
 mirs = grepl("miR", rownames(raw)) | grepl("let", rownames(raw))
 
-# pheatmap(raw[positive,], annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2")
-# pheatmap(raw[negative,], annotation = meta, cluster_rows = FALSE, cluster_cols = FALSE)
-# pheatmap(raw[hk,], annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2")
+dd = melt(raw %>%  mutate(id=rownames(raw)), id.vars = "id")
+dd$group = meta[dd$variable, "Treatment"]
+
+ggplot(dd %>% filter(grepl("POS", id))) + geom_boxplot(aes(y=value,x=variable,fill=group)) + ggtitle("Positive probes")
+ggplot(dd %>% filter(grepl("ANT", id))) + geom_boxplot(aes(y=value,x=variable,fill=group)) + ggtitle("Negative probes")
 
 ```
 
+Only one sample has a lot of noise in the negative probes.
 
 # Normalization
 
@@ -184,6 +190,7 @@ for (cond in unique(pool_meta$Treatment)){
 }
 ```
 
+
 ## Differential expression
 ```{r fn}
 handle_deseq2 = function(dds, summarydata, column) {
@@ -264,4 +271,67 @@ for (i in names(res)){
 
 ```
 
+## Using 70 as cutoff to get miRNAs "on/off"
+
+As a note this is not a reliable method and leads to false positive since it is not counting
+variability among samples, and 70 is an arbitraty cutoff that may not be valid for all
+experiments with this technology.
+
+```{r onoff}
+cpm = pool_cpm^2
+group = as.character(unique(pool_meta$Treatment))
+.iscontrol = pool_meta$Treatment == "Control"
+.count_control =rowMeans(cpm[,.iscontrol])
+for (g in setdiff(group, "Control")){
+  .is = pool_meta$Treatment == g
+  .count_group =rowMeans(cpm[,.is])
+  .keep = .count_control < 70 & .count_group > 70
+  cat("\n\n###",g,"\n\n")
+  print(kable(data.frame(mirs=rownames(cpm)[.keep], group=.count_group[.keep], control=.count_control[.keep]), row.names = FALSE))
+  cat("\n\n")
+}
+```
+
+## Alternative strategy to detect ON/OFF
+
+I think a more valid strategy would be to do the 70 cut off by group.
+So I keep mirnas that have average of 70 in any of the groups and then do the 
+differential expression analysis. The ones with padj < 0.05 are good candidates 
+to on/off assuming 70 as the cutoff for expression/non expression.
+
+
+```{r on0ff-deseq2}
+no_pooled = !grepl("Pool", meta$Experimentdate)
+onoff_meta = meta[no_pooled,]
+onoff_raw = raw[grepl("-",rownames(raw)),no_pooled]
+keep = lapply(group, function(g){
+  .is = onoff_meta$Treatment == g
+  .count_group = rowMeans(onoff_raw[,.is])
+  .count_group > 70
+})
+idx = apply(do.call(cbind, keep),1,any)
+all = apply(do.call(cbind, keep),1,all)
+
+dse = DESeqDataSetFromMatrix(onoff_raw[idx,],onoff_meta,~ Treatment)
+dse = DESeq(dse)
+res = handle_deseq2(dse,colData(dse),"Treatment")
+
+for (i in names(res)){
+  cat("\n\n###Top 20 at: ",i,"\n\n")
+  .onoff = !(row.names(res[[i]]) %in% names(all)[all])
+  .res = res[[i]][.onoff,]
+  print(kable(head(.res,20)))
+  # top = (all_results[[i]] %>% mutate(mir=rownames(all_results[[i]])) %>% filter(padj<0.1))[,1:5]
+  .plots = lapply(rownames(.res[1:6,]), plot_gene, dse)
+  do.call(grid.arrange, .plots)
+  i = gsub(" ","", i)
+  res_tab = cbind(id=rownames(as.data.frame(res[[i]])),as.data.frame(res[[i]]))
+  write.table(res_tab,paste0(i,"_mirna_onoff_de.tsv"),sep="\t",quote=F, row.names=F)
+  cat("\n\n") 
+  cat("[Download file](",get_report_links(paste0(i,"_mirna_onoff_de.tsv")),")", sep = "")
+  cat("\n\n") 
+}
+
+
+```
 
