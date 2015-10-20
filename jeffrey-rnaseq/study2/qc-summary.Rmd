@@ -427,8 +427,9 @@ binary_ma=.make_binary_matrix(ma)
 upset(binary_ma, sets = names(ma))
 venn(ma)
 corder = colnames(counts)[c(seq(1,12,2),seq(2,12,2))]
+corder = corder[c(5:6,1:4,11:12,7:10)]
 library(RColorBrewer)
-my_palette <- brewer.pal(11,"RdBu")
+my_palette <- rev(brewer.pal(11,"RdBu"))
 heatmap_fn(as.matrix(assay(rld)[de_genes,corder]), scale='row',show_rownames=F,cluster_cols=FALSE, color=my_palette)
 ```
 
@@ -583,9 +584,60 @@ heatmap_fn(as.matrix(assay(rld)[de_genes,corder]), scale='row',show_rownames=F,c
 ## Heatmap with all DE genes
 
 ```{r heatmpa-all}
-heatmap_fn(as.matrix(assay(rld)[de_genes,]), scale='row',show_rownames=F)
+de_genes = unlist(unique(de_genes))
+ma = as.matrix(assay(rld)[de_genes,corder])
+hr = hclust(as.dist(1-cor(t(ma))), method = "ward.D2")
+heatmap_fn(ma[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = .ens2name(hr$labels[hr$order])
+name_genes[is.na(name_genes)] = hr$labels[hr$order][is.na(name_genes)]
+write.table(data.frame(symbol=name_genes, ensembl=hr$labels[hr$order]),"all_de_genes_order.tsv",row.names = F,col.names = F)
+
+heatmap_fn(ma[hr$order,], scale='row', cluster_row=FALSE, show_rownames=F, color=my_palette)
 ```
 
+[genes sorted](`r get_report_links("all_de_genes_order.tsv")`)
+
+# Custom hetmpas
+
+sheet 1 in excel
+
+```{r sheet-1}
+genes = read.table("unique_hc_v_snp_plus_0_4.csv", skip=1, stringsAsFactors = FALSE)
+ma = as.matrix(assay(rld)[,corder])
+name_genes = .ens2name(row.names(ma))
+rownames(ma)[!is.na(name_genes)] = name_genes[!is.na(name_genes)]
+genes = intersect(genes$V1, rownames(ma))
+
+ma_sub = ma[genes,]
+hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
+heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = hr$labels[hr$order]
+write.table(data.frame(symbol=name_genes),"sheet1_genes_order.tsv",row.names = F,col.names = F)
+```
+
+sheet 2 in excel
+
+```{r sheet-2}
+genes = read.table("unique_hc_v_snpplus_minus_hc_snpminus.csv", skip=1, stringsAsFactors = FALSE)
+genes = intersect(genes$V1, rownames(ma))
+ma_sub = ma[genes,]
+hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
+heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = hr$labels[hr$order]
+write.table(data.frame(symbol=name_genes),"sheet2_genes_order.tsv",row.names = F,col.names = F)
+```
+
+sheet 3 in excel
+
+```{r sheet-3}
+genes = read.table("lps_iduced_snppllus_snpminus.csv", skip=1, stringsAsFactors = FALSE)
+genes = intersect(genes$V1, rownames(ma))
+ma_sub = ma[genes,]
+hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
+heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = hr$labels[hr$order]
+write.table(data.frame(symbol=name_genes),"sheet3_genes_order.tsv",row.names = F,col.names = F)
+```
 
 # Files
 
@@ -597,5 +649,12 @@ for (f in fn){
 }
 ```
 
+```{r fpkm}
+fpkm = read.table("combined.fpkm", header=T, row.names=1)
+fpkm$name = .ens2name(rownames(fpkm))
+fpkm$ens = rownames(fpkm)
+write.table(fpkm[,c(13,14,1:12)], "combined_w_name.fpkm", quote=F,sep="\t", row.names=F)
+```
 
-[fpkm](`r get_report_links("combined.fpkm")`)
+[fpkm](`r get_report_links("combined_w_name.fpkm")`)
+
