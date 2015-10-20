@@ -599,3 +599,21 @@ for (f in fn){
 
 
 [fpkm](`r get_report_links("combined.fpkm")`)
+
+# Isoforms
+
+```{r iso-fpkm, results='asis'}
+iso_fpkm = read.table("~/orch/scratch/jeffreys_chron_snp/chron_snp/work/htseq-count/combined.isoform.fpkm", header=T)
+iso_names = read.table("~/orch/scratch/jeffreys_chron_snp/chron_snp/work/htseq-count/isoform_to_gene.txt")
+idx = match(iso_fpkm$id, iso_names$V1)
+names = .ens2name(iso_names$V2[idx])
+iso_fpkm$name = names
+write.table(iso_fpkm, "combined_iso.fpkm", row.names=F, quote=F, sep="\t")
+
+kable(rbind(iso_fpkm[grepl("SP140",names),],
+            iso_fpkm[grepl("SP110",names),],
+            iso_fpkm[grepl("SP100",names),]))
+
+```
+
+[fpkm](`r get_report_links("combined_iso.fpkm")`)
