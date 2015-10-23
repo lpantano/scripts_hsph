@@ -14,7 +14,7 @@ Last updated `r date()` by Lorena Pantano
 
 ```{r setup-opts, echo=FALSE}
 options(bitmapType = "cairo")
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 9,
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 10,
                cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                message=FALSE, prompt=TRUE, comment='', fig.cap='')
 ```
@@ -23,6 +23,7 @@ knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code 
 library(rmarkdown)
 library(knitrBootstrap)
 source("~/repos/myRfunctions/transactions.R")
+# knit("qc_de_analysis.Rmd",  )
 # render_2_drop("qc_de_analysis.Rmd", dn = "Fichorova_EdgeSeq_miRNA_analysis")
 ```
 
@@ -43,7 +44,9 @@ library(pheatmap)
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=9,fig.heigh=6,
                cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
-
+.cor=function(d){
+  as.dist(1-cor(d,method = "spearman"))
+}
 ```
 
 
@@ -76,7 +79,7 @@ mds(raw,d = "cor",condition = meta$Treatment)
 below are the boxplot of the raw counts for positve and negative probes.
 
 ```{r raw-heatmap}
-pheatmap(log2(raw+0.5), annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2",labels_row = "")
+pheatmap(log2(raw+0.5), annotation = meta, clustering_distance_col=.cor(log2(raw+0.5)), clustering_method = "ward.D2",labels_row = "")
 
 positive = grepl("POS", rownames(raw))
 negative = grepl("ANT", rownames(raw))
@@ -95,11 +98,28 @@ Only one sample has a lot of noise in the negative probes.
 
 # Normalization
 
-Remove miRNAs with average counts < 70
+Kept miRNAs with average counts > 70 in any group.
 ```{r deseq2, cache=TRUE}
 library(DESeq2)
-raw_f = raw[rowMeans(raw)>70,]
-mirs = grepl("miR", rownames(raw_f)) | grepl("let", rownames(raw_f))
+
+no_pooled = !grepl("Pool", meta$Experimentdate)
+clean_meta = meta
+clean_meta$Treatment = gsub(" ", "",clean_meta$Treatment)
+group = as.character(unique(clean_meta$Treatment[no_pooled]))
+clean_raw = raw[grepl("-",rownames(raw)),]
+cpm = clean_raw
+
+keep = lapply(group, function(g){
+  .is = clean_meta$Treatment == g
+  .count_group = rowMeans(cpm[,.is])
+  .count_group > 70
+})
+idx = apply(do.call(cbind, keep),1,any)
+all = do.call(cbind, keep)
+colnames(all) = gsub(" ","",group)
+
+# mirs = grepl("miR", rownames(raw_f)) | grepl("let", rownames(raw_f))
+raw_f = clean_raw[idx,]
 dse = DESeqDataSetFromMatrix(raw_f, meta,~ Treatment)
 dse = estimateSizeFactors(dse)
 rlg = rlog(dse)
@@ -109,15 +129,6 @@ rlg = rlog(dse)
 ```
 
 Total mirnas `r nrow(raw_f)`
-
-
-```{r edgeR, echo=FALSE, eval=FALSE}
-library(edgeR)
-raw_f = raw[rowSums(raw>70)>10,]
-dge = DGEList(raw_f)
-dge = calcNormFactors(dge)
-lcpm = cpm(dge,normalized.lib.sizes = TRUE,log = TRUE)
-```
 
 ## Distribution
 ```{r rlg-dist}
@@ -129,14 +140,14 @@ ggplot(df, aes(x=value,group=X2,color=group)) + geom_density() + facet_wrap(~gro
 ## Clustering
 ```{r rlg-mds}
 ma = assay(rlg)
-mds(ma[mirs,] ,d = "cor",condition = meta$Treatment)
+mds(ma ,d = "cor",condition = meta$Treatment)
 ```
 
 ## Heatmap
 ```{r rlg-heatmap}
 meta$Total = log10(colSums(raw_f))
 
-pheatmap(ma[mirs,], annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+pheatmap(ma, annotation = meta, clustering_distance_col=.cor(ma), clustering_method = "ward.D2", show_rownames = FALSE)
 # pheatmap(ma[positive,], annotation = meta, clustering_distance_col="correlation", clustering_method = "ward.D2")
 ```
 
@@ -147,11 +158,11 @@ Sorted by average expression.
 ### All conditions
 ```{r heatmap-pooled}
 pooled = grepl("Pool", meta$Experimentdate)
-pool_cpm = ma[mirs, pooled]
+pool_cpm = ma[, pooled]
 pool_meta = meta[pooled,]
 pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
-pheatmap(pool_sort, annotation = pool_meta, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
-pheatmap(pool_sort, annotation = pool_meta[,"Treatment", drop=F], cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+pheatmap(pool_sort, annotation = pool_meta, cluster_rows = FALSE, clustering_distance_col=.cor(pool_sort), clustering_method = "ward.D2", show_rownames = FALSE)
+pheatmap(pool_sort, annotation = pool_meta[,"Treatment", drop=F], cluster_rows = FALSE, clustering_distance_col=.cor(pool_sort), clustering_method = "ward.D2", show_rownames = FALSE)
 ```
 
 ### Each condition
@@ -161,8 +172,8 @@ for (cond in unique(pool_meta$Treatment)){
   .pool_cpm = pool_cpm[,.cond]
   .pool_meta = pool_meta[.cond,]
   .pool_sort = .pool_cpm[order(rowMeans(.pool_cpm),decreasing = TRUE),]
-  pheatmap(.pool_sort, annotation = .pool_meta, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
-  pheatmap(.pool_sort, cluster_rows = FALSE, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
+  pheatmap(.pool_sort, annotation = .pool_meta, cluster_rows = FALSE, clustering_distance_col=.cor(.pool_sort), clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
+  pheatmap(.pool_sort, cluster_rows = FALSE, clustering_distance_col=.cor(.pool_sort), clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
 }
 ```
 
@@ -171,11 +182,11 @@ for (cond in unique(pool_meta$Treatment)){
 ### All
 ```{r heatmap-nopooled}
 pooled = !grepl("Pool", meta$Experimentdate)
-pool_cpm = ma[mirs, pooled]
+pool_cpm = ma[, pooled]
 pool_meta = meta[pooled,]
 # pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
-pheatmap(pool_cpm, annotation = pool_meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
-pheatmap(pool_cpm, annotation = pool_meta[,"Treatment", drop=F], clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE)
+pheatmap(pool_cpm, annotation = pool_meta, clustering_distance_col=.cor(pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE)
+pheatmap(pool_cpm, annotation = pool_meta[,"Treatment", drop=F], clustering_distance_col=.cor(pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE)
 ```
 
 ### Each condition
@@ -185,8 +196,8 @@ for (cond in unique(pool_meta$Treatment)){
   .pool_cpm = pool_cpm[,.cond]
   .pool_meta = pool_meta[.cond,]
   # .pool_sort = .pool_cpm[order(rowMeans(.pool_cpm),decreasing = TRUE),]
-  pheatmap(.pool_cpm, annotation = .pool_meta, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
-   pheatmap(.pool_cpm, clustering_distance_col="correlation", clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
+  pheatmap(.pool_cpm, annotation = .pool_meta, clustering_distance_col=.cor(.pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
+   pheatmap(.pool_cpm, clustering_distance_col=.cor(.pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
 }
 ```
 
@@ -198,6 +209,8 @@ handle_deseq2 = function(dds, summarydata, column) {
   all_results = list()
   contrast_strings = list()
   for(comb in all_combs) {
+    if (comb[1]=="Control")
+      comb = rev(comb)
     contrast_string = paste(comb, collapse="_vs_")
     contrast = c(column, comb)
     res = results(dds, contrast=contrast)
@@ -237,9 +250,9 @@ plot_gene = function(name, d){
 * Not including pooled samples
 
 ```{r de}
-no_pooled = !grepl("Pool", meta$Experimentdate)
-
-dse = DESeqDataSetFromMatrix(raw_f[,no_pooled], meta[no_pooled,],~ Treatment)
+no_pooled = !grepl("Pool", clean_meta$Experimentdate)
+clean_meta$Treatment = relevel(factor(clean_meta$Treatment), ref = "Control")
+dse = DESeqDataSetFromMatrix(raw_f[,no_pooled], clean_meta[no_pooled,],~ Treatment)
 dse = DESeq(dse)
 plotDispEsts(dse)
 res = handle_deseq2(dse,colData(dse),"Treatment")
@@ -247,7 +260,7 @@ plot_MA(res)
 ```
 
 
-```{r tables, results='asis'}
+```{r nonpooled-de-volcano, results='asis', fig.width=13}
 for (i in names(res)){
   cat("\n\n###Top 20 at: ",i,"\n\n")
   print(kable(head(res[[i]],20)))
@@ -259,79 +272,106 @@ for (i in names(res)){
   # suppressMessages(print(p))
   cat("\n\n")
   
-  .plots = lapply(rownames(res[[i]][1:6,]), plot_gene, dse)
-  do.call(grid.arrange, .plots)
+  # .plots = lapply(rownames(res[[i]][1:6,]), plot_gene, dse)
+  # do.call(grid.arrange, .plots)
   i = gsub(" ","", i)
   res_tab = cbind(id=rownames(as.data.frame(res[[i]])),as.data.frame(res[[i]]))
-  write.table(res_tab,paste0(i,"_mirna_de.tsv"),sep="\t",quote=F, row.names=F)
+  write.table(res_tab,paste0(i,"_mirna_de.xls"),sep="\t",quote=F, row.names=F)
   cat("\n\n") 
-  cat("[Download file](",get_report_links(paste0(i,"_mirna_de.tsv")),")", sep = "")
+  cat("[Download file](",get_report_links(paste0(i,"_mirna_de.xls")),")", sep = "")
   cat("\n\n") 
 }
 
-```
-
-## Using 70 as cutoff to get miRNAs "on/off"
-
-As a note this is not a reliable method and leads to false positive since it is not counting
-variability among samples, and 70 is an arbitraty cutoff that may not be valid for all
-experiments with this technology.
-
-```{r onoff}
-cpm = pool_cpm^2
-group = as.character(unique(pool_meta$Treatment))
-.iscontrol = pool_meta$Treatment == "Control"
-.count_control =rowMeans(cpm[,.iscontrol])
-for (g in setdiff(group, "Control")){
-  .is = pool_meta$Treatment == g
-  .count_group =rowMeans(cpm[,.is])
-  .keep = .count_control < 70 & .count_group > 70
-  cat("\n\n###",g,"\n\n")
-  print(kable(data.frame(mirs=rownames(cpm)[.keep], group=.count_group[.keep], control=.count_control[.keep]), row.names = FALSE))
-  cat("\n\n")
-}
 ```
 
 ## Alternative strategy to detect ON/OFF
 
-I think a more valid strategy would be to do the 70 cut off by group.
+I think a valid strategy would be to do the 70 cut off by group.
 So I keep mirnas that have average of 70 in any of the groups and then do the 
 differential expression analysis. The ones with padj < 0.05 are good candidates 
 to on/off assuming 70 as the cutoff for expression/non expression.
 
 
-```{r on0ff-deseq2}
-no_pooled = !grepl("Pool", meta$Experimentdate)
-onoff_meta = meta[no_pooled,]
-onoff_raw = raw[grepl("-",rownames(raw)),no_pooled]
-keep = lapply(group, function(g){
-  .is = onoff_meta$Treatment == g
-  .count_group = rowMeans(onoff_raw[,.is])
-  .count_group > 70
-})
-idx = apply(do.call(cbind, keep),1,any)
-all = apply(do.call(cbind, keep),1,all)
+```{r on0ff-deseq2, results='asis'}
 
-dse = DESeqDataSetFromMatrix(onoff_raw[idx,],onoff_meta,~ Treatment)
-dse = DESeq(dse)
-res = handle_deseq2(dse,colData(dse),"Treatment")
-
+onoff_de = c()
 for (i in names(res)){
-  cat("\n\n###Top 20 at: ",i,"\n\n")
-  .onoff = !(row.names(res[[i]]) %in% names(all)[all])
-  .res = res[[i]][.onoff,]
-  print(kable(head(.res,20)))
-  # top = (all_results[[i]] %>% mutate(mir=rownames(all_results[[i]])) %>% filter(padj<0.1))[,1:5]
-  .plots = lapply(rownames(.res[1:6,]), plot_gene, dse)
-  do.call(grid.arrange, .plots)
-  i = gsub(" ","", i)
-  res_tab = cbind(id=rownames(as.data.frame(res[[i]])),as.data.frame(res[[i]]))
-  write.table(res_tab,paste0(i,"_mirna_onoff_de.tsv"),sep="\t",quote=F, row.names=F)
-  cat("\n\n") 
-  cat("[Download file](",get_report_links(paste0(i,"_mirna_onoff_de.tsv")),")", sep = "")
-  cat("\n\n") 
+  if (grepl("Control", i)){
+    .g = unlist(strsplit(i, "_"))
+    .g1 = match(.g[1], colnames(all))
+    .g2 = match(.g[3], colnames(all))
+    .onoff = row.names(res[[i]]) %in% rownames(all[rowSums(all[,c(.g1,.g2)]) == 1 & all[,.g2]==0,]) & res[[i]]$log2FoldChange > 0.5
+    .res = res[[i]][.onoff,]
+    .res = .res[.res$padj<0.05,]
+    cat("\n\n###",.g[3],". Top 10 (total",nrow(.res),"):\n\n")
+    print(kable(head(.res, 10)))
+    cat("\n\n")
+    # top = (all_results[[i]] %>% mutate(mir=rownames(all_results[[i]])) %>% filter(padj<0.1))[,1:5]
+    # .plots = lapply(rownames(.res[1:3,]), plot_gene, dse)
+    # do.call(grid.arrange, .plots)
+    i = gsub(" ","", i)
+    res_tab = cbind(id=rownames(as.data.frame(.res)), as.data.frame(.res))
+    write.table(res_tab,paste0(i,"_mirna_onoff_de.xls"),sep="\t",quote=F, row.names=F)
+    cat("\n\n") 
+    cat("[Download file](",get_report_links(paste0(i,"_mirna_onoff_de.xls")),")", sep = "")
+    cat("\n\n") 
+    onoff_de = c(onoff_de, rownames(.res[.res$padj<0.05,]))
+  }
 }
 
+```
 
+
+Heatmap with all onoff detected:
+
+```{r onoff-heatmap}
+onoff_rlg = assay(rlog(dse))
+pheatmap(onoff_rlg[unique(onoff_de),], clustering_distance_col=.cor(onoff_rlg), clustering_method = "ward.D2", annotation =clean_meta ,show_rownames = FALSE, main="ON/OFF mirnas")
+
+pheatmap(onoff_rlg[unique(onoff_de),], clustering_distance_col=.cor(onoff_rlg), clustering_method = "ward.D2", annotation =clean_meta[,"Treatment", drop=F] ,show_rownames = FALSE, main="ON/OFF mirnas")
+
+```
+
+
+# Files requested
+
+## heatmaps of pooled samples
+
+[heatmap of pooled samples](`r get_report_links("figure/heatmap-pooled-2.png")`)
+
+## heatmaps of non-pooled samples
+
+### Each condition
+[heatmap of non pooled samples from L.Crispatus](`r get_report_links("figure/heatmap-nopooled-condition-2.png")`)
+
+[heatmap of non pooled samples from P.bivia](`r get_report_links("figure/heatmap-nopooled-condition-4.png")`)
+
+[heatmap of non pooled samples from T.Vag UR1](`r get_report_links("figure/heatmap-nopooled-condition-6.png")`)
+
+[heatmap of non pooled samples from Control](`r get_report_links("figure/heatmap-nopooled-condition-8.png")`)
+
+### All together
+[heatmap of non pooled samples all together](`r get_report_links("figure/heatmap-nopooled-2.png")`)
+
+## Differential expression tables and volcano plots
+```{r table-diff-genes, results='asis', echo=FALSE}
+i = 1
+for (fn in list.files(".","mirna_de.xls")){
+  cat("\n\n[download table with differential expressed genes of ",gsub("_mirna_de.xls","",fn),
+      "](",get_report_links(fn),")",sep="")
+  
+  cat("\n\n[download volcano plot of ",gsub("_mirna_de.tsv","",fn),
+      "](",get_report_links(paste0("figure/nonpooled-de-volcano-",i,".png")),")",sep="")
+  
+  i = i + 1
+}
+```
+
+## On/Off miRNAs
+```{r table-on-off, results='asis', echo=FALSE}
+for (fn in list.files(".","onoff_de.xls")){
+  if (grepl("Control", fn))
+    cat("\n\n[download table with onn/off genes of ",gsub("_onoff_de.xls","",fn),"](",get_report_links(fn),")",sep="")
+}
 ```
 
