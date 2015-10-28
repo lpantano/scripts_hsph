@@ -1,14 +1,29 @@
 ---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
   html_document:
     toc: true
     highlight: zenburn
-    theme: united
 ---
 
+Last updated `r date()` by Lorena Pantano
+
 ```{r setup, echo=FALSE}
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+options(bitmapType = "cairo")
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 9,
                cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                message=FALSE, prompt=TRUE, comment='', fig.cap='')
+```
+
+```{r render,echo=F}
+library(rmarkdown)
+library(knitrBootstrap)
+source("~/repos/myRfunctions/transactions.R")
+# render_2_drop("qc-summary.Rmd", dn = "kim_singlecell")
 ```
 
 # Overview
@@ -20,6 +35,9 @@ library(gplots)
 library(edgeR)
 library(CHBUtils)
 library(pheatmap)
+library(dplyr)
+library(gridExtra)
+
 project_summary = "/home/lpantano/orch/scratch/kim_sc_lung/lung_sc-merged/final/2015-10-02_lung_sc-merged/project-summary.csv"
 counts_file = "/home/lpantano/orch/scratch/kim_sc_lung/lung_sc-merged/final/2015-10-02_lung_sc-merged/combined.counts"
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
@@ -35,9 +53,10 @@ known_columns = c("Name", "X.GC", "Sequences.flagged.as.poor.quality",
     "rRNA.rate", "Fragment.Length.Mean", "Intronic.Rate", "Intergenic.Rate",
     "Quality.format", "Duplication.Rate.of.Mapped", "Mapped",
     "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
-    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "Unique.Starts.Per.Read", "unique_starts_per_read",
     "complexity","descrition")
-summarydata$mapped_log10 = log10(summarydata$Mapped)
+summarydata$mapped_mill = unlist(cut(log10(summarydata$Mapped),breaks = c(0,5,6,12), labels = c("<0.1","0.1-0.5",">1")))
+summarydata$Genes.Detected=colSums(counts > 0)
 ```
 
 ```{r heatmap-function}
@@ -178,16 +197,19 @@ ggplot(melted, aes(x=count, group=sample)) +
 ```{r pearson-heatmap-normalized}
 heatmap_fn(cor(normalized_counts, method="pearson"))
 ```
+The clustering is due to differentl depth in sequencing as green color shows.
 
 ## Correlation (Spearman) heatmap of TMM-normalized counts
 ```{r spearman-heatmap-normalized}
 heatmap_fn(cor(normalized_counts, method="spearman"))
 ```
+Same happens here.
 
 ## MDS plot of TMM-normalized counts
 ```{r mds-normalized}
-mds(normalized_counts, k=length(colnames(normalized_counts)) - 1,summarydata$Exonic.Rate)
+mds(normalized_counts, k=length(colnames(normalized_counts)) - 1,summarydata$mapped_mill, d="cor")
 ```
+Groups separated by mapped reads: green (>1 mill reads) and red(<1mill reads).
 
 
 ## Heatmap by concordance correlation coefficient
@@ -216,10 +238,10 @@ do_propcor = function(x) {
 
 heatmap_fn(do_propcor(normalized_counts))
 ```
+Almost same thing. Clustering based on mill reads mapped as shown by top annotation row (ref, green blue).
 
-## Heatmap of top 30 most expressed genes
-```{r top-count-genes, results='asis'}
-library(dplyr)
+## Heatmap of top 50 most expressed genes
+```{r top-count-genes, results='asis', fig.height=10}
 .ens2name = function(x){
     require(org.Mm.eg.db)
     symbol = AnnotationDbi::select(org.Mm.eg.db, as.character(x), "SYMBOL", keytype="ENSEMBL")
@@ -237,32 +259,64 @@ rownames(ma) = select_names
 heatmap_fn(ma)
 ```
 
-## Heatmap of top spc and sca most expressed genes
+## Removing MT genes
+```{r top-counts-remove-mit, fig.height=10}
+mt = read.table("chrMT.txt", sep="\t", header=T)
+y = DGEList(counts=counts[!(rownames(counts) %in% as.character(mt[,1])),])
+y = calcNormFactors(y)
+normalized_counts_mt = cpm(y, normalized.lib.sizes=TRUE,log = TRUE)
+select = order(rowMeans(normalized_counts_mt),decreasing=TRUE)[1:50]
+select_names = rownames(normalized_counts_mt[select,])
+select_names = .ens2name(select_names)
+ma = normalized_counts_mt[select,]
+rownames(ma) = select_names
+
+heatmap_fn(ma)
+```
+
+Seems two clusters, but one of the marker Sca1 is part of the genes that make these
+two groups, so probably is not true, and it is correlated with mapped reads.
+
+## Heatmap of spc and sca1 
 
 Sca1 was annotated as Ly6a as the official name (need confirmation)
 
-```{r top-count-genes, results='asis'}
+```{r markers-count-genes, results='asis'}
 select_names = rownames(normalized_counts)
 select_names = .ens2name(select_names)
 ma = log2(normalized_counts + 0.5)
 rownames(ma) = select_names
-select = grepl("Sftpc",select_names) | grepl("Atx",select_names) 
+select = grepl("Sftpc",select_names) | grepl("Ly6a",select_names) 
 select = rowSums(ma[select,]>-1)>3
 heatmap_fn(ma[names(select)[select],])
 ```
 
-## Filtering bad samples
+## Filtering out bad samples
 
-* less than 1000 genes
-* less than 0.5 exonic rate
+* remove samples with less than 1800 genes
+* remove samples with less than 0.5 exonic rate
+* remove genes that are not seen in a sufficient number of cells (5)
+* remove genes that don't have many reads (10)
 
-## Heatmap of 30 top express and markers
-```{r filter}
-idx = colSums(counts>0) > 1000
-summaryfilter = summarydata %>% filter(Exonic.Rate > 0.5) %>% filter(Name %in% names(idx)[idx])
+### Heatmap of 50 top express and markers
+```{r filter, fig.height=10}
+counts = y$counts
+summaryfilter = subset(summarydata, summarydata$Exonic.Rate > 0.5)
 counts_filter = counts[,summaryfilter$Name]
 
-y = DGEList(counts=counts_filter)
+cd <- counts_filter
+# filter data
+# filter out low-gene cells
+cd <- cd[, colSums(cd>0)>1.8e3]
+# remove genes that don't have many reads
+cd <- cd[rowSums(cd)>10, ]
+# remove genes that are not seen in a sufficient number of cells
+cd <- cd[rowSums(cd>0)>5, ]
+# check the final dimensions of the read count matrix
+dim(cd)
+valid_summary = subset(summaryfilter, summaryfilter$Name %in% colnames(cd))
+
+y = DGEList(counts=cd)
 y = calcNormFactors(y)
 normalized_counts = cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
 
@@ -271,7 +325,6 @@ select_names = rownames(normalized_counts[select,])
 select_names = .ens2name(select_names)
 ma = normalized_counts[select,]
 rownames(ma) = select_names
-
 heatmap_fn(ma, main="top 50 genes")
 
 select_names = rownames(normalized_counts)
@@ -284,21 +337,223 @@ heatmap_fn(ma[names(select)[select],], main="markers")
 
 ```
 
+The correlation with the two clusters seems to be with mapping.Rate now. Maybe there something happen with a set of samples that get less mapping rate. Don't know if some biological function could explain that.
 
-```{r seurat, echo=F, eval=F}
-library(seurat)
+We cannot detect the two markers. If sca1 should be expressed in all of them,
+then we have a limit in the power to detect the genes, that means if we cluster and we see
+two groups, it is hard to support that they are really two group of cells and not technology noise.
+
+### Clustering of all genes after filtering
+
+Top figure considering previous filtering. 
+
+Bottom figure considering harder filter, gene should be expressed > 10 cells.
+
+```{r clus-filtered}
+
+pheatmap(normalized_counts, show_rownames = FALSE, clustering_method = "ward.D2", clustering_distance_cols = "correlation", annotation=valid_summary[,c("mapped_mill", "Mapping.Rate"), drop=F])
+
+# mds(assay(rld),condition = ma["Ly6a",],d = "cor",xi = 1,yi = 2) + ggtitle("Colored by expression of sca1")
+# mds(assay(rld),condition = valid_summary$mapped_log10,d = "cor",xi = 1,yi = 2) + ggtitle("Colored by mapped reads.")
+
+cd_hard <- cd[rowSums(cd>5)>10, ]
+y = DGEList(counts=cd_hard)
+y = calcNormFactors(y)
+normalized_counts_hard = cpm(y, normalized.lib.sizes=TRUE, log = TRUE)
+pheatmap(normalized_counts_hard, show_rownames = FALSE, clustering_method = "ward.D2", clustering_distance_cols = "correlation", annotation=valid_summary[,c("mapped_mill", "Mapping.Rate"), drop=F],
+         main = "Only genes expressed in > 10 samples.")
+
+```
+
+Still clusters are correlated with Mapped.Rate. Although there are two clusters inside the big one that seems pretty similar in terms of mill reads and mapping rate.
+
+### PCA to detect group of cells
+
+PCA should be able to detect group of cells. I show the first 4 components to
+try to get some clusterig of cells. Colored by cells > 1 mill (blue). Not big evidence of groups.
+
+```{r pca-filtered}
+library(fpc)
+pca = prcomp(t(normalized_counts))
+
+pcaplot = function(pca, col, x=1,y=2){
+  # the contribution to the total variance for each component
+  percentVar <- pca$sdev^2 / sum( pca$sdev^2 )
+  
+  group <- valid_summary[, col]
+  # assembly the data for the plot
+  d <- data.frame(PC1=pca$x[,x], PC2=pca$x[,y], group=group, name=colnames(normalized_counts))
+  
+  ggplot(data=d, aes(x=PC1, y=PC2, color=group)) + geom_point(size=3) + 
+    scale_color_brewer(guide=FALSE, palette = "Set1") +
+    xlab(paste0("PC",x,": ",round(percentVar[x] * 100),"% variance")) +
+    ylab(paste0("PC",y,": ",round(percentVar[y] * 100),"% variance")) +
+    coord_fixed()
+}
+
+
+.gg=list()
+for (i in 1:3){
+  for (j in (i+1):4){
+    .gg[[paste0(i,j)]] = (pcaplot(pca, "mapped_mill", i, j))
+  }
+}
+do.call(grid.arrange,.gg)
+```
+
+## Clustering with sincle cell DE package
+
+Tried to use a specific package to cluster single cell data, taking the most variable
+genes considering the noise of the data, but not having good output.
+
+```{r scde,cache=T}
+library(scde)
+# read in the expression matrix
+#o.ifm = scde.error.models(counts = cd, save.crossfit.plots = F, n.cores = 2, 
+#                           threshold.segmentation = T, save.model.plots = F, verbose = 0)
+#save(o.ifm,file="oifm.rda")
+load("oifm.rda")
+valid.cells <- o.ifm$corr.a > 0
+o.ifm = o.ifm[valid.cells, ]
+valid_counts = cd[, valid.cells]
+valid_summary = subset(summarydata, summarydata$Name %in% colnames(valid_counts))
+rownames(valid_summary) = valid_summary$Name
+p.self.fail <- scde.failure.probability(models = o.ifm, counts = valid_counts)
+n.simulations <- 100
+k <- 0.9
+cell.names <- colnames(valid_counts)
+names(cell.names) <- cell.names
+cd = valid_counts
+n.cores = 1
+dl <- mclapply(1:n.simulations, function(i) {
+  scd1 <- do.call(cbind, lapply(cell.names, function(nam) {
+    x <- cd[, nam]
+    # replace predicted drop outs with NAs
+    x[!as.logical(rbinom(length(x), 1, 1 - p.self.fail[, nam] * k))] <- NA
+    x
+  }))
+  rownames(scd1) <- rownames(cd)
+  # calculate correlation on the complete observation pairs
+  cor(log10(scd1 + 1), use = "pairwise.complete.obs")
+}, mc.cores = n.cores)
+
+direct.dist <- Reduce("+", dl)/length(dl)
+#direct.dist = direct.dist[, colSums(is.na(direct.dist)) > 0]
+pheatmap(direct.dist, clustering_distance_cols = "correlation", clustering_method = "ward", annotation = valid_summary[, c("mapped_mill", "Exonic.Rate", "Genes.Detected")], fontsize = 6)
+```
+
+## Study heterogenety with PAGODA tool
+
+It uses GO terms to find whether all genes inside a GO term change the same way. Quality figure seems weird compare to their test data: https://github.com/hms-dbmi/scde/blob/master/vignettes/pagoda.md.
+
+At the end finds two terms that explain the heterogenety of the cells, but not sure about the confidence. Green / Orange tell abaout the weight in the PCs of that term for each sample.
+
+```{r padoga,cache=T}
+########
+scde.data = data.frame(cd)
+symbol = .ens2name(row.names(scde.data))
+rownames(scde.data)[!is.na(symbol)] = symbol[!is.na(symbol)]
+
+# knn <- knn.error.models(scde.data, k = round(ncol(scde.data)/3), n.cores = 2, min.count.threshold = 2, min.nonfailed = 5, max.model.plots = 10)
+# varinfo <- pagoda.varnorm(knn, counts = scde.data, trim = 3/ncol(scde.data), max.adj.var = 5, n.cores = 2, plot = TRUE)
+# varinfo <- pagoda.subtract.aspect(varinfo, colSums(scde.data[, rownames(knn)]>0))
+# save(varinfo,file="varinfo.rda")
+load("varinfo.rda")
+library(org.Mm.eg.db)
+# # translate gene names to ids
+# ids <- unlist(lapply(mget(rownames(scde.data), org.Mm.egALIAS2EG, ifnotfound = NA), function(x) x[1]))
+# 
+# # reverse map
+# rids <- names(ids)
+# names(rids) <- ids
+# # list all the ids per GO category
+# go.env <- eapply(org.Mm.egGO2ALLEGS, function(x) as.character(na.omit(rids[x])))
+#  # omit categories with too few genes
+# go.env <- go.env[unlist(lapply(go.env, length))>5]
+# 
+# # append descriptions to the GO names
+# library(GO.db)
+# desc <- unlist(lapply(mget(names(go.env), GOTERM, ifnotfound = NA), function(x) if(is.logical(x)) { return("") } else { slot(x, "Term")}))
+# names(go.env) <- paste(names(go.env), desc)  # append description to the names
+# save(go.env, file="goenv.rda")
+load("goenv.rda")
+go.env <- list2env(go.env)  # convert to an environment
+
+# pwpca <- pagoda.pathway.wPCA(varinfo, go.env, n.components = 1, n.cores = 2, n.internal.shuffles = 0)
+# save(pwpca,file="pwpca.rda")
+load("pwpca.rda")
+df <- pagoda.top.aspects(pwpca, return.table = TRUE, plot = FALSE, z.score = 1.96)
+# head(df)
+# 
+# clpca <- pagoda.gene.clusters(varinfo, trim = 7.1/ncol(varinfo$mat), n.clusters = 150, n.cores = 1, plot = TRUE)
+# save(clpca,file="clpca.rda")
+# load("clpca.rda")
+# df <- pagoda.top.aspects(pwpca, clpca, return.table = TRUE, plot = TRUE, z.score = 1.96)
+# head(df)
+
+# df <- pagoda.top.aspects(pwpca, clpca, return.table = TRUE, plot = TRUE, z.score = 1.96)
+# 
+# get full info on the top aspects
+tam <- pagoda.top.aspects(pwpca, n.cells = NULL, z.score = qnorm(0.01/2, lower.tail = FALSE))
+# determine overall cell clustering
+hc <- pagoda.cluster.cells(tam, varinfo)
+tamr <- pagoda.reduce.loading.redundancy(tam, pwpca)
+
+# tamr2 <- pagoda.reduce.redundancy(tamr, distance.threshold = 0.9, plot = TRUE, cell.clustering = hc, labRow = NA, labCol = NA, box = TRUE, margins = c(0.5, 0.5), trim = 0)
+
+col.cols <- rbind(groups = cutree(hc, 3))
+pagoda.view.aspects(tamr, cell.clustering = hc, top=10,box = TRUE, labCol = NA, margins = c(0.5, 30), col.cols = rbind(col.cols),cexRow=1)
+```
+
+The expression of the genes in regulation of multicellular organismal process (strongest signal):
+
+```{r padoga-top-terms}
+# pagoda.show.pathways(c("GO:0005615 extracellular space"), varinfo, go.env, cell.clustering = hc, margins = c(1,10), show.cell.dendrogram = TRUE, showRowLabels = TRUE, showPC = TRUE)
+
+pagoda.show.pathways(c("GO:0051239 regulation of multicellular organismal process"), varinfo, go.env, cell.clustering = hc, margins = c(1,10), show.cell.dendrogram = TRUE, showRowLabels = TRUE, showPC = TRUE)
+```
+
+Lamellar body
+
+```{r padoga-top-terms-lamellar}
+# pagoda.show.pathways(c("GO:0005615 extracellular space"), varinfo, go.env, cell.clustering = hc, margins = c(1,10), show.cell.dendrogram = TRUE, showRowLabels = TRUE, showPC = TRUE)
+
+pagoda.show.pathways(c("GO:0042599 lamellar body"), varinfo, go.env, cell.clustering = hc, margins = c(1,10), show.cell.dendrogram = TRUE, showRowLabels = TRUE, showPC = TRUE)
+```
+
+
+## Study heterogenety with Seurat
+
+Although it has problems identifying the significant PCs, will plot the heatmap using the first 4 components and then all genes together. PCA doesn't show a clear clustering. Heatmap shows
+kind of two groups. TRUE/FALSE in the cell names indicates if sca1 is detected there.
+
+```{r seurat, cache=T}
+library(Seurat)
 nbt.data = data.frame(normalized_counts)
+symbol = .ens2name(row.names(nbt.data))
+rownames(nbt.data)[!is.na(symbol)] = symbol[!is.na(symbol)]
+idx = nbt.data[grepl("Ly6a",symbol),] > 0
+cnames = paste0(colnames(nbt.data), "_", idx)
+colnames(nbt.data) = cnames
 nbt = new("seurat", raw.data = nbt.data)
-nbt = setup(nbt, project = "NBT", min.cells = 3, min.genes = 1000, is.expr = 1)
-
+nbt = setup(nbt, project = "NBT", min.cells = 3, min.genes = 1000, is.expr = 1,names.field = 2,names.delim = "_")
 nbt = mean.var.plot(nbt)
-
 length(nbt@var.genes)
+nbt = pca(nbt, do.print=FALSE)
 
-nbt = pca(nbt)
+pca.plot(nbt, 1, 2, pt.size = 2)
+pca.plot(nbt, 3, 4, pt.size = 2)
 
-nbt = jackStraw(nbt, num.replicate = 5, num.pc = 10)
+.genes = list()
+for (i in 1:4)
+  .genes[[i]] = pcTopGenes(nbt,1)
+.genes = unique(unlist(.genes))
 
-jackStrawPlot(nbt, PCs=1:2)
+ma=nbt.data[.genes,]
+ma_summary = valid_summary
+rownames(ma_summary) = colnames(ma)
+pheatmap(ma, clustering_method = "ward.D2", clustering_distance_cols = "correlation",
+         annotation= ma_summary[,c("mapped_mill", "Mapping.Rate")], main = "Genes from first 4 PCs.")
+
 ```
 
