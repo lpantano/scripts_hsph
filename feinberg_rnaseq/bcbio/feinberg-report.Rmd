@@ -1,13 +1,13 @@
 ---
 output:
   knitrBootstrap::bootstrap_document:
-    title: "Feinberg RNA-seq"
     theme: readable
     highlight: zenburn
-    theme.chooser: FALSE
-    highlight.chooser: FALSE
-
-
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
 ---
 
 ```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
@@ -21,7 +21,10 @@ analystemail="lpantano@hsph.harvard.edu"
 
 
 ```{r knitrsetup, echo=FALSE}
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code=FALSE, bootstrap.show.output=FALSE, bootstrap.thumbnail.size="col-md-10", cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE, message=FALSE, prompt=TRUE, comment='', fig.cap='', tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200), fig.width = 8, fig.height = 8)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
 options(bitmapType = 'cairo')
 ```
 
@@ -49,7 +52,6 @@ The sections below provide code to reproduce the included results and plots.
 
 # Setup
 
-## Libraries
 
 ```{r functions}
 library(ggplot2)
@@ -76,7 +78,6 @@ library(clusterProfiler)
 source("~/repos/myRfunctions/transactions.R")
 ```
 
-## Functions
 
 ```{r plots-function}
 
@@ -163,7 +164,6 @@ convertIDs <- function( ids, from, to, db, ifMultiple=c("putNA", "useFirst")) {
 
 ```
 
-## Setup
 # Overview
 
 ```{r qc-setup}

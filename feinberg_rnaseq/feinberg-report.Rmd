@@ -21,7 +21,7 @@ analystemail="lpantano@hsph.harvard.edu"
 
 
 ```{r knitrsetup, echo=FALSE}
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code=FALSE, bootstrap.show.output=FALSE, bootstrap.thumbnail.size="col-md-10", cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE, message=FALSE, prompt=TRUE, comment='', fig.cap='', tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200), fig.width = 8, fig.height = 8)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code=FALSE, bootstrap.show.output=TRUE, bootstrap.thumbnail.size="col-md-10", cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE, message=FALSE, prompt=TRUE, comment='', fig.cap='', tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200), fig.width = 8, fig.height = 8)
 options(bitmapType = 'cairo')
 ```
 
@@ -436,6 +436,18 @@ write.table(tab, "metatable_de.tsv", quote = F, sep = "\t", row.names = F)
 ```
 
 [Download metatable](`r get_report_links("metatable_de.tsv")`)
+
+
+```{r count-files}
+write.table(counts(dds), "raw_counts.tsv", quote=F, sep="\t")
+write.table(counts(dds, normalized=TRUE), "norm_counts.tsv", quote=F, sep="\t")
+write.table(assay(rlog(dds)), "rlog_counts.tsv", quote=F, sep="\t")
+```
+
+[Download raw](`r get_report_links("raw_counts.tsv")`)
+[Download normalized](`r get_report_links("norm_counts.tsv")`)
+[Download log2](`r get_report_links("rlog_counts.tsv")`)
+
 
 #R Session Info
 
