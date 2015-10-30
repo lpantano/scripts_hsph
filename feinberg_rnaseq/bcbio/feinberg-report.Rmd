@@ -1,0 +1,556 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    title: "Feinberg RNA-seq"
+    theme: readable
+    highlight: zenburn
+    theme.chooser: FALSE
+    highlight.chooser: FALSE
+
+
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="Feinberg - RNAseq"
+labPI="Mark W. Feinberg"
+lablocation="BWH"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+
+```
+
+
+```{r knitrsetup, echo=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code=FALSE, bootstrap.show.output=FALSE, bootstrap.thumbnail.size="col-md-10", cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE, message=FALSE, prompt=TRUE, comment='', fig.cap='', tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200), fig.width = 8, fig.height = 8)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+source("~/repos/myRfunctions/transactions.R")
+# render_2_drop("feinberg-report.Rmd", "feinberg/bcbio_rnaseq_report")
+```
+
+---
+
+# Feinberg RNA-seq
+
+RNA-seq analysis for`r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+# Setup
+
+## Libraries
+
+```{r functions}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(pcaMethods)
+library(gridExtra)
+library(knitr)
+library(biomaRt)
+library(rmarkdown)
+library(dplyr)
+library(magrittr)
+library(tidyr)
+# library(gProfileR)
+# library(VennDiagram) 
+library(org.Mm.eg.db)
+library(xlsx)
+library(DESeq2)
+library(knitr)
+library(clusterProfiler)
+source("~/repos/myRfunctions/transactions.R")
+```
+
+## Functions
+
+```{r plots-function}
+
+plot.pca <- function (pcadata, condition= NULL, condition2= "", type="score", xi=1, yi=2, text=TRUE, title=""){
+    require(pcaMethods)
+  k = dim( pcadata)[3]
+    xnames = paste0("PC", 1:k, " ", round(pcadata@R2 * 100,  digits = 1), "%")
+  if (type == "loadings"){
+     df <- loadings(pcadata)
+	} else {
+	   df <- scores(pcadata)
+	}
+    df = as.data.frame(df[, c(xi, yi)])
+    names(df) = c("one", "two")
+	df$label = rownames(df)
+	if (text){
+	    if (!is.null(condition)) {
+	        df$condition = condition
+	        p = ggplot(df, aes(one, two, label = label, color = condition)) + 
+	            geom_text(aes(one, two, label = label), size = 3) + 
+	            labs(list(x = xnames[xi], y = xnames[yi])) + 
+				      scale_x_continuous() +
+            ggtitle(title) +
+            theme(plot.title = element_text(size=20, face="bold", vjust=2)) 
+
+	    }
+	    else {
+	        p = ggplot(df, aes(one, two)) + 
+			    geom_text(aes(one, two, label = label), size = 3) + 
+				labs(list(x = xnames[xi], y = xnames[yi])) + 
+				scale_x_continuous() +
+            ggtitle(title) +
+            theme(plot.title = element_text(size=20, face="bold", vjust=2))           
+	    }
+	} else {
+	    if (!is.null(condition)) {
+	        df$condition = condition
+	        df$condition2 = condition2	        
+	        p = ggplot(df, aes(one, two, label = label, color = condition, shape = condition2)) + 
+	            geom_point(aes(one, two, label = label), size = 4) + 
+	            labs(list(x = xnames[xi], y = xnames[yi])) + 
+            ggtitle(title) +
+            theme(plot.title = element_text(size=20, face="bold", vjust=2)) +            
+				scale_x_continuous()
+	    }
+	    else {
+	        p = ggplot(df, aes(one, two)) + 
+			    geom_point(aes(one, two, label = label), size = 4) + 
+				labs(list(x = xnames[xi], y = xnames[yi])) + 
+            ggtitle(title) +
+            theme(plot.title = element_text(size=20, face="bold", vjust=2)) +              
+				scale_x_continuous()
+	    }	
+	}
+    return(p)
+}
+
+get_biomart_transcript = function(v, type="description")
+{
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_gene_id",type) , filters=
+                    "ensembl_transcript_id"    , values =as.character(v) ,mart=mart)
+    #row.names(g) = g[,1]
+    out <- c("", length=length(v))
+    idx <- match(g[,1], v)
+    out[idx] <- g[,2]
+    names(out[idx]) <- g[,1]    
+    out
+    #g
+}
+
+convertIDs <- function( ids, from, to, db, ifMultiple=c("putNA", "useFirst")) {
+  stopifnot( inherits( db, "AnnotationDb" ) )
+  ifMultiple <- match.arg( ifMultiple )
+  suppressWarnings( selRes <- AnnotationDbi::select(
+    db, keys=ids, keytype=from, columns=c(from,to) ) )
+  if ( ifMultiple == "putNA" ) {
+    duplicatedIds <- selRes[ duplicated( selRes[,1] ), 1 ]
+    selRes <- selRes[ ! selRes[,1] %in% duplicatedIds, ]
+  }
+  return( selRes[ match( ids, selRes[,1] ), 2 ] )
+}
+
+```
+
+## Setup
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+project_summary = "/home/lpantano/orch/scratch/feinberg_rnaseq/treatment4points/final/2015-10-27_treatment4points/project-summary.csv"
+counts_file = "/home/lpantano/orch/scratch/feinberg_rnaseq/treatment4points/final/2015-10-27_treatment4points/combined.counts"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
+summarydata$Name = rownames(summarydata)
+summarydata = summarydata[order(summarydata$Name),]
+counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE)
+counts = counts[, order(colnames(counts))]
+colnames(counts) = gsub(".counts", "", colnames(counts))
+# this is a list of all non user-supplied metadata columns that could appear
+known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.quality",
+    "rRNA.rate", "Fragment.Length.Mean", "Intronic.Rate", "Intergenic.Rate",
+    "Mapping.Rate", "Quality.format", "Duplication.Rate.of.Mapped", "Mapped",
+    "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
+    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "complexity", "X5.3.bias", "Duplicates.pct", "Duplicates", "Mapped.reads",
+    "Median.insert.size", "Mapped.reads.pct", "Total.reads",
+    "avg_coverage_per_region")
+```
+
+```{r heatmap-function}
+get_heatmap_fn = function(summarydata) {
+    # return the pheatmap function with or without metadata
+    metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
+    if(ncol(metadata) == 0) {
+       return(pheatmap)
+    }
+    else {
+    # rownames(metadata) = summarydata$Name
+    heatmap_fn = function(data, ...) {
+        pheatmap(data, annotation=metadata, clustering_method = "ward.D2", clustering_distance_cols = "correlation",...)
+    }
+    return(heatmap_fn)
+}}
+heatmap_fn = get_heatmap_fn(summarydata)
+```
+
+# Quality control metrics
+
+## Mapped reads
+```{r mapped-plot}
+ggplot(summarydata, aes(x=Name, y=Mapped)) +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    geom_bar(stat="identity") +
+    ylab("mapped reads") + xlab("")
+```
+
+## Genomic mapping rate
+```{r mapping-rate-plot}
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) +
+    geom_bar(stat="identity") +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Number of genes detected
+```{r genes-detected-plot}
+dd = data.frame(Name=names(counts), Genes.Detected = colSums(counts > 0))
+ggplot(dd, aes(x=Name, y=Genes.Detected)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("genes detected") + xlab("")
+```
+
+## Gene detection saturation
+```{r saturation-plot}
+dd = data.frame(Mapped=summarydata$Mapped, Genes.Detected = colSums(counts > 0))
+ggplot(dd, aes(x=Mapped, y=Genes.Detected)) +
+    geom_point() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("genes detected") + xlab("reads mapped")
+```
+
+## Exonic mapping rate
+```{r exonic-mapping-plot}
+ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("exonic mapping rate") + xlab("")
+```
+
+## rRNA mapping rate
+```{r rRNA-rate-plot}
+ggplot(summarydata, aes(x=Name, y=rRNA.rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("rRNA rate") + xlab("")
+```
+
+## Estimated fragment length of paired-end reads
+```{r fragment-length-plot}
+ggplot(summarydata, aes(x=Name, y=Fragment.Length.Mean)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("fragment length") + xlab("")
+```
+
+## Boxplot of log10 counts per gene
+```{r boxplot-raw}
+melted = melt(counts)
+colnames(melted) = c("sample", "count")
+melted$sample = factor(melted$sample)
+melted = melted[order(melted$sample),]
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Boxplot of log10 TMM-normalized counts per gene
+Trimmed mean of M-values (TMM) normalization is described
+[here](http://genomebiology.com/2010/11/3/R25)
+
+Robinson, M. D., & Oshlack, A. (2010). A scaling normalization method for differential expression analysis of RNA-seq data. Genome Biology, 11(3). doi:10.1186/gb-2010-11-3-r25
+
+```{r boxplot-normalized}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample)
+melted = melted[order(melted$sample),]
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Density of log10 TMM-normalized counts
+```{r density-normalized}
+ggplot(melted, aes(x=count, group=sample)) +
+    geom_density() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Correlation (Pearson) heatmap of TMM-normalized counts
+```{r pearson-heatmap-normalized}
+heatmap_fn(cor(normalized_counts, method="pearson"))
+```
+
+## Correlation (Spearman) heatmap of TMM-normalized counts
+```{r spearman-heatmap-normalized}
+heatmap_fn(cor(normalized_counts, method="spearman"))
+```
+
+## MDS plot of TMM-normalized counts
+```{r mds-normalized}
+mds(normalized_counts, k=length(colnames(normalized_counts)) - 1, condition = summarydata$condition)
+```
+
+
+## Heatmap by concordance correlation coefficient
+http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1004075
+
+```{r propcor-heatmap}
+propcor = function(x, y) {
+    x = log(x + 0.1)
+    y = log(y + 0.1)
+    num = 2 * cov(x, y)
+    denom = var(x) + var(y)
+return(num/denom)}
+
+do_propcor = function(x) {
+     mat = list()
+     for(i in seq_len(ncol(x))) {
+         for(j in seq_len(ncol(x))) {
+        x2 = x[, i]
+        y2 = x[, j]
+        mat = c(mat, propcor(x2, y2)) } }
+    mat = unlist(mat)
+    mat = matrix(mat, ncol(x), ncol(x))
+    colnames(mat) = colnames(x)
+    rownames(mat) = colnames(x)
+    return(mat)}
+
+heatmap_fn(do_propcor(normalized_counts))
+```
+
+# Statistical analysis
+
+Filtering away genes with less than 10 counts.
+
+```{r dataprep}
+colData <- summarydata
+countData <- counts
+countData <- countData[rowSums(countData) > 10,]
+colData$condition <- factor(colData$condition)
+dds <- DESeqDataSetFromMatrix(countData = countData, colData = colData, design = ~  condition)
+```
+
+```{r fn-deseq}
+
+handle_deseq2 = function(dds, summarydata, column) {
+  all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="_vs_")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+
+plot_MA = function(res){
+    for(i in seq(length(res))) {
+        DESeq2::plotMA(res[[i]])
+        title(paste("MA plot for contrast", names(res)[i]))
+    }
+}
+
+plot_gene = function(name, d){
+  design = colData(d)
+  ggplot(plotCounts(d, name, returnData=TRUE, intgroup = "condition",transform = TRUE), aes(x=condition,y=count, color=condition)) + 
+    geom_point(size=3) +
+    ggtitle(name) + 
+    scale_color_brewer(palette = "Set1")
+}
+
+reduce = function(genes){
+  seen = c()
+  idx = sapply(genes, function(x){
+    here = as.character(as.vector(unlist(strsplit(x, split = "/"))))
+    if (length(here) > 100)
+      return(FALSE)
+    c = intersect(seen, here)
+    seen <<- unique(c(seen, here))
+    score = 0.6 * length(here)
+    if (length(c) < score)
+      return(TRUE)
+    FALSE
+  })
+  idx
+}
+
+.isvalid= function(dd){
+  if (is.null(dim(dd))){
+    return(FALSE)
+  }
+  if (nrow(dd)==0){
+    return(FALSE)
+  }
+  return(TRUE)
+}
+
+```
+
+```{r ddstats}
+dds <- DESeq(dds)
+res <- handle_deseq2(dds, colData, "condition")
+plotDispEsts(dds)
+```
+
+```{r dds-ma}
+plot_MA(res)
+```
+
+```{r dds-show, results='asis'}
+de_list = list()
+for (cond in names(res)){
+  .res = res[[cond]]
+  .res$symbol <- convertIDs(row.names(.res), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
+  .res$entrezgene <- convertIDs(row.names(.res), "ENSEMBL", "ENTREZID", org.Mm.eg.db, "useFirst")
+  .res$description <- convertIDs(row.names(.res), "ENSEMBL", "GENENAME", org.Mm.eg.db, "useFirst")
+  cat("\n\n##", cond, "\n\n")
+  summary(.res)
+  cat("\n\n")
+  cat("\n\n### Top 6 genes\n\n")
+  .plots = lapply(rownames(.res[1:6,]), plot_gene, dds)
+  do.call(grid.arrange, .plots)  
+  cat("\n\n###Top 10 genes:")
+  .res = as.data.frame(.res)
+  print(kable(head(.res)))
+  cat("\n\n")
+  res_tab = cbind(id=rownames(.res), .res)
+  write.table(res_tab,paste0(cond,"_de.tsv"),sep="\t",quote=T, row.names=F)
+  cat("\n\n") 
+  cat("[Download file](",get_report_links(paste0(cond,"_de.tsv")),")", sep = "")
+  cat("\n\n###GO ontology of DE genes:")
+  .idx = .res$padj<0.01 & abs(.res$log2FoldChange) > 1
+  .idx[is.na(.idx)] = FALSE
+  .de = .res[.idx,"entrezgene"]
+  de_list[[cond]] = unique(.res[.idx,"symbol"])
+  ego <- enrichGO(gene = .de[!is.na(.de)], 
+                  organism = "mouse", ont = "BP", pAdjustMethod = "BH",
+                  pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
+  if (.isvalid(summary(ego))){
+    idx =reduce(summary(ego)$geneID)
+    print(kable(summary(ego)[idx, 1:7]))
+  }  
+    cat("\n\n")
+    
+}
+```
+
+## Common genes
+
+Genes with FDR < 0.01 and log2FC > 1 has been considered for this.
+Transcripts id were converted to symbol gene names, only those with name were
+considered here.
+```{r common}
+library(UpSetR)
+ma = reshape(do.call(rbind,lapply(names(de_list), function(x){
+  .g = de_list[[x]]
+  .g = .g[!is.na(.g)]
+  .t = data.frame(genes=.g, present=1, group=x)
+  .t
+})), timevar = "group",idvar = "genes", direction = "wide")
+names(ma) = gsub("present.","",names(ma))
+ma[is.na(ma)] = 0
+upset(ma, sets = names(ma)[2:7])
+
+```
+
+# Metatable
+
+```{r metatable}
+tab = data.frame()
+for (fn in list.files(".","tsv")){
+  if (grepl("group", fn)){
+    d = read.table(fn, sep="\t",header=T)
+    comp = gsub("_de.tsv", "", fn)
+    if (nrow(tab)==0){
+      tab = d[,c("id","baseMean","symbol","entrezgene","description")]
+      tab$type = get_biomart_transcript(tab$id, "gene_biotype")
+      names(d) = paste0(comp,"_",names(d))
+      tab = cbind(tab, d[,c(3,6,7)])
+    }else{
+      names(d) = paste0(comp,"_",names(d))
+      tab = merge(tab, d[,c(1,3,6,7)], by=1, all=T)
+    }  
+  }
+}
+
+write.table(tab, "metatable_de.tsv", quote = F, sep = "\t", row.names = F)
+```
+
+[Download metatable](`r get_report_links("metatable_de.tsv")`)
+
+```{r count-files}
+write.table(counts(dds), "raw_counts.tsv", quote=F, sep="\t")
+write.table(counts(dds, normalized=TRUE), "norm_counts.tsv", quote=F, sep="\t")
+write.table(assay(rlog(dds)), "rlog_counts.tsv", quote=F, sep="\t")
+```
+
+[Download raw](`r get_report_links("raw_counts.tsv")`)
+[Download normalized](`r get_report_links("norm_counts.tsv")`)
+[Download log2](`r get_report_links("rlog_counts.tsv")`)
+
+#R Session Info
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
