@@ -125,6 +125,7 @@ xpress <- xpress[rowSums(xpress>0)>1,]
 dds = DESeqDataSetFromMatrix(countData=xpress,
     colData=summarydata, design = design)
 dds = DESeq(dds)
+write.table(rowMeans((counts(dds, normalized=TRUE))[,10:12]), "mean_wt_xpress.tsv", quote=FALSE, col.names=FALSE)
 
 counts <- counts[rowSums(counts>0)>1,]
 dds_c = DESeqDataSetFromMatrix(countData=counts,

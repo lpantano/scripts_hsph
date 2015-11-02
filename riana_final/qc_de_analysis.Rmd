@@ -14,7 +14,7 @@ Last updated `r date()` by Lorena Pantano
 
 ```{r setup-opts, echo=FALSE}
 options(bitmapType = "cairo")
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 10,
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 11,
                cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                message=FALSE, prompt=TRUE, comment='', fig.cap='')
 ```
@@ -23,7 +23,7 @@ knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code 
 library(rmarkdown)
 library(knitrBootstrap)
 source("~/repos/myRfunctions/transactions.R")
-# knit("qc_de_analysis.Rmd",  )
+# knit("qc_de_analysis.Rmd")
 # render_2_drop("qc_de_analysis.Rmd", dn = "Fichorova_EdgeSeq_miRNA_analysis")
 ```
 
@@ -66,7 +66,8 @@ meta = meta[,c(2,6,8)]
 ```{r total}
 df = data.frame(counts=colSums(raw),samples=colnames(raw), treatment=meta$Treatment)
 ggplot(df, aes(x=samples,y=counts,fill=treatment)) +
-  geom_bar(stat="identity")
+  geom_bar(stat="identity") +
+  theme(axis.text=element_text(angle=90,hjust=1))
 ```
 
 ## Clustering of raw counts
@@ -74,12 +75,24 @@ ggplot(df, aes(x=samples,y=counts,fill=treatment)) +
 mds(raw,d = "cor",condition = meta$Treatment)
 ```
 
+## Cumulative curve
+```{r raw-cum}
+ma_cum = do.call(cbind,lapply(raw,function(x){
+  cumsum(sort(x, decreasing = T))/sum(x)
+})) %>% as.data.frame()
+ma_cum$pos=1:nrow(ma_cum)
+ggplot(melt(ma_cum,id.vars = "pos"), aes(x=pos, y=value, group=variable)) +
+  geom_point() +
+  ylab("pct of total reads") +
+  xlab("ranked position of miRNA")
+```
+
 ## Heatmap of raw counts
 
 below are the boxplot of the raw counts for positve and negative probes.
 
 ```{r raw-heatmap}
-pheatmap(log2(raw+0.5), annotation = meta, clustering_distance_col=.cor(log2(raw+0.5)), clustering_method = "ward.D2",labels_row = "")
+pheatmap(log2(raw+0.5), annotation = meta, clustering_distance_col=.cor(log2(raw+0.5)), clustering_method = "ward.D2",show_rownames = F)
 
 positive = grepl("POS", rownames(raw))
 negative = grepl("ANT", rownames(raw))
@@ -90,11 +103,12 @@ dd = melt(raw %>%  mutate(id=rownames(raw)), id.vars = "id")
 dd$group = meta[dd$variable, "Treatment"]
 
 ggplot(dd %>% filter(grepl("POS", id))) + geom_boxplot(aes(y=value,x=variable,fill=group)) + ggtitle("Positive probes")
-ggplot(dd %>% filter(grepl("ANT", id))) + geom_boxplot(aes(y=value,x=variable,fill=group)) + ggtitle("Negative probes")
+ggplot(dd %>% filter(grepl("ANT", id))) + geom_boxplot(aes(y=value,x=variable,fill=group)) + ggtitle("Negative probes") +
+  theme(axis.text=element_text(angle=90,hjust=1))
 
 ```
 
-Only one sample has a lot of noise in the negative probes.
+Only one sample has a lot of noise in the negative probes. Remove sample 55 (  P. bivia  replicate).
 
 # Normalization
 
@@ -134,7 +148,8 @@ Total mirnas `r nrow(raw_f)`
 ```{r rlg-dist}
 df = melt(assay(rlg))
 df$group = meta$Treatment[match(df$X2,rownames(meta))]
-ggplot(df, aes(x=value,group=X2,color=group)) + geom_density() + facet_wrap(~group)
+df$experiment = meta$Experimentdate[match(df$X2,rownames(meta))]
+ggplot(df, aes(x=value,group=X2,color=group)) + geom_density() + facet_wrap(~experiment)
 ```
 
 ## Clustering
@@ -161,7 +176,9 @@ pooled = grepl("Pool", meta$Experimentdate)
 pool_cpm = ma[, pooled]
 pool_meta = meta[pooled,]
 pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
-pheatmap(pool_sort, annotation = pool_meta, cluster_rows = FALSE, clustering_distance_col=.cor(pool_sort), clustering_method = "ward.D2", show_rownames = FALSE)
+
+pheatmap(cor(pool_cpm,method = "kendall"),clustering_method = "ward.D2", annotation = pool_meta)
+pheatmap(pool_sort, annotation = pool_meta, clustering_distance_col=.cor(pool_sort), clustering_method = "ward.D2", show_rownames = FALSE)
 pheatmap(pool_sort, annotation = pool_meta[,"Treatment", drop=F], cluster_rows = FALSE, clustering_distance_col=.cor(pool_sort), clustering_method = "ward.D2", show_rownames = FALSE)
 ```
 
@@ -181,28 +198,69 @@ for (cond in unique(pool_meta$Treatment)){
 
 ### All
 ```{r heatmap-nopooled}
+library(corrplot)
 pooled = !grepl("Pool", meta$Experimentdate)
 pool_cpm = ma[, pooled]
-pool_meta = meta[pooled,]
+pool_meta = meta[pooled,c("Treatment", "Experimentdate")]
 # pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
-pheatmap(pool_cpm, annotation = pool_meta, clustering_distance_col=.cor(pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE)
 pheatmap(pool_cpm, annotation = pool_meta[,"Treatment", drop=F], clustering_distance_col=.cor(pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE)
+
+pheatmap(pool_cpm, annotation = pool_meta, clustering_distance_col=.cor(pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE)
+```
+
+Correlation values
+
+```{r cor-nopooled,fig.width=12}
+pheatmap(cor(pool_cpm,method = "kendall"),clustering_method = "ward.D2", annotation = pool_meta, annotation_row = pool_meta[,"Treatment",drop=F], main="correlation values between samples")
+
+con_crisp = grepl("Control", pool_meta$Treatment) | grepl("crisp", pool_meta$Treatment)
+# corrplot(cor(pool_cpm[,con_crisp], method="kendall"), method = "number")
+pheatmap(cor(pool_cpm[,con_crisp],method = "kendall"),clustering_method = "ward.D2", annotation = pool_meta, annotation_row = pool_meta[,"Treatment",drop=F], display_numbers = T,main="correlation values between Control and L.crispatus samples")
+```
+
+Only for Controls and LCrispatus
+
+```{r cor-nopooled-zoom}
+dd = cor(pool_cpm[,con_crisp], method="kendall")
+colnames(dd) = paste0("D",pool_meta[colnames(dd),"Experimentdate"],"_",pool_meta[colnames(dd),"Treatment"],"_",1:nrow(dd))
+rownames(dd) = paste0("D",pool_meta[rownames(dd),"Experimentdate"],"_",pool_meta[rownames(dd),"Treatment"],"_",1:nrow(dd))
+dd = melt(dd)
+ggplot(dd %>% filter(grepl("D7/13/2015_L. crispatus",X1) & grepl("L. crispatus",X2) & !grepl("D7/13/2015",X2)), aes(x=X1,y=X2,fill=1))+
+  geom_tile(color="white")+
+  scale_fill_continuous(guide=FALSE,low="white",high = "white") +
+  geom_text(aes(label=round(value,digits=2),size=3))+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  labs(list(title="correlation among Lcrispatus in different experimental date",x="",y=""))
+  
+
+ggplot(dd %>% filter(grepl("D7/13/2015_L. crispatus",X1) & grepl("D7/13/2015_Control",X2)), aes(x=X1,y=X2,fill=1))+
+  geom_tile(color="white")+
+  scale_fill_continuous(guide=FALSE,low="white",high = "white") +
+  geom_text(aes(label=round(value,digits=2),size=3))+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1))+
+  labs(list(title="correlation among Lcrispatus and Controls in same experimental date",x="",y=""))
 ```
 
 ### Each condition
 ```{r heatmap-nopooled-condition}
+library(GGally)
 for (cond in unique(pool_meta$Treatment)){
   .cond = grepl(cond, pool_meta$Treatment)
   .pool_cpm = pool_cpm[,.cond]
   .pool_meta = pool_meta[.cond,]
   # .pool_sort = .pool_cpm[order(rowMeans(.pool_cpm),decreasing = TRUE),]
   pheatmap(.pool_cpm, annotation = .pool_meta, clustering_distance_col=.cor(.pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
-   pheatmap(.pool_cpm, clustering_distance_col=.cor(.pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
+  # dd_cor = data.frame(run1=rowMeans(.pool_cpm[,1:3]), run2=rowMeans(.pool_cpm[,4:6]), run3=rowMeans(.pool_cpm[,7:9]))
+  # print(ggpairs(.pool_cpm))
+  
+  pheatmap(.pool_cpm, clustering_distance_col=.cor(.pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE, main=cond)
 }
 ```
 
 
-## Differential expression
+# Differential expression
 ```{r fn}
 handle_deseq2 = function(dds, summarydata, column) {
   all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
@@ -300,7 +358,7 @@ for (i in names(res)){
     .g = unlist(strsplit(i, "_"))
     .g1 = match(.g[1], colnames(all))
     .g2 = match(.g[3], colnames(all))
-    .onoff = row.names(res[[i]]) %in% rownames(all[rowSums(all[,c(.g1,.g2)]) == 1 & all[,.g2]==0,]) & res[[i]]$log2FoldChange > 0.5
+    .onoff = row.names(res[[i]]) %in% rownames(all[rowSums(all[,c(.g1,.g2)]) == 1 & all[,.g2]==0,])
     .res = res[[i]][.onoff,]
     .res = .res[.res$padj<0.05,]
     cat("\n\n###",.g[3],". Top 10 (total",nrow(.res),"):\n\n")

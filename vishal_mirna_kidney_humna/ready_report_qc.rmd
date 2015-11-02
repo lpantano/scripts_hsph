@@ -15,7 +15,7 @@ Last updated `r date()` by Lorena Pantano
 ```{r setup-opts, echo=FALSE}
 options(bitmapType = "cairo")
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 9,
-               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+               cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
                message=FALSE, prompt=TRUE, comment='', fig.cap='')
 ```
 
@@ -113,7 +113,7 @@ ggplot(tab, aes(x=V1,y=V2,fill=sample)) +
 mi_files = file.path(root_path,files[,"miraligner"])
 row.names(design) = samples
 
-# obj <- IsomirDataSeqFromFiles(files = mi_files, design = design ,header = T, cov = 1)
+# obj <- IsomirDataSeqFromFiles(files = mi_files, design = design ,header = T)
 # save(obj, file="obj.rda")
 load("obj.rda")
 ```
@@ -163,6 +163,7 @@ ma = counts(obj, norm=T)
 ma = ma[rowSums(ma>2)>3,]
 pheatmap(ma, show_rownames = F, clustering_method = "ward.D")
 ```
+
 
 ## Others small RNA
 
@@ -360,12 +361,12 @@ do_norm = function(dss, root_path, prefix, by_groups=NULL){
     fn_count = paste0(prefix, "count_matrix.txt")
     write.table(count_ma,fn_count,sep="\t")
     fn_raw = paste0(prefix, "raw_matrix.txt")
-    write.table(count_ma,fn_raw,sep="\t")
+    write.table(counts(dss),fn_raw,sep="\t")
 }
 
 plot_gene = function(name, d){
   design = colData(d)
-  ggplot(plotCounts(d, name, returnData=TRUE) %>% mutate(gender=design$gender, age=as.factor(design$age)), aes(x=condition,y=count,color=age,shape=gender)) + 
+  ggplot(plotCounts(d, name, returnData=TRUE,transform = TRUE) %>% mutate(gender=design$gender, age=as.factor(design$age)), aes(x=condition,y=count,color=age,shape=gender)) + 
     geom_point(size=3) +
     ggtitle(name) + 
     scale_color_brewer(palette = "Set1")
@@ -390,7 +391,7 @@ for (s in samples){
   }
 }
 ma = do.call(cbind, .list)
-designma = metadata %>% mutate (age=round(AGE/10)*10, gender=GENDER, condition=X.1, diagnosis=SAMPLEDIAGNOSIS ) %>% dplyr::select(diagnosis, age, gender, condition)
+designma = metadata %>% mutate (age=factor(round(AGE/10)*10), gender=GENDER, condition=X.1, diagnosis=SAMPLEDIAGNOSIS ) %>% dplyr::select(diagnosis, age, gender, condition)
 rownames(designma) = colnames(ma)
 
 keep = lapply(unique(designma$condition), function(g){
@@ -409,6 +410,23 @@ groups = list(Healthy = grepl("Healthy", designma$condition),
               CKD = grepl("CKD", designma$condition),
               AKI = grepl("AKI", designma$condition))
 do_norm(dds, root_path, "mirna_", groups)
+```
+
+### Top expressed miRNAS
+```{r top-mirna}
+cpm = counts(dds, normalized=T)
+cpm = .add_average(cpm, groups)
+cpm = cpm[,c("Healthy", "CKD", "AKI")]
+for (c in colnames(cpm)){
+  .sort = sort(cpm[,c], decreasing = T)/sum(cpm[,c])
+  .top5 = .sort[1:5]
+  .rest = sum(.sort) - sum(.top5)
+  p = ggplot(data.frame(names=factor(c(names(.top5),"rest"), levels=c(names(.top5),"rest")), pct=c(.top5, .rest))) +
+      geom_bar(aes(y=pct,x=names), stat = "identity") +
+      ylab("% of reads") +
+      ggtitle(c)
+  print(p)
+}
 ```
 
 ### Clustering
@@ -446,6 +464,22 @@ for (i in names(all_results)){
   write.table(row.names(subset(all_results[[i]],padj<0.01)),paste0(i,"_mirna_sign.tsv"),sep="\t",quote=F, row.names=F)
 }
 
+```
+
+```{r modified-control, results='asis', fig.width=9, fig.height=9}
+ma_red = ma[,c(-8,-10)]
+designma_red = designma[colnames(ma_red),]
+dds_res = do_de(ma_red, designma_red, ~ age + gender + condition)
+res = results(dds_res, contrast=c("condition", "CKD", "Healthy"))
+res = res[order(res$padj),]
+cat("\n\n Top 10 at:  Control vs CKD 1,2,4\n\n")
+print(kable(head(res,10)))
+cat("\n\n")
+.plots = lapply(rownames(res[1:5,]), plot_gene, dds_res)
+do.call(grid.arrange, .plots)
+cat("\n\n")
+  
+write.table(as.data.frame(res),paste0("CKD_vs_red_controls","_mirna_de.tsv"),sep="\t",quote=F)
 ```
 
 ### target enrichment
@@ -571,7 +605,7 @@ for (s in samples){
   }
 }
 ma = do.call(cbind, .list)
-designma = metadata %>% mutate (age=round(AGE/10)*10, gender=GENDER, condition=X.1) %>% dplyr::select(age, gender, condition)
+designma = metadata %>% mutate (age=factor(round(AGE/10)*10), gender=GENDER, condition=X.1) %>% dplyr::select(age, gender, condition)
 rownames(designma) = colnames(ma)
 
 keep = lapply(unique(designma$condition), function(g){
@@ -598,7 +632,7 @@ obj = isoPlot(obj, type = "iso5")
 obj = isoPlot(obj, type = "iso3")
 obj = isoPlot(obj, type = "add")
 obj = isoPlot(obj, type = "subs")
-isoPlotPosition(obj)
+isoPlotPosition(obj, position = 9)
 ```
 
 
@@ -609,10 +643,27 @@ pheatmap(assay(mat), clustering_distance_cols = "correlation", show_rownames = F
 plotPCA(mat)
 ```
 
+### Top expressed isomiRs
+```{r top-iso}
+cpm = counts(dds, normalized=T)
+cpm = .add_average(cpm, groups)
+cpm = cpm[,c("Healthy", "CKD", "AKI")]
+for (c in colnames(cpm)){
+  .sort = sort(cpm[,c], decreasing = T)/sum(cpm[,c])
+  .top5 = .sort[1:5]
+  .rest = sum(.sort) - sum(.top5)
+  p = ggplot(data.frame(names=factor(c(names(.top5),"rest"), levels=c(names(.top5),"rest")), pct=c(.top5, .rest))) +
+       theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+      geom_bar(aes(y=pct,x=names), stat = "identity") +
+      ylab("% of reads") +
+      ggtitle(c)
+  print(p)
+}
+```
 
 ### MA-plots
   
-```{r DESeq-iso-output, results='asis', fig.height=9}
+```{r DESeq-iso-output, results='asis', fig.height=12, fig.width=12}
 all_results = handle_deseq2(dds, designma, "condition")
 plot_MA(all_results)
 
@@ -628,6 +679,43 @@ for (i in names(all_results)){
 }
 
 ```
+
+
+```{r modified-control-iso, results='asis', fig.width=12, fig.height=12}
+ma_red = ma[,c(-8,-10)]
+designma_red = designma[colnames(ma_red),]
+dds_res = do_de(ma_red, designma_red, ~ age + gender + condition)
+res = results(dds_res, contrast=c("condition", "CKD", "Healthy"))
+res = res[order(res$padj),]
+cat("\n\n Top 10 at:  Control 1,2,4 vs CKD\n\n")
+print(kable(head(res,10)))
+cat("\n\n")
+
+.plots = lapply(rownames(res[1:5,]), plot_gene, dds_res)
+do.call(grid.arrange, .plots)
+cat("\n\n")
+
+get_seq = function(x,name){
+  if (grepl("iso", name)){
+    tags = strsplit2(split = "[::.::]", name)
+    for (i in obj@rawList){
+      t = i %>% filter(t5==tags[1,4] & t3==tags[1,8] & add==tags[1,10] & subs==tags[1,12] & mir==tags[1,1])
+      if (nrow(t)>0){
+        print(cbind(name=name,t[,1:2]))
+        break
+      }
+    }
+  }
+}
+
+# cat("\n\nSequence of the miR-486-5p isomir:\n")
+# get_seq(obj,rownames(res[1:5,])[2])
+# cat("\n\nCounts of miR-486-5p isomir:\n")
+# counts(dds_res, normalized=T)[rownames(res[1:5,])[2],]
+# cat("\n")
+write.table(as.data.frame(res),paste0("CKD_vs_red_controls","_isomirna_de.tsv"),sep="\t",quote=F)
+```
+
 
 ```{r, eval=FALSE, echo=FALSE}
 
