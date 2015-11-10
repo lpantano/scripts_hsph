@@ -1,0 +1,630 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    title: "Feinberg RNA-seq"
+    theme: readable
+    highlight: zenburn
+    theme.chooser: FALSE
+    highlight.chooser: FALSE
+
+
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="Splicing RNAseq"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+```
+
+
+```{r knitrsetup, echo=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code=FALSE, bootstrap.show.output=TRUE, bootstrap.thumbnail.size="col-md-10", cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE, message=FALSE, prompt=TRUE, comment='', fig.cap='', tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200), fig.width = 8, fig.height = 8)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+source("~/repos/myRfunctions/transactions.R")
+# render_2_drop("qc-summary.Rmd", "splicing/rnaseq_report")
+```
+
+---
+
+# Splicing RNA-seq
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+# Overview
+
+```{r qc-setup}
+library(edgeR)
+library(limma)
+library(org.Hs.eg.db)
+library(ggbio)
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+devtools::load_all("~/repos/CHBUtils")
+library(pheatmap)
+library(dplyr)
+library(clusterProfiler)
+basedir = "~/orch/scratch/anyu_splicing/cardio_failure/final/2015-10-26_cardio_failure/files"
+dir.create(basedir, showWarnings = F)
+
+project_summary = "~/orch/scratch/anyu_splicing/cardio_failure/final/2015-10-26_cardio_failure/project-summary.csv"
+
+counts_file = "~/orch/scratch/anyu_splicing/cardio_failure/final/2015-10-26_cardio_failure/combined.counts"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+
+summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
+summarydata$Name = rownames(summarydata)
+summarydata = summarydata[order(summarydata$Name),]
+
+counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE)
+counts = counts[, order(colnames(counts))]
+colnames(counts) = gsub(".counts", "", colnames(counts))
+# this is a list of all non user-supplied metadata columns that could appear
+known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.quality",
+    "rRNA.rate", "Fragment.Length.Mean", "Intronic.Rate", "Intergenic.Rate",
+    "Mapping.Rate", "Quality.format", "Duplication.Rate.of.Mapped", "Mapped",
+    "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
+    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "complexity", "X5.3.bias", "Duplicates.pct", "Duplicates", "Mapped.reads",
+    "Median.insert.size", "Mapped.reads.pct", "Total.reads",
+    "avg_coverage_per_region")
+```
+
+```{r heatmap-function}
+get_heatmap_fn = function(summarydata) {
+    # return the pheatmap function with or without metadata
+    metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
+    if(ncol(metadata) == 0) {
+       return(pheatmap)
+    }
+    else {
+    # rownames(metadata) = summarydata$Name
+    heatmap_fn = function(data, ...) {
+        pheatmap(data, annotation=metadata, clustering_method = "ward.D2", clustering_distance_rows = "correlation", ...)
+    }
+    return(heatmap_fn)
+}}
+heatmap_fn = get_heatmap_fn(summarydata)
+```
+
+# Quality control metrics
+
+## Mapped reads
+```{r mapped-plot}
+ggplot(summarydata, aes(x=Name, y=Mapped)) +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    geom_bar(stat="identity") +
+    ylab("mapped reads") + xlab("")
+```
+
+## Genomic mapping rate
+```{r mapping-rate-plot}
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) +
+    geom_bar(stat="identity") +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Number of genes detected
+```{r genes-detected-plot}
+dd = data.frame(Name=names(counts), Genes.Detected = colSums(counts > 0))
+ggplot(dd, aes(x=Name, y=Genes.Detected)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("genes detected") + xlab("")
+```
+
+## Gene detection saturation
+```{r saturation-plot}
+dd = data.frame(Mapped=summarydata$Mapped, Genes.Detected = colSums(counts > 0))
+ggplot(dd, aes(x=Mapped, y=Genes.Detected)) +
+    geom_point() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("genes detected") + xlab("reads mapped")
+```
+
+## Exonic mapping rate
+```{r exonic-mapping-plot}
+ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("exonic mapping rate") + xlab("")
+```
+
+## rRNA mapping rate
+```{r rRNA-rate-plot}
+ggplot(summarydata, aes(x=Name, y=rRNA.rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("rRNA rate") + xlab("")
+```
+
+## Estimated fragment length of paired-end reads
+```{r fragment-length-plot}
+ggplot(summarydata, aes(x=Name, y=Fragment.Length.Mean)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("fragment length") + xlab("")
+```
+
+## Boxplot of log10 counts per gene
+```{r boxplot-raw}
+melted = melt(counts)
+colnames(melted) = c("sample", "count")
+melted$sample = factor(melted$sample)
+melted = melted[order(melted$sample),]
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Boxplot of log10 TMM-normalized counts per gene
+Trimmed mean of M-values (TMM) normalization is described
+[here](http://genomebiology.com/2010/11/3/R25)
+
+Robinson, M. D., & Oshlack, A. (2010). A scaling normalization method for differential expression analysis of RNA-seq data. Genome Biology, 11(3). doi:10.1186/gb-2010-11-3-r25
+
+```{r boxplot-normalized}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample)
+melted = melted[order(melted$sample),]
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Density of log10 TMM-normalized counts
+```{r density-normalized}
+ggplot(melted, aes(x=count, group=sample)) +
+    geom_density() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Correlation (Pearson) heatmap of TMM-normalized counts
+```{r pearson-heatmap-normalized}
+heatmap_fn(cor(normalized_counts, method="pearson"))
+```
+
+## Correlation (Spearman) heatmap of TMM-normalized counts
+```{r spearman-heatmap-normalized}
+heatmap_fn(cor(normalized_counts, method="spearman"))
+```
+
+## MDS plot of TMM-normalized counts
+```{r mds-normalized}
+mds(normalized_counts, k=length(colnames(normalized_counts)) - 1, condition = summarydata$group)
+```
+
+## Heatmap of top 30 most expressed genes
+```{r top-count-genes, results='asis'}
+select = order(rowMeans(normalized_counts),decreasing=TRUE)[1:30]
+heatmap_fn(log2(normalized_counts[select,])+0.5)
+```
+
+
+## Heatmap by concordance correlation coefficient
+http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1004075
+
+```{r propcor-heatmap}
+propcor = function(x, y) {
+    x = log(x + 0.1)
+    y = log(y + 0.1)
+    num = 2 * cov(x, y)
+    denom = var(x) + var(y)
+return(num/denom)}
+
+do_propcor = function(x) {
+     mat = list()
+     for(i in seq_len(ncol(x))) {
+         for(j in seq_len(ncol(x))) {
+        x2 = x[, i]
+        y2 = x[, j]
+        mat = c(mat, propcor(x2, y2)) } }
+    mat = unlist(mat)
+    mat = matrix(mat, ncol(x), ncol(x))
+    colnames(mat) = colnames(x)
+    rownames(mat) = colnames(x)
+    return(mat)}
+
+heatmap_fn(do_propcor(normalized_counts))
+```
+
+# Differentially expression analysis
+
+Analysis was done with [limma package](https://www.bioconductor.org/packages/release/bioc/vignettes/limma/inst/doc/usersguide.pdf). The idea behind the analysis is to test if any exon inside each gene change different than the rest. This can be due to different events: like exon retention, alternative splicing, completely different isoforms inside the gene... Each case need to be studied specifically.
+
+```{r dexseq, eval=F, echo=F}
+
+library(DEXSeq)
+
+countFiles=list.files("~/scratch/anyu_splicing/cardio_failure/work/dexseq/", pattern = ".dexseq", full.names = TRUE)
+
+samples = grepl("/NF", countFiles) |  grepl("/ICM[0-9].dexseq", countFiles)
+
+dxd = DEXSeqDataSetFromHTSeq(countFiles[samples],sampleData=summarydata[samples,],design= ~ Name + exon + exon:group, flattenedfile="~/groups/bcbio/genomes/Hsapiens/hg19/rnaseq/ref-transcripts.dexseq.gff3")
+# head( rowRanges(dxd), 3 )
+
+dxd = estimateSizeFactors(dxd)
+dxd = estimateDispersions(dxd)
+dxd = testForDEU(dxd)
+dxd = estimateExonFoldChanges(dxd, fitExpToVar="group")
+save(dxd, file="dxd.rda")
+
+plotDispEsts(dxd)
+plotMA(dxd)
+plotDEXSeq(dxr, "FBgn0010909", legend=TRUE, cex.axis=1.2, cex=1.3, lwd=2)
+DEXSeqHTML(dxr, FDR=0.1, color=c("#FF000080", "#0000FF80"))
+```
+
+
+```{r limma-exons}
+ecounts = read.table("~/orch/scratch/anyu_splicing/cardio_failure/work/htseq-count/combined.dexseq", header=TRUE, row.names="id", check.names=FALSE)
+einfo = read.table("~/orch/scratch/anyu_splicing/cardio_failure/work/htseq-count/combined.dexseq.ann")
+names(einfo) = c("id", "GeneId", "Chr", "Start", "End", "Length", "Strand")
+einfo = einfo[einfo$Length>10, ]
+rownames(einfo) = einfo$id
+ecounts = ecounts[as.character(einfo$id), summarydata$Name]
+
+samples = !grepl("LVAD", summarydata$Name)
+dge <- DGEList(counts=ecounts[,samples], genes=einfo)
+
+isexpr <- rowSums(cpm(dge) > 1) >=5
+dge <- dge[isexpr,,keep.lib.sizes=FALSE]
+
+y <- calcNormFactors(dge)
+# y$sample
+plotMDS(y)
+
+Group = factor(summarydata$group[samples], levels = c("NF", "ICM", "NICM"))
+design <- model.matrix(~ 0 + Group)
+v <- voom(y,design,plot=TRUE)
+
+fit <- lmFit(v, design)
+
+limma_de <- function(fit, g1, g2, splicing=FALSE){
+  cont <- paste0(g1," - ", g2)
+  contrast.matrix <- makeContrasts(contrasts = cont, levels=design)  
+  fit.c <- contrasts.fit(fit, contrast.matrix)
+  fit.de <- eBayes(fit.c, robust=TRUE)
+  ex_res <- topTable(fit.de, coef=1,n =Inf)
+  # summary(decideTests(fit.de))
+  altex_res = NULL
+  if (splicing){
+    ex <- diffSplice(fit.c[,1], geneid = "GeneId", exonid = "Start")
+    altex_res <- topSplice(ex, test="t", n=Inf)
+  }
+  list(exons = ex_res, alt = altex_res, raw=ex, groups=c(gsub("Group","",g1),gsub("Group","",g2)))
+}
+
+do_de = function(fit, splicing=FALSE){
+  res = list()
+  res[["ICMvsNF"]] = limma_de(fit, "GroupICM", "GroupNF", splicing)
+  res[["NICMvsNF"]] = limma_de(fit, "GroupNICM", "GroupNF", splicing)
+  # res[["ICMvsNICM"]] = limma_de(fit, "GroupICM", "GroupNICM", splicing)
+  res
+}
+res_dexseq = do_de(fit, TRUE)
+
+```
+
+The summary of alternative splicing contains for each comparison:
+* Heatmap with significant alternative splicing events
+* TP53 result showing pvalue and FDR for this gene
+* Number of alternative splicing events
+* Number of genes with alternative splicing events
+* Table with top 10 genes
+* Biological process annotation of genes with alternative splicing events
+* Figures for top 10 genes:
+** 1)simply scheme showing exons (red point) with significan difference
+** 2)real transcript structure and colored in blue the approximate location of the significant splicing event/s
+** 3)expression for each exon and being red the ones with significant diference (similar to red point in figure 1)
+
+Note: figure 1 and 3 show counting bins, that is different than real exons shown in figure 2. In genes, many exons appear multiple times, once for each transcript that contains them. We need
+to “collapse” this information to define exon counting bins, i. e., a list of intervals, each corresponding to
+one exon or part of an exon. Counting bins for parts of exons arise when an exonic region appears with
+different boundaries in different transcripts: 
+
+<div style="width:300px; height=200px">
+![exon](http://genome.cshlp.org/content/22/10/2008/F1.large.jpg)
+</div>
+
+> Flattening of gene models: This (fictional) gene has three annotated transcripts involving three exons (light shading), one of which has alternative boundaries. We form counting bins (dark shaded boxes) from the exons as depicted; the exon of variable length gets split into two bins.
+
+```{r dexseq-output, fig.width=11, fig.height=9, results='asis'}
+txdb <- loadDb("~/soft/bcbio/genomes/Hsapiens/hg19/rnaseq/txdb.sqlite")
+.plot_tx = function(txdb, gene, tab, mark){
+    
+
+    .tx_tab = lapply(gene, function(g){
+                     g = as.character(as.vector(unlist(strsplit2(g, split = "[::+::]"))))
+                     select(txdb,keys = as.character(g), columns = c("EXONCHROM", "EXONSTART", "EXONEND", "EXONSTRAND", "TXID"),keytype = "GENEID")
+    })
+    .tx_tab = do.call(rbind, .tx_tab) %>% arrange(EXONSTART)
+    # .de = .tx_tab$EXONSTART>=min(tab$Start[mark]) & .tx_tab$EXONEND<=max(tab$End[mark]) |
+    #      .tx_tab$EXONSTART<=min(tab$End[mark]) & .tx_tab$EXONEND>=max(tab$Start[mark])
+    .gr_de = GRanges(seqnames=tab$Chr[mark],
+                         IRanges(start=tab$Start[mark], 
+                                 width=abs(tab$End[mark]-tab$Start[mark])
+                                 ),
+                         strand=tab$Strand[mark]
+                         )
+    
+     # .tx_tab$de[.de]="significant"
+     .gr_custom = GRanges(seqnames=.tx_tab$EXONCHROM,
+                         IRanges(start=.tx_tab$EXONSTART, 
+                                 width=abs(.tx_tab$EXONEND-.tx_tab$EXONSTART)
+                                 ),
+                         strand=.tx_tab$EXONSTRAND,
+                         tx=.tx_tab$TXID,
+                         de=rep("NO", nrow(.tx_tab))
+                         )
+    .de = findOverlaps(.gr_de, .gr_custom, minoverlap=5)
+    .gr_custom$de[unique(.de@subjectHits)] =  "YES"    # print(.de@subjectHits)
+    .grl <- split(.gr_custom, values(.gr_custom)$tx)
+    print(autoplot(.grl, aes(fill=de, color=de)))
+    
+}
+
+.plot_expression = function(count,genes,summarydata,einfo){
+    .c = melt(count[as.character(genes),,drop=F], varnames = c("id", "sample"))
+    .c$group = summarydata[as.character(.c$sample), "group"]
+    .start = einfo[as.character(.c$id),"Start"]
+    .c$start = factor(.start, level=sort(unique(.start)))
+    .c$name = paste0(.c$id, "\n", .c$start)
+    col = rep("black", nrow(.gene))
+    col[.mark] = "red"
+    .a = einfo[as.character(.c$id),]
+    print(ggplot(.c, aes(x=start, y=value)) +
+      geom_boxplot(aes(colour = group), outlier.colour = NA, position=position_dodge(width = 0.9)) +
+      geom_jitter(aes(color=group, fill=group), position=position_jitterdodge(dodge.width=0.9)) + 
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, color=col)) +
+      ylab("normalized log2 counts") +
+      ggtitle(g))
+
+}
+
+.add_symbol = function(genes){
+  .symbol = lapply(as.character(genes), function(g){
+    if (grepl("[::+::]", g)){
+      .id = as.character(as.vector(unlist(strsplit2(g, split = "[::+::]"))))
+      .names = convertIDs(.id, "ENSEMBL", "SYMBOL", org.Hs.eg.db, "useFirst")
+      return(paste(.names, collapse=":"))
+    }else{
+      return(convertIDs(g, "ENSEMBL", "SYMBOL", org.Hs.eg.db, "useFirst"))
+    }
+  })
+  unlist(.symbol)
+}
+
+tp53 = convertIDs("TP53", "SYMBOL", "ENSEMBL", org.Hs.eg.db, "useFirst")
+
+for (comp in names(res_dexseq)){
+  tab = res_dexseq[[comp]]$alt %>% filter(FDR<0.01)
+  etab = res_dexseq[[comp]]$ex
+  ex = res_dexseq[[comp]]$raw
+  g = res_dexseq[[comp]]$groups
+  
+  cat("\n\n## Comparison: ", comp, "\n\n")
+  heatmap_fn(v$E[as.character(tab$id), colnames(v$E) %in% summarydata$Name[summarydata$group %in% g]], show_row=F)
+  
+  cat("\n\n### TP53 expression:")
+  .mark = plotSplice(ex, res_dexseq[[comp]]$alt, geneid=tp53, genecol="GeneId")
+  
+  cat("\n\n### Number of significantly alternative de-regulated exons at 0.01 of FDR", sum(tab$FDR<0.01), "\n\n")
+  
+  .tmp = unique(as.character(as.vector(unlist(strsplit2(tab$GeneId, split = "[::+::]")))))
+  cat("### Percentage of genes with de-regulated exons:", length(.tmp)/length(unique(dge$genes$GeneId))*100)
+  
+  cat("\n\n### Top 10 genes:\n\n")
+  tab$symbol = .add_symbol(tab$GeneId)
+  print(kable(head(tab, 10),row.names = F))
+  
+  cat("\n\nComplete file with name in attached document: ",paste0(comp,"_de.tsv"))
+  save_file(tab,paste0(comp,"_de.tsv"),basedir)
+  
+  cat("\n\n### Biological process annotation\n")
+  .entrezid = convertIDs(.tmp[.tmp!=""],"ENSEMBL", "ENTREZID", org.Hs.eg.db, "useFirst")
+  ego <- groupGO(gene = .entrezid[!is.na(.entrezid)], 
+                  organism = "human", ont= "BP", level=3,
+                  readable = TRUE)
+  if (.isvalid(summary(ego))){
+    idx = reduce(summary(ego)$geneID, 30)
+    print(kable(summary(ego)[idx, 1:4] %>% filter(Count>4)))
+  }  
+  cat("\n\n")
+  
+  cat("\n\n### Plot of top 10 genes\n\n")
+  .to_plot = unique(tab[,"GeneId"])[1:10]
+  for (g in .to_plot){
+    gs = tab[match(g, tab[,"GeneId"]), "symbol"]
+    cat("\n\n**Gene",gs,"**\n", sep = "")
+    cat("\n\nlog2FC of exons respect to the rest:\n")
+    .mark = plotSplice(ex, tab, geneid=g, genecol="GeneId")
+    
+    cat("\n\nReal representation of exons:\n")
+    .gene = etab %>% filter(GeneId==g) %>% arrange(Start)
+    .plot_tx(txdb, g, .gene, .mark)
+    
+    cat("\n\nSignificant exons:\n")
+    print(kable(.gene[.mark,1:8,drop=F]))
+    
+    cat("\n\nExpression:\n")
+    .plot_expression(v$E, .gene$id, summarydata, einfo)  
+        
+  }
+    
+}
+
+```
+
+```{r limma-express-transcript, eval=F, echo=F}
+tcounts = read.table("~/orch/scratch/anyu_splicing/cardio_failure/work/htseq-count/combined.isoform.express_counts", header=TRUE, row.names="id", check.names=FALSE)
+names(tcounts) = gsub("_eff", "", names(tcounts))
+tinfo = read.table("~/orch/scratch/anyu_splicing/cardio_failure/work/htseq-count/isoform_to_gene.txt")
+
+# einfo = einfo[einfo$Length>10, ]
+tcounts = tcounts[, summarydata$Name]
+
+samples = !grepl("LVAD", summarydata$Name)
+dge <- DGEList(counts=tcounts[tinfo$V1, samples], genes=tinfo)
+
+isexpr <- rowSums(cpm(dge) > 1) >=5
+dge <- dge[isexpr,,keep.lib.sizes=FALSE]
+
+y <- calcNormFactors(dge)
+y$sample
+plotMDS(y)
+
+design <- model.matrix(~ 0 + Group)
+v <- voom(y,design,plot=TRUE)
+
+fit <- lmFit(v, design)
+
+res_express = do_de(fit)
+
+```
+
+```{r limma-sailfish-transcript, echo=F, eval=T}
+tcounts_long = read.table("~/orch/scratch/anyu_splicing/cardio_failure/work/sailfish/combined.sf", header=TRUE, check.names=FALSE)
+
+tcounts = reshape(tcounts_long[,c(1,4,5)], direction = "wide", timevar = "sample", idvar = "name")
+# tcounts = tidyr::spread(tcounts_long[,c(1,3,5)] %>% filter(sample %in% summarydata$Name[samples]), sample, tpm)
+tinfo = read.table("~/orch/scratch/anyu_splicing/cardio_failure/work/htseq-count/isoform_to_gene.txt")
+
+names(tcounts) = gsub("numreads.", "", names(tcounts))
+rownames(tcounts) = tcounts[,1]
+tcounts = tcounts[,2:ncol(tcounts)]
+tcounts = round(tcounts, digits = 0)
+
+# einfo = einfo[einfo$Length>10, ]
+tcounts = tcounts[, summarydata$Name]
+
+dge <- DGEList(counts=tcounts[tinfo$V1, samples], genes=tinfo)
+
+isexpr <- rowSums(cpm(dge) > 1) >=5
+dge <- dge[isexpr,,keep.lib.sizes=FALSE]
+
+# ggplot(melt(cpm(dge,normalized.lib.sizes = T, log = T)), aes(x=value, group=X2)) + geom_density()
+# sd = 1/rowSds(cpm(dge,normalized.lib.sizes = T))
+# m = rowMeans(cpm(dge,normalized.lib.sizes = T))
+# plot(log2(m)[m>10],sd[m>10])
+
+y <- calcNormFactors(dge)
+# y$sample
+# plotMDS(y)
+
+Group = factor(summarydata$group, levels = c("NF", "ICM", "NICM"))
+design <- model.matrix(~ 0 + Group)
+v <- voom(y, design,plot=TRUE)
+
+fit <- lmFit(v, design)
+res_sailfish = do_de(fit)
+
+```
+
+### Confirmation of YWHAE by transcripts analysis
+
+transcript with the splicing event is: ENST00000496706
+
+```{r sailfish-confirmation}
+g="ENSG00000108953"
+idx = intersect(tinfo[tinfo$V2 %in% g,1], rownames(v$E))
+
+.c = melt(v$E[idx,,drop=F], varnames = c("id", "sample"))
+.c$group = summarydata[as.character(.c$sample), "group"]
+ggplot(.c, aes(x=id, y=value)) +
+        geom_boxplot(aes(colour = group), outlier.colour = NA, position=position_dodge(width = 0.9)) +
+        geom_jitter(aes(color=group, fill=group), position=position_jitterdodge(dodge.width=0.9)) + 
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+        ylab("normalized log2 counts") 
+
+# res_sailfish$ICMvsNF$exons["ENST00000496706",]
+```
+
+
+```{r sleuth, echo=F, eval=F}
+library(sleuth)
+base_dir <- "~/orch/scratch/anyu_splicing/cardio_failure/work/kallisto"
+
+dirs_id <- list.files(base_dir,pattern = "SRR", full.names = TRUE)
+meta_csv <- read.csv("~/orch/scratch/anyu_splicing/cardio_failure/config/cardio_failure.csv")
+
+meta_csv$path = as.character(dirs_id)
+meta_csv = meta_csv %>% filter(!grepl("LVAD", group) & !grepl("NICM", group))
+meta_csv$group = relevel(meta_csv$group, "NF")
+names(meta_csv)[1] = "sample"
+so <- sleuth_prep(meta_csv, ~ group)
+# save(so, file="so.rda")
+so <- sleuth_fit(so)
+so <- sleuth_wt(so, which_beta = 'conditionscramble')
+
+models(so)
+
+biocLite("biomaRt")
+mart <- biomaRt::useMart(biomart = "ensembl", dataset = "hsapiens_gene_ensembl")
+t2g <- biomaRt::getBM(attributes = c("ensembl_transcript_id", "ensembl_gene_id",
+    "external_gene_name"), mart = mart)
+t2g <- dplyr::rename(t2g, target_id = ensembl_transcript_id,
+  ens_gene = ensembl_gene_id, ext_gene = external_gene_name)
+so <- sleuth_prep(s2c, ~ condition, target_mapping = t2g)
+so <- sleuth_fit(so)
+so <- sleuth_test(so, which_beta = 'conditionscramble')
+
+sleuth_live(so)
+
+```
+
+```{r comp, echo=F, eval=F}
+
+for (name in names(res_dexseq)){
+  dexseq_sign = as.character(unique((res_dexseq[[name]]$exons %>% filter(adj.P.Val < 0.05))[,"GeneId"]))
+  # express_sign = as.character(unique((res_express[[name]]$exons %>% filter(adj.P.Val < 0.01))[,"V2"]))
+  sailfish_sign = as.character(unique((res_sailfish[[name]]$exons %>% filter(P.Value < 0.001))[,"V2"]))
+  venn(list(dexseq=dexseq_sign, sailfish=sailfish_sign))
+  title(name)
+}
+```
+
+```{r session}
+sessionInfo()
+```
