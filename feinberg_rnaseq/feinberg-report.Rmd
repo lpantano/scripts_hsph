@@ -416,9 +416,9 @@ upset(ma, sets = names(ma)[2:7])
 
 ```{r metatable}
 tab = data.frame()
-for (fn in list.files(".","tsv")){
+for (fn in list.files(".","vs")){
   if (grepl("group", fn)){
-    d = read.table(fn, sep="\t",header=T)
+    d = read.table(fn, sep="\t",header=T,strip.white = T)
     comp = gsub("_de.tsv", "", fn)
     if (nrow(tab)==0){
       tab = d[,c("id","baseMean","symbol","entrezgene","description","xloc")]
@@ -432,6 +432,7 @@ for (fn in list.files(".","tsv")){
   }
 }
 
+write.table(tab[,-5], "metatable_simple_de.tsv", quote = F, sep = "\t", row.names = F)
 write.table(tab, "metatable_de.tsv", quote = F, sep = "\t", row.names = F)
 ```
 

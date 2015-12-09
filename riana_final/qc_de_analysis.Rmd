@@ -22,6 +22,7 @@ knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code 
 ```{r render,echo=F}
 library(rmarkdown)
 library(knitrBootstrap)
+library(knitr)
 source("~/repos/myRfunctions/transactions.R")
 # knit("qc_de_analysis.Rmd")
 # render_2_drop("qc_de_analysis.Rmd", dn = "Fichorova_EdgeSeq_miRNA_analysis")
@@ -103,6 +104,7 @@ dd = melt(raw %>%  mutate(id=rownames(raw)), id.vars = "id")
 dd$group = meta[dd$variable, "Treatment"]
 
 ggplot(dd %>% filter(grepl("POS", id))) + geom_boxplot(aes(y=value,x=variable,fill=group)) + ggtitle("Positive probes")
+
 ggplot(dd %>% filter(grepl("ANT", id))) + geom_boxplot(aes(y=value,x=variable,fill=group)) + ggtitle("Negative probes") +
   theme(axis.text=element_text(angle=90,hjust=1))
 
@@ -112,10 +114,12 @@ Only one sample has a lot of noise in the negative probes. Remove sample 55 (  P
 
 # Normalization
 
-Kept miRNAs with average counts > 70 in any group.
+Kept miRNAs with average counts > 70 in any group. Removed samples 55.
+
 ```{r deseq2, cache=TRUE}
 library(DESeq2)
-
+meta = meta[-55,]
+raw = raw[,-55]
 no_pooled = !grepl("Pool", meta$Experimentdate)
 clean_meta = meta
 clean_meta$Treatment = gsub(" ", "",clean_meta$Treatment)
@@ -203,9 +207,10 @@ pooled = !grepl("Pool", meta$Experimentdate)
 pool_cpm = ma[, pooled]
 pool_meta = meta[pooled,c("Treatment", "Experimentdate")]
 # pool_sort = pool_cpm[order(rowMeans(pool_cpm),decreasing = TRUE),]
-pheatmap(pool_cpm, annotation = pool_meta[,"Treatment", drop=F], clustering_distance_col=.cor(pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE)
 
 pheatmap(pool_cpm, annotation = pool_meta, clustering_distance_col=.cor(pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE)
+
+pheatmap(pool_cpm, annotation = pool_meta[,"Treatment", drop=F], clustering_distance_col=.cor(pool_cpm), clustering_method = "ward.D2", show_rownames = FALSE)
 ```
 
 Correlation values

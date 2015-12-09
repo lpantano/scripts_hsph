@@ -44,7 +44,7 @@ The sections below provide code to reproduce the included results and plots.
 
 # Overview
 
-```{r qc-setup}
+```{r qc-setup, echo=FALSE}
 library(edgeR)
 library(limma)
 library(org.Hs.eg.db)
@@ -57,6 +57,8 @@ devtools::load_all("~/repos/CHBUtils")
 library(pheatmap)
 library(dplyr)
 library(clusterProfiler)
+library(knitr)
+txdb_file="~/soft/bcbio/genomes/Hsapiens/hg19/rnaseq/txdb.sqlite"
 basedir = "~/orch/scratch/anyu_splicing/cardio_failure/final/2015-10-26_cardio_failure/files"
 dir.create(basedir, showWarnings = F)
 
@@ -284,9 +286,10 @@ dxd = DEXSeqDataSetFromHTSeq(countFiles[samples],sampleData=summarydata[samples,
 
 dxd = estimateSizeFactors(dxd)
 dxd = estimateDispersions(dxd)
+save(dxd, file="icm_dxd.rda")
 dxd = testForDEU(dxd)
 dxd = estimateExonFoldChanges(dxd, fitExpToVar="group")
-save(dxd, file="dxd.rda")
+save(dxd, file="icm_dxd_de.rda")
 
 plotDispEsts(dxd)
 plotMA(dxd)
@@ -306,7 +309,7 @@ ecounts = ecounts[as.character(einfo$id), summarydata$Name]
 samples = !grepl("LVAD", summarydata$Name)
 dge <- DGEList(counts=ecounts[,samples], genes=einfo)
 
-isexpr <- rowSums(cpm(dge) > 1) >=5
+isexpr <- rowSums(dge$counts > 3) >=5
 dge <- dge[isexpr,,keep.lib.sizes=FALSE]
 
 y <- calcNormFactors(dge)
@@ -346,49 +349,37 @@ res_dexseq = do_de(fit, TRUE)
 ```
 
 The summary of alternative splicing contains for each comparison:
+
 * Heatmap with significant alternative splicing events
-* TP53 result showing pvalue and FDR for this gene
+* TP53/USF2 result showing pvalue and FDR for this gene
 * Number of alternative splicing events
 * Number of genes with alternative splicing events
 * Table with top 10 genes
 * Biological process annotation of genes with alternative splicing events
 * Figures for top 10 genes:
-** 1)simply scheme showing exons (red point) with significan difference
-** 2)real transcript structure and colored in blue the approximate location of the significant splicing event/s
-** 3)expression for each exon and being red the ones with significant diference (similar to red point in figure 1)
+    + 1)simply scheme showing exons (red point) with significant difference
+    + 2)real transcript structure and colored in blue the approximate location of the significant splicing event/s
+    + 3)expression for each exon and being red the ones with significant difference (similar to red point in figure 1)
 
 Note: figure 1 and 3 show counting bins, that is different than real exons shown in figure 2. In genes, many exons appear multiple times, once for each transcript that contains them. We need
 to “collapse” this information to define exon counting bins, i. e., a list of intervals, each corresponding to
 one exon or part of an exon. Counting bins for parts of exons arise when an exonic region appears with
 different boundaries in different transcripts: 
 
-<div style="width:300px; height=200px">
-![exon](http://genome.cshlp.org/content/22/10/2008/F1.large.jpg)
-</div>
+
+<img src="http://genome.cshlp.org/content/22/10/2008/F1.large.jpg" width="800px" height="300px" />
 
 > Flattening of gene models: This (fictional) gene has three annotated transcripts involving three exons (light shading), one of which has alternative boundaries. We form counting bins (dark shaded boxes) from the exons as depicted; the exon of variable length gets split into two bins.
 
 ```{r dexseq-output, fig.width=11, fig.height=9, results='asis'}
-txdb <- loadDb("~/soft/bcbio/genomes/Hsapiens/hg19/rnaseq/txdb.sqlite")
+txdb <- loadDb(txdb_file)
 .plot_tx = function(txdb, gene, tab, mark){
-    
-
     .tx_tab = lapply(gene, function(g){
                      g = as.character(as.vector(unlist(strsplit2(g, split = "[::+::]"))))
-                     select(txdb,keys = as.character(g), columns = c("EXONCHROM", "EXONSTART", "EXONEND", "EXONSTRAND", "TXID"),keytype = "GENEID")
+                     AnnotationDbi::select(txdb,keys = as.character(g), columns = c("EXONCHROM", "EXONSTART", "EXONEND", "EXONSTRAND", "TXID"),keytype = "GENEID")
     })
     .tx_tab = do.call(rbind, .tx_tab) %>% arrange(EXONSTART)
-    # .de = .tx_tab$EXONSTART>=min(tab$Start[mark]) & .tx_tab$EXONEND<=max(tab$End[mark]) |
-    #      .tx_tab$EXONSTART<=min(tab$End[mark]) & .tx_tab$EXONEND>=max(tab$Start[mark])
-    .gr_de = GRanges(seqnames=tab$Chr[mark],
-                         IRanges(start=tab$Start[mark], 
-                                 width=abs(tab$End[mark]-tab$Start[mark])
-                                 ),
-                         strand=tab$Strand[mark]
-                         )
-    
-     # .tx_tab$de[.de]="significant"
-     .gr_custom = GRanges(seqnames=.tx_tab$EXONCHROM,
+    .gr_custom = GRanges(seqnames=.tx_tab$EXONCHROM,
                          IRanges(start=.tx_tab$EXONSTART, 
                                  width=abs(.tx_tab$EXONEND-.tx_tab$EXONSTART)
                                  ),
@@ -396,8 +387,17 @@ txdb <- loadDb("~/soft/bcbio/genomes/Hsapiens/hg19/rnaseq/txdb.sqlite")
                          tx=.tx_tab$TXID,
                          de=rep("NO", nrow(.tx_tab))
                          )
-    .de = findOverlaps(.gr_de, .gr_custom, minoverlap=5)
-    .gr_custom$de[unique(.de@subjectHits)] =  "YES"    # print(.de@subjectHits)
+    if (!is.null(mark)){
+      .gr_de = GRanges(seqnames=tab$Chr[mark],
+                         IRanges(start=tab$Start[mark], 
+                                 width=abs(tab$End[mark]-tab$Start[mark])
+                                 ),
+                         strand=tab$Strand[mark]
+                         )
+      .de = findOverlaps(.gr_de, .gr_custom, minoverlap=5)
+      .gr_custom$de[unique(.de@subjectHits)] =  "YES"    # print(.de@subjectHits)
+    }
+      
     .grl <- split(.gr_custom, values(.gr_custom)$tx)
     print(autoplot(.grl, aes(fill=de, color=de)))
     
@@ -436,9 +436,12 @@ txdb <- loadDb("~/soft/bcbio/genomes/Hsapiens/hg19/rnaseq/txdb.sqlite")
 }
 
 tp53 = convertIDs("TP53", "SYMBOL", "ENSEMBL", org.Hs.eg.db, "useFirst")
+usf2 = convertIDs("USF2", "SYMBOL", "ENSEMBL", org.Hs.eg.db, "useFirst")
+nxf1 = convertIDs("NXF1", "SYMBOL", "ENSEMBL", org.Hs.eg.db, "useFirst")
 
 for (comp in names(res_dexseq)){
-  tab = res_dexseq[[comp]]$alt %>% filter(FDR<0.01)
+  tab = res_dexseq[[comp]]$alt %>% filter(FDR<0.1)
+  alltab = res_dexseq[[comp]]$alt
   etab = res_dexseq[[comp]]$ex
   ex = res_dexseq[[comp]]$raw
   g = res_dexseq[[comp]]$groups
@@ -446,12 +449,16 @@ for (comp in names(res_dexseq)){
   cat("\n\n## Comparison: ", comp, "\n\n")
   heatmap_fn(v$E[as.character(tab$id), colnames(v$E) %in% summarydata$Name[summarydata$group %in% g]], show_row=F)
   
-  cat("\n\n### TP53 expression:")
-  .mark = plotSplice(ex, res_dexseq[[comp]]$alt, geneid=tp53, genecol="GeneId")
+  #cat("\n\n### TP53 expression:")
+  #.mark = plotSplice(ex, res_dexseq[[comp]]$alt, geneid=tp53, genecol="GeneId")
+
+  #cat("\n\n### USF2 expression:")
+  #.mark = plotSplice(ex, res_dexseq[[comp]]$alt, geneid=usf2, genecol="GeneId")
   
-  cat("\n\n### Number of significantly alternative de-regulated exons at 0.01 of FDR", sum(tab$FDR<0.01), "\n\n")
+  cat("\n\n### Number of significantly alternative de-regulated exons at 0.1 of FDR", sum(tab$FDR<0.1), "\n\n")
   
   .tmp = unique(as.character(as.vector(unlist(strsplit2(tab$GeneId, split = "[::+::]")))))
+  res_dexseq[[comp]][["de_sign"]] = .tmp
   cat("### Percentage of genes with de-regulated exons:", length(.tmp)/length(unique(dge$genes$GeneId))*100)
   
   cat("\n\n### Top 10 genes:\n\n")
@@ -461,24 +468,34 @@ for (comp in names(res_dexseq)){
   cat("\n\nComplete file with name in attached document: ",paste0(comp,"_de.tsv"))
   save_file(tab,paste0(comp,"_de.tsv"),basedir)
   
-  cat("\n\n### Biological process annotation\n")
+  cat("\n\n### Biological process enrichment analysis\n")
+  cat("\nDark blue means more significant.\n")
   .entrezid = convertIDs(.tmp[.tmp!=""],"ENSEMBL", "ENTREZID", org.Hs.eg.db, "useFirst")
-  ego <- groupGO(gene = .entrezid[!is.na(.entrezid)], 
-                  organism = "human", ont= "BP", level=3,
+  ego <- enrichGO(gene = .entrezid[!is.na(.entrezid)], 
+                  organism = "human", ont= "BP", pvalueCutoff=0.01,
                   readable = TRUE)
   if (.isvalid(summary(ego))){
-    idx = reduce(summary(ego)$geneID, 30)
-    print(kable(summary(ego)[idx, 1:4] %>% filter(Count>4)))
+   idx = reduce_cp(summary(ego)$geneID, 30)
+   print(kable(summary(ego)[idx, 1:6]))
+   cat("\n\n")
+   dd = summary(ego)[idx,] # %>% tidyr::separate(GeneRatio, c("size","total"),sep="/")
+   p = ggplot(dd, aes(x=Description, y=Count,fill=p.adjust)) +
+     geom_bar(stat="identity") + coord_flip() +
+     theme_bw() +
+     ylab("# of genes.")
+   print(p)
   }  
   cat("\n\n")
   
-  cat("\n\n### Plot of top 10 genes\n\n")
-  .to_plot = unique(tab[,"GeneId"])[1:10]
-  for (g in .to_plot){
-    gs = tab[match(g, tab[,"GeneId"]), "symbol"]
-    cat("\n\n**Gene",gs,"**\n", sep = "")
+  cat("\n\n### Plot of top 10 genes and TP53, USF2 genes:\n\n")
+  .to_plot = as.character(unique(tab[,"GeneId"])[1:10])
+  for (g in c(nxf1, usf2, tp53, .to_plot)){
+    gs = tab[match(g, tab$GeneId), "symbol"]
+    if (is.na(gs))
+      gs = convertIDs(g, "ENSEMBL", "SYMBOL", org.Hs.eg.db, "useFirst")
+    cat("\n\n------\n\n**Gene ",gs,"**\n", sep = "")
     cat("\n\nlog2FC of exons respect to the rest:\n")
-    .mark = plotSplice(ex, tab, geneid=g, genecol="GeneId")
+    .mark = plotSplice(ex, tab, geneid=g, genecol="GeneId",FDR = 0.1)
     
     cat("\n\nReal representation of exons:\n")
     .gene = etab %>% filter(GeneId==g) %>% arrange(Start)
@@ -523,6 +540,13 @@ res_express = do_de(fit)
 
 ```
 
+## Transcript analysis
+
+Another approximation is to estimate transcript counts and do the differential analysis
+with limma. The problem is that the variance-mean relationship is not what expected so it is
+difficult to assure this is working well. But can help us to validate what we see with the previous
+analysis.
+
 ```{r limma-sailfish-transcript, echo=F, eval=T}
 tcounts_long = read.table("~/orch/scratch/anyu_splicing/cardio_failure/work/sailfish/combined.sf", header=TRUE, check.names=FALSE)
 
@@ -540,7 +564,7 @@ tcounts = tcounts[, summarydata$Name]
 
 dge <- DGEList(counts=tcounts[tinfo$V1, samples], genes=tinfo)
 
-isexpr <- rowSums(cpm(dge) > 1) >=5
+isexpr <- rowSums(dge$counts > 3) >=5
 dge <- dge[isexpr,,keep.lib.sizes=FALSE]
 
 # ggplot(melt(cpm(dge,normalized.lib.sizes = T, log = T)), aes(x=value, group=X2)) + geom_density()
@@ -554,29 +578,51 @@ y <- calcNormFactors(dge)
 
 Group = factor(summarydata$group, levels = c("NF", "ICM", "NICM"))
 design <- model.matrix(~ 0 + Group)
-v <- voom(y, design,plot=TRUE)
+v <- voom(y, design,plot=FALSE)
 
 fit <- lmFit(v, design)
 res_sailfish = do_de(fit)
 
 ```
 
-### Confirmation of YWHAE by transcripts analysis
+## Confirmation of YWHAE by transcripts analysis
 
 transcript with the splicing event is: ENST00000496706
 
-```{r sailfish-confirmation}
+```{r sailfish-confirmation, fig.width=11}
 g="ENSG00000108953"
 idx = intersect(tinfo[tinfo$V2 %in% g,1], rownames(v$E))
 
 .c = melt(v$E[idx,,drop=F], varnames = c("id", "sample"))
 .c$group = summarydata[as.character(.c$sample), "group"]
+.c$id = factor(.c$id, levels = idx)
+col = rep("black", length(idx))
+col[idx=="ENST00000496706"] = "red"
+
 ggplot(.c, aes(x=id, y=value)) +
         geom_boxplot(aes(colour = group), outlier.colour = NA, position=position_dodge(width = 0.9)) +
         geom_jitter(aes(color=group, fill=group), position=position_jitterdodge(dodge.width=0.9)) + 
         theme_bw() +
-        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-        ylab("normalized log2 counts") 
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, color = col)) +
+        ylab("normalized log2 counts") +
+        ggtitle(convertIDs(g, "ENSEMBL", "SYMBOL", org.Hs.eg.db, "useFirst"))
+
+for (g in c(tp53, usf2, nxf1)){
+  
+  idx = intersect(tinfo[tinfo$V2 %in% g,1], rownames(v$E))
+  .c = melt(v$E[idx,,drop=F], varnames = c("id", "sample"))
+  .c$group = summarydata[as.character(.c$sample), "group"]
+  .c$id = factor(.c$id, levels = idx)
+
+  p = ggplot(.c, aes(x=id, y=value)) +
+    geom_boxplot(aes(colour = group), outlier.colour = NA, position=position_dodge(width = 0.9)) +
+    geom_jitter(aes(color=group, fill=group), position=position_jitterdodge(dodge.width=0.9)) + 
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    ylab("normalized log2 counts") +
+    ggtitle(convertIDs(g, "ENSEMBL", "SYMBOL", org.Hs.eg.db, "useFirst"))
+  print(p)
+}
 
 # res_sailfish$ICMvsNF$exons["ENST00000496706",]
 ```
@@ -614,10 +660,13 @@ sleuth_live(so)
 
 ```
 
-```{r comp, echo=F, eval=F}
+## Genes detected as de-regulated using transcripts information instead of exons
 
+Common genes with some de-regulated event where the FDR < 0.1 for exon analysis and p-value < 0.001 for transcript analysis.
+
+```{r comp}
 for (name in names(res_dexseq)){
-  dexseq_sign = as.character(unique((res_dexseq[[name]]$exons %>% filter(adj.P.Val < 0.05))[,"GeneId"]))
+  dexseq_sign = as.character(unique((res_dexseq[[name]]$alt %>% filter(FDR < 0.1))[,"GeneId"]))
   # express_sign = as.character(unique((res_express[[name]]$exons %>% filter(adj.P.Val < 0.01))[,"V2"]))
   sailfish_sign = as.character(unique((res_sailfish[[name]]$exons %>% filter(P.Value < 0.001))[,"V2"]))
   venn(list(dexseq=dexseq_sign, sailfish=sailfish_sign))
@@ -625,6 +674,80 @@ for (name in names(res_dexseq)){
 }
 ```
 
+# rMAT
+
+rMAT bases the quantification in 2 ways: 
+
+* counting only splicing reads
+* counting splicing reads and the regions of the exon that differs in the event (see striped regions in http://rnaseq-mats.sourceforge.net/splicing.jpg)
+
+Here we show the second approach that takes into account more reads.
+
+```{r rmat-summary}
+rmat_nf_icm = c(SE=48358, MXE=7369, A5SS=3097, A3SS=4789, RI=4010)
+rmat_nf_nicm = c(SE=56582, MXE=9436, A5SS=3359, A3SS=5149, RI=4160)
+
+pie(rmat_nf_icm, names(rmat_nf_icm),main = "summary of detected events in NF vs ICM")
+pie(rmat_nf_nicm, names(rmat_nf_nicm),main = "summary of detected events in NF vs NICM")
+```
+
+## Differential expression
+
+```{r rmat-de, results='asis'}
+lookup =  c("TP53", "USF2", "NXF1")
+type = c("SE", "MXE", "A5SS", "A3SS", "RI")
+comparison = c("NF_ICM_2", "NF_NICM")
+for (c in comparison){
+  tab = data.frame(row.names=c("events", "genes"))
+  selected = data.frame()
+  for (t in type){
+    d = read.table(file.path("~/orch/scratch/anyu_splicing/cardio_failure/work/rmat/", c, "MATS_output",paste0(t,".MATS.ReadsOnTargetAndJunctionCounts.txt")), sep="\t", header=T)
+    .events = nrow(d %>% filter(FDR<0.1))
+    .genes = length(unique((d %>% filter(FDR<0.1))[,"geneSymbol"]))
+    tab["events",t] = .events
+    tab["genes",t] = .genes
+    selected = rbind(selected,d %>% filter(geneSymbol %in% lookup) %>% filter(FDR<0.1))
+  }
+  cat("\n###Numbers of DE events at FDR 1% for", c,"\n")
+  print(kable(tab))
+  cat("\n\n")
+  if (nrow(selected)>0){
+    cat("\nSignificant events for ", paste(lookup, sep=",") ,":\n")
+    print(kable(selected))
+    cat("\n\n")
+  }else{
+    cat("\nNo significant events for ", paste(lookup, sep=","), "\n")
+  }
+}
+```
+
+
+### Comparison with rMATS and exon based analysis
+
+```{r rMATS}
+nf_icm = list.files("~/orch/scratch/anyu_splicing/cardio_failure/work/rmat/NF_ICM_2/MATS_output/", "ReadsOnTargetAndJunctionCounts",full.names = T)
+dexseq_sign = as.character(unique((res_dexseq[["ICMvsNF"]]$de_sign)))
+rmats_sign = as.character(unique(unlist(lapply(nf_icm, function(fn){
+  d = read.table(fn, sep="\t",header=T)
+  as.character(d[d$FDR<0.1, "GeneID"])
+}))))
+venn(list(dexseq=dexseq_sign, rMATs=rmats_sign))
+  title("ICMvsNF")
+
+  
+nf_nicm = list.files("~/orch/scratch/anyu_splicing/cardio_failure/work/rmat/NF_NICM/MATS_output/", "JunctionCountOnly",full.names = T)
+dexseq_sign = as.character(unique((res_dexseq[["NICMvsNF"]]$de_sign)))
+rmats_sign = as.character(unique(unlist(lapply(nf_nicm, function(fn){
+  d = read.table(fn, sep="\t",header=T)
+  as.character(d[d$FDR<0.1, "GeneID"])
+}))))
+venn(list(dexseq=dexseq_sign, rMATs=rmats_sign))
+  title("NICMvsNF")
+
+```
+
+
+# R session
 ```{r session}
 sessionInfo()
 ```
