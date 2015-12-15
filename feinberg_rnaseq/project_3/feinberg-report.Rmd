@@ -1,0 +1,409 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    title: "Feinberg RNA-seq"
+    theme: readable
+    highlight: zenburn
+    theme.chooser: FALSE
+    highlight.chooser: FALSE
+
+
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="Feinberg - RNAseq"
+labPI="Mark W. Feinberg"
+lablocation="BWH"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+
+```
+
+
+```{r knitrsetup, echo=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code=FALSE, bootstrap.show.output=TRUE, bootstrap.thumbnail.size="col-md-10", cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE, message=FALSE, prompt=TRUE, comment='', fig.cap='', tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200), fig.width = 8, fig.height = 8)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+source("~/repos/myRfunctions/transactions.R")
+# render_2_drop("feinberg-report.Rmd", "feinberg/rnaseq_project_3")
+```
+
+---
+
+# Feinberg RNA-seq
+
+RNA-seq analysis for`r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+# Setup
+
+## Libraries
+
+```{r functions}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+devtools::load_all("~/repos/CHBUtils")
+library(pheatmap)
+library(pcaMethods)
+library(gridExtra)
+library(knitr)
+library(biomaRt)
+library(rmarkdown)
+library(dplyr)
+library(magrittr)
+library(tidyr)
+library(org.Hs.eg.db)
+library(xlsx)
+library(DESeq2)
+library(knitr)
+library(clusterProfiler)
+source("~/repos/myRfunctions/transactions.R")
+```
+
+## Functions
+
+```{r heatmap-function}
+
+plot.pca <- function (pcadata, condition= NULL, condition2= "", type="score", xi=1, yi=2, text=TRUE, title=""){
+    require(pcaMethods)
+  k = dim( pcadata)[3]
+    xnames = paste0("PC", 1:k, " ", round(pcadata@R2 * 100,  digits = 1), "%")
+  if (type == "loadings"){
+     df <- loadings(pcadata)
+	} else {
+	   df <- scores(pcadata)
+	}
+    df = as.data.frame(df[, c(xi, yi)])
+    names(df) = c("one", "two")
+	df$label = rownames(df)
+	if (text){
+	    if (!is.null(condition)) {
+	        df$condition = condition
+	        p = ggplot(df, aes(one, two, label = label, color = condition)) + 
+	            geom_text(aes(one, two, label = label), size = 3) + 
+	            labs(list(x = xnames[xi], y = xnames[yi])) + 
+				      scale_x_continuous() +
+            ggtitle(title) +
+            theme(plot.title = element_text(size=20, face="bold", vjust=2)) 
+
+	    }
+	    else {
+	        p = ggplot(df, aes(one, two)) + 
+			    geom_text(aes(one, two, label = label), size = 3) + 
+				labs(list(x = xnames[xi], y = xnames[yi])) + 
+				scale_x_continuous() +
+            ggtitle(title) +
+            theme(plot.title = element_text(size=20, face="bold", vjust=2))           
+	    }
+	} else {
+	    if (!is.null(condition)) {
+	        df$condition = condition
+	        df$condition2 = condition2	        
+	        p = ggplot(df, aes(one, two, label = label, color = condition, shape = condition2)) + 
+	            geom_point(aes(one, two, label = label), size = 4) + 
+	            labs(list(x = xnames[xi], y = xnames[yi])) + 
+            ggtitle(title) +
+            theme(plot.title = element_text(size=20, face="bold", vjust=2)) +            
+				scale_x_continuous()
+	    }
+	    else {
+	        p = ggplot(df, aes(one, two)) + 
+			    geom_point(aes(one, two, label = label), size = 4) + 
+				labs(list(x = xnames[xi], y = xnames[yi])) + 
+            ggtitle(title) +
+            theme(plot.title = element_text(size=20, face="bold", vjust=2)) +              
+				scale_x_continuous()
+	    }	
+	}
+    return(p)
+}
+
+get_biomart_transcript = function(v, type="description")
+{
+    require(biomaRt)
+    mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
+    g <- getBM( attributes=c("ensembl_transcript_id",type) , filters=
+                    "ensembl_transcript_id"    , values =as.character(v) ,mart=mart)
+    #row.names(g) = g[,1]
+    out <- c("", length=length(v))
+    idx <- match(g[,1], v)
+    out[idx] <- g[,2]
+    names(out[idx]) <- g[,1]    
+    out
+    #g
+}
+
+convertIDs <- function( ids, from, to, db, ifMultiple=c("putNA", "useFirst")) {
+  stopifnot( inherits( db, "AnnotationDb" ) )
+  ifMultiple <- match.arg( ifMultiple )
+  suppressWarnings( selRes <- AnnotationDbi::select(
+    db, keys=ids, keytype=from, columns=c(from,to) ) )
+  if ( ifMultiple == "putNA" ) {
+    duplicatedIds <- selRes[ duplicated( selRes[,1] ), 1 ]
+    selRes <- selRes[ ! selRes[,1] %in% duplicatedIds, ]
+  }
+  return( selRes[ match( ids, selRes[,1] ), 2 ] )
+}
+
+```
+
+## Setup
+
+```{r qc-setup}
+
+dataDir <- file.path("data")
+# metaDir <- file.path(baseDir, "meta")
+# resultsDir <- file.path(baseDir, "results")
+
+#Used files
+rimagefile <- "~/orch/scratch/feinberg_rnaseq/project_3/10033684.1_edgeR/10033684.1.edgeR.Rdata"
+# edgerfile <- "data/10031812.1_edgeR/10027561.1group1%group2.toptags_edgeR.csv"
+annogtf <- "~/orch/scratch/feinberg_rnaseq/project_3/10033684.1.GRCh38.combined.gtf"
+# output files
+res_files <- "~/orch/scratch/feinberg_rnaseq/project_3/files"
+dir.create(res_files, showWarnings = FALSE)
+
+# Load old image
+load(rimagefile)
+
+#Get count data
+counts.org <- counts
+metadata <- samples[,2:1]
+rownames(metadata) = samples[,2]
+#Set cut-offs
+count.cutoff <- 10
+p.cutoff <- 0.01
+fc.cutoff <- 1
+
+```
+
+
+```{r idconversion}
+#Getting conversion betwen xloc and ensembl
+anno.conv <- read.table(annogtf, header=FALSE, sep="\t")
+tmp <- strsplit(as.character(anno.conv[,9]), "; ")
+tmp <- matrix(unlist(lapply(tmp, function(x) x[c(1,5)])), ncol=2, byrow = T )
+tmp[,1] <- gsub("gene_id ", "", tmp[,1])
+tmp[,2] <- gsub("oId ", "", tmp[,2])
+anno.conv <- tmp
+rm(tmp)
+
+colnames(anno.conv) <- c("xloc", "ensembl")
+anno.conv <- anno.conv[!duplicated(anno.conv[,1]),]
+idx <- match(gsub("\"" , "", rownames(counts)), anno.conv[,1])
+rownames(counts) <- anno.conv[idx,2]
+```
+
+
+This analysis is based on the R image file (`r rimagefile`), annotations from gtf-file (`r annogtf`).
+
+# Quality control metrics
+
+## Counts per gene
+
+```{r boxplot-raw-new}
+melted = melt(counts)
+#colnames(melted) = c("sample", "count")
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample, colnames(counts))
+#melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+c1 <- ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90), plot.title = element_text(size=20, face="bold", vjust=2)) + 
+    labs(y="log10 counts per gene", x="", title="log10 counts per gene")  
+```
+
+```{r boxplot-normalized-new}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample, colnames(counts))
+#melted$sample = reorder(melted$sample, colnames(counts))
+melted$count = log(melted$count)
+c2 <- ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90), plot.title = element_text(size=20, face="bold", vjust=2)) + 
+    labs(y="log10 TMM-normalized counts per gene", x="", title="log10 TMM-normalized counts per gene")  
+```
+ 
+```{r density-normalized-new}
+c3 <- ggplot(melted, aes(x=count, group=sample)) +
+    geom_density() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90), plot.title = element_text(size=20, face="bold", vjust=2)) + 
+    labs(y="density", x="", title="Density of log10 TMM-normalized counts") 
+```
+
+```{r qc-plots2-new , fig.width = 16, fig.height = 16}
+grid.arrange( c1, c2, c3, ncol=2)
+```
+
+## Correlation (Spearman) heatmap of TMM-normalized counts
+```{r spearman-heatmap-normalized-new, fig.width = 8, fig.height = 8}
+pheatmap(cor(normalized_counts, method="spearman"), annotation = metadata[,"condition",drop=F],main="Spearman correlation", clustering_method = "ward.D2")
+```
+
+## PCA plot of TMM-normalized log2 counts
+```{r pca-normalized-log2-new, fig.width = 8, fig.height = 8}
+pca.expr <- pca(t(log2(normalized_counts+1) ), method = "svd", nPcs = 5, center = T, scale="none", cv="q2")
+p1 <- plot.pca(pca.expr, metadata$condition, metadata$condition, type="scores", text=F, title="Scores") + scale_color_brewer( palette = "Set1" )
+p1
+```
+
+We are able to separate groups in the first PC component.
+
+# Statistical analysis
+
+Filtering away genes with less than `r count.cutoff` counts.
+
+```{r dataprep}
+colData <- metadata
+countData <- counts
+countData <- countData[rowSums(countData) > count.cutoff,]
+colData$condition <- factor(colData$condition)
+dds <- DESeqDataSetFromMatrix(countData = countData, colData = colData, design = ~  condition)
+```
+
+```{r fn-deseq}
+
+handle_deseq2 = function(dds, summarydata, column) {
+  all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="_vs_")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+
+plot_MA = function(res){
+    for(i in seq(length(res))) {
+        DESeq2::plotMA(res[[i]])
+        title(paste("MA plot for contrast", names(res)[i]))
+    }
+}
+
+plot_gene = function(name, d){
+  design = colData(d)
+  ggplot(plotCounts(d, name, returnData=TRUE, intgroup = "condition",transform = TRUE), aes(x=condition,y=count, color=condition)) + 
+    geom_point(size=3) +
+    ggtitle(name) + 
+    scale_color_brewer(palette = "Set1")
+}
+
+reduce = function(genes){
+  seen = c()
+  idx = sapply(genes, function(x){
+    here = as.character(as.vector(unlist(strsplit(x, split = "/"))))
+    if (length(here) > 100)
+      return(FALSE)
+    c = intersect(seen, here)
+    seen <<- unique(c(seen, here))
+    score = 0.6 * length(here)
+    if (length(c) < score)
+      return(TRUE)
+    FALSE
+  })
+  idx
+}
+
+.isvalid= function(dd){
+  if (is.null(dim(dd))){
+    return(FALSE)
+  }
+  if (nrow(dd)==0){
+    return(FALSE)
+  }
+  return(TRUE)
+}
+
+```
+
+```{r ddstats}
+dds <- DESeq(dds)
+res <- handle_deseq2(dds, colData, "condition")
+plotDispEsts(dds)
+```
+
+```{r dds-ma}
+plot_MA(res)
+```
+
+```{r dds-show, results='asis'}
+de_list = list()
+for (cond in names(res)){
+  .res = res[[cond]]
+  .res$symbol <- convertIDs(row.names(.res), "ENSEMBLTRANS", "SYMBOL", org.Hs.eg.db, "useFirst")
+  .res$entrezgene <- convertIDs(row.names(.res), "ENSEMBLTRANS", "ENTREZID", org.Hs.eg.db, "useFirst")
+  .res$description <- convertIDs(row.names(.res), "ENSEMBLTRANS", "GENENAME", org.Hs.eg.db, "useFirst")
+  .res$xloc <- anno.conv[match(row.names(.res), anno.conv[,2]),1]
+  cat("\n\n##", cond, "\n\n")
+  summary(.res)
+  cat("\n\n")
+  cat("\n\n### Top 6 genes\n\n")
+  .plots = lapply(rownames(.res[1:6,]), plot_gene, dds)
+  do.call(grid.arrange, .plots)  
+  cat("\n\n###Top 10 genes:")
+  .res = as.data.frame(.res)
+  print(kable(head(.res)))
+  cat("\n\n")
+  res_tab = cbind(id=rownames(.res), .res)
+  fn = file.path(res_files,paste0(cond,"_de.tsv"))
+  write.table(res_tab,fn,sep="\t",quote=T, row.names=F)
+  cat("\n\n") 
+  cat("Files with full table is inside attached file with name:", basename(fn))
+  cat("\n\n###GO ontology of DE genes:")
+  .idx = .res$padj<p.cutoff & abs(.res$log2FoldChange) > 1
+  .idx[is.na(.idx)] = FALSE
+  .de = .res[.idx,"entrezgene"]
+  de_list[[cond]] = unique(.res[.idx,"symbol"])
+  ego <- enrichGO(gene = .de[!is.na(.de)], 
+                  organism = "human", ont = "BP", pAdjustMethod = "BH",
+                  pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
+  if (.isvalid(summary(ego))){
+    idx =reduce(summary(ego)$geneID)
+    print(kable(summary(ego)[idx, 1:7]))
+  }  
+    cat("\n\n")
+    
+}
+```
+
+```{r compress, echo=F}
+name_res = compress_results(res_files)
+```
+
+#R Session Info
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
