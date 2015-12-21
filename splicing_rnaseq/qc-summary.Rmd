@@ -442,7 +442,7 @@ nxf1 = convertIDs("NXF1", "SYMBOL", "ENSEMBL", org.Hs.eg.db, "useFirst")
 for (comp in names(res_dexseq)){
   tab = res_dexseq[[comp]]$alt %>% filter(FDR<0.1)
   alltab = res_dexseq[[comp]]$alt
-  etab = res_dexseq[[comp]]$ex
+  etab = res_dexseq[[comp]]$exons
   ex = res_dexseq[[comp]]$raw
   g = res_dexseq[[comp]]$groups
   
@@ -685,7 +685,7 @@ Here we show the second approach that takes into account more reads.
 
 ```{r rmat-summary}
 rmat_nf_icm = c(SE=48358, MXE=7369, A5SS=3097, A3SS=4789, RI=4010)
-rmat_nf_nicm = c(SE=56582, MXE=9436, A5SS=3359, A3SS=5149, RI=4160)
+rmat_nf_nicm = c(SE=46192, MXE=6778, A5SS=3028, A3SS=4657, RI=3974)
 
 pie(rmat_nf_icm, names(rmat_nf_icm),main = "summary of detected events in NF vs ICM")
 pie(rmat_nf_nicm, names(rmat_nf_nicm),main = "summary of detected events in NF vs NICM")
@@ -696,7 +696,7 @@ pie(rmat_nf_nicm, names(rmat_nf_nicm),main = "summary of detected events in NF v
 ```{r rmat-de, results='asis'}
 lookup =  c("TP53", "USF2", "NXF1")
 type = c("SE", "MXE", "A5SS", "A3SS", "RI")
-comparison = c("NF_ICM_2", "NF_NICM")
+comparison = c("NF_ICM", "NF_NICM")
 for (c in comparison){
   tab = data.frame(row.names=c("events", "genes"))
   selected = data.frame()
@@ -725,7 +725,7 @@ for (c in comparison){
 ### Comparison with rMATS and exon based analysis
 
 ```{r rMATS}
-nf_icm = list.files("~/orch/scratch/anyu_splicing/cardio_failure/work/rmat/NF_ICM_2/MATS_output/", "ReadsOnTargetAndJunctionCounts",full.names = T)
+nf_icm = list.files("~/orch/scratch/anyu_splicing/cardio_failure/work/rmat/NF_ICM/MATS_output/", "ReadsOnTargetAndJunctionCounts",full.names = T)
 dexseq_sign = as.character(unique((res_dexseq[["ICMvsNF"]]$de_sign)))
 rmats_sign = as.character(unique(unlist(lapply(nf_icm, function(fn){
   d = read.table(fn, sep="\t",header=T)
