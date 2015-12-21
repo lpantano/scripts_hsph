@@ -132,20 +132,6 @@ plot.pca <- function (pcadata, condition= NULL, condition2= "", type="score", xi
     return(p)
 }
 
-get_biomart_transcript = function(v, type="description")
-{
-    require(biomaRt)
-    mart = useMart("ensembl", dataset="mmusculus_gene_ensembl")
-    g <- getBM( attributes=c("ensembl_transcript_id",type) , filters=
-                    "ensembl_transcript_id"    , values =as.character(v) ,mart=mart)
-    #row.names(g) = g[,1]
-    out <- c("", length=length(v))
-    idx <- match(g[,1], v)
-    out[idx] <- g[,2]
-    names(out[idx]) <- g[,1]    
-    out
-    #g
-}
 
 convertIDs <- function( ids, from, to, db, ifMultiple=c("putNA", "useFirst")) {
   stopifnot( inherits( db, "AnnotationDb" ) )
@@ -360,6 +346,8 @@ de_list = list()
 for (cond in names(res)){
   .res = res[[cond]]
   .res$symbol <- convertIDs(row.names(.res), "ENSEMBLTRANS", "SYMBOL", org.Hs.eg.db, "useFirst")
+  .res$ensembl <- convertIDs(row.names(.res), "ENSEMBLTRANS", "ENSEMBL", org.Hs.eg.db, "useFirst")
+
   .res$entrezgene <- convertIDs(row.names(.res), "ENSEMBLTRANS", "ENTREZID", org.Hs.eg.db, "useFirst")
   .res$description <- convertIDs(row.names(.res), "ENSEMBLTRANS", "GENENAME", org.Hs.eg.db, "useFirst")
   .res$xloc <- anno.conv[match(row.names(.res), anno.conv[,2]),1]
@@ -369,16 +357,18 @@ for (cond in names(res)){
   cat("\n\n### Top 6 genes\n\n")
   .plots = lapply(rownames(.res[1:6,]), plot_gene, dds)
   do.call(grid.arrange, .plots)  
-  cat("\n\n###Top 10 genes:")
+  cat("\n\n### Top 10 genes:")
   .res = as.data.frame(.res)
-  print(kable(head(.res)))
+  #print(kable(head(.res)))
   cat("\n\n")
   res_tab = cbind(id=rownames(.res), .res)
+  print(res_tab$ensembl)
+  res_tab$type = get_biomart(res_tab$ensembl, "gene_biotype")
   fn = file.path(res_files,paste0(cond,"_de.tsv"))
   write.table(res_tab,fn,sep="\t",quote=T, row.names=F)
   cat("\n\n") 
   cat("Files with full table is inside attached file with name:", basename(fn))
-  cat("\n\n###GO ontology of DE genes:")
+  cat("\n\n### GO ontology of DE genes:")
   .idx = .res$padj<p.cutoff & abs(.res$log2FoldChange) > 1
   .idx[is.na(.idx)] = FALSE
   .de = .res[.idx,"entrezgene"]

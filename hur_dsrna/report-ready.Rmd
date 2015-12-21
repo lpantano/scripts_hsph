@@ -1,0 +1,181 @@
+
+
+```{r custom}
+library(ggplot2)
+library(pheatmap)
+library(scales)
+library(gridExtra)
+library(gtools)
+library(RColorBrewer)
+library(knitr)
+library(tidyr)
+library(reshape)
+library(rmarkdown)
+library(dplyr)
+# library(ggbio)
+number_ticks <- function(n) {function(limits) pretty(limits, n)}
+options(bitmapType = 'cairo')
+
+path_results = "~/orch/scratch/hur_dsRNA/dsrna/final/2015-12-21_dsrna/report"
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9, echo=FALSE,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+render(file.path(path_results, "report-ready.Rmd"))
+```
+
+
+
+## Basic sample metrics
+
+A quick summary of sample metrics to identify outliers. Offtargets will be set to 0 for non-targeted experiments:
+
+
+```{r table, results='asis'}
+qc = read.table(file.path(path_results, "metrics", "metrics.tsv"),
+                header=T, sep="\t", check.names=F,
+                colClasses=list("sample"="character"))
+rownames(qc) = qc$sample
+qc$Mapped_reads_pct = as.numeric(gsub("%", "", qc$Mapped_reads_pct))
+qc$Duplicates_pct = as.numeric(gsub("%", "", qc$Duplicates_pct))
+
+metrics = c("sample", "Total_reads" ,"Mapped_reads_pct", "Duplicates_pct",
+            "offtarget",
+            "%GC", "Sequence_length", "Median_insert_size")
+
+if (is.null(qc$offtarget)) {
+  qc$offtarget <- rep  (0, length(qc$sample))
+} else {
+  qc$offtarget = qc$offtarget/qc$Total_reads
+}
+
+print(kable(qc[, metrics], align="c", digits=2))
+
+```
+
+
+### Total and mapped reads
+
+The next two plots compare the number of reads in each sample (should be uniform) and the percentage of reads mapping to the reference genome. Low mapping rates are indicative of sample contamination, poor sequencing quality or other artifacts.
+
+
+```{r total-reads}
+ggplot(qc, aes(x=sample, y=Total_reads/1e6)) +
+    geom_bar(stat = 'identity') +
+    ylab("Million reads") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r mapped-reads}
+ggplot(qc, aes(x=sample, y=Mapped_reads/Total_reads)) +
+    geom_bar(stat = 'identity') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+## Sequencing metrics
+
+Various metrics related to the quality of the sequencing data itself, i.e., the FASTQ or BAM fie as it came off the sequencer. 
+
+### Mean sequence quality along read
+
+Mean base quality for each sample along with the upper and lower quartile, and the 10% (lower) quantile. A slight dropoff towards the end of the read is normal, but you want the mean qualities and quartiles to track each other closely with relatively few outliers. In addition, all plots should look similar to each other.
+
+
+```{r read-qual}
+qual = read.table(file.path(path_results, "fastqc", "Per_base_sequence_quality.tsv"), header=T, sep= "\t", check.names =T, colClasses=list("sample"="character"))
+qual$sample = as.character(qual$sample)
+
+ggplot(qual, aes(x=Base, y=Median, group=sample)) +
+    geom_line() +
+    geom_line(aes(x=Base, y=Lower_Quartile, group=sample, col="lower_quantile")) +
+    geom_line(aes(x=Base, y=Upper_Quartile, group=sample, col="upper_quantile")) +
+    geom_line(aes(x=Base, y=X10th_Percentile, group=sample, col="10%_quantile")) +
+    facet_wrap(~sample) +
+    ylim(0,45) +
+    scale_color_brewer("metrics",palette = "Set1") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5))+
+    scale_x_discrete(breaks=number_ticks(10))
+```
+
+### Read length distribution
+
+This should ideally be uniform across all samples with one distinct read length dominating the distribution.
+
+```{r read-size}
+qual = read.table(file.path(path_results, "fastqc", "Sequence_Length_Distribution.tsv"), header=T, sep= "\t", check.names = F, colClasses=list("sample"="character"))
+qual = qual %>% group_by(sample) %>% mutate(total=sum(Count), pct=Count/total)
+
+ggplot(qual , aes(x=Length, y=Count, group=sample)) +
+    geom_line(size=2, alpha=0.5) +
+    scale_color_brewer(palette = "Set1") +
+    theme_bw() +
+    facet_wrap(~sample) +
+    labs(y="# of reads")+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) +
+    scale_x_discrete(breaks=number_ticks(5))
+```
+
+The following table lists for each sample the read lengths contributing more than 10% of that sample's total number of reads:
+
+```{r table-size, results='asis'}
+kable(qual %>% filter(pct > 0.10) %>% dplyr::select(Length, sample, pct) %>% spread(Length, pct), align="c", digits=2)
+
+```
+
+### Read GC content
+
+For re-sequencing projects the GC nucleotide content of sequenced reads should follow the genome distribution. Here we are checking if there are any samples where reads outside of a 10-90% GC content contribute more than 5% of the overall reads. These cutoffs can be tweaked as needed based on the G/C distribution graph:
+
+```{r table-gc, results='asis'}
+qual = read.table(file.path(path_results, "fastqc", "Per_sequence_GC_content.tsv"), header=T, sep= "\t", check.names = F, colClasses=list("sample"="character"))
+qual = qual %>% group_by(sample) %>% mutate(total=sum(Count), pct=Count/total)
+
+ggplot(qual, aes(x=GC_Content, y=pct, group=sample)) +
+  geom_line(size=2, alpha=0.5) +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() +
+  labs(y='Percent of reads', x='Percent G/C content')
+
+qual = qual %>% filter(GC_Content>10 & GC_Content<90) %>% 
+   group_by(sample) %>% summarise(pct_in_10_90=sum(pct))
+kable(qual %>% filter(pct_in_10_90 <= 0.95))
+
+```
+
+### Read nucleotide content
+
+Expanding on the GC read content analysis this checks for biases in nucleotide content along the position in the read. Typically, biases are introduced to due preferential (non-random) primer binding (at the beginning of the read) or other artifacts; strong biases are indicative of technical problems:
+
+```{r read-content}
+qual = read.table(file.path(path_results, "fastqc", "Per_base_sequence_content.tsv"), header=T, sep= "\t", check.names = F, colClasses=list("sample"="character"))
+qual$sample = as.character(qual$sample)
+
+qual$Base = as.numeric(qual$Base)
+dd = melt(qual, id.vars = c("Base", "sample"), variable_name = c("nt"))
+
+ggplot(dd %>% filter(nt!="total"), aes(x=Base, y=value, group=sample)) +
+        geom_line(size=2, alpha=0.5) +
+        theme_bw() +
+        ylab("% of nucleotides") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5)) +
+        ylim(10,50) +
+    facet_wrap(~nt)
+```
+
+### Read nuceotide biases
+
+To help trace down possible adapter contamination, missed barcodes or other biases we list for each sample the read positions where any nucleotide is present in either less than 10% or more than 30% of the reads:
+
+```{r table-content, results='asis'}
+kable( melt(qual, id.vars=c("Base", "sample"), variable_name = "nt") %>%
+           filter(value > 30 | value < 10) %>% filter(Base<20) %>%
+           dplyr::select(Base, sample, nt, value) %>%
+           spread(Base, value),
+       align="c", digits=2)
+```
+

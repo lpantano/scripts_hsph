@@ -1,0 +1,89 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    title: "Feinberg RNA-seq"
+    theme: readable
+    highlight: zenburn
+    theme.chooser: FALSE
+    highlight.chooser: FALSE
+
+
+---
+
+
+```{r knitrsetup, echo=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code=FALSE, bootstrap.show.output=TRUE, bootstrap.thumbnail.size="col-md-10", cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE, message=FALSE, prompt=TRUE, comment='', fig.cap='', tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200), fig.width = 8, fig.height = 8)
+options(bitmapType = 'cairo')
+```
+
+This code helps to render into HTML if needed.
+
+```{r render,echo=FALSE,eval=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+# render("closest-genes.Rmd")
+```
+
+
+Load all libraries and functions needed.
+
+```{r load}
+library(AnnotationDbi)
+library(OrganismDbi)
+library(GenomicRanges)
+library(org.Mm.eg.db)
+devtools::load_all("~/repos/CHBUtils")
+
+txdb_file="~/soft/bcbio/genomes/Mmusculus/mm10/rnaseq/txdb.sqlite"
+txdb <- loadDb(txdb_file)
+.get_tx = function(txdb, gene, flank=5000){
+    .tx_tab = AnnotationDbi::select(txdb,keys = gene, columns = c("EXONCHROM", "EXONSTART", "EXONEND", "EXONSTRAND", "TXNAME"),keytype = c("TXNAME"))
+  
+    .gr_custom = GRanges(seqnames=.tx_tab$EXONCHROM,
+                         IRanges(start=.tx_tab$EXONSTART-flank, 
+                                 width=2*flank
+                                 ),
+                         strand=.tx_tab$EXONSTRAND,
+                         tx=.tx_tab$TXID
+                         )
+    .gr <- transcripts(txdb, columns=c("GENEID","TXNAME"))
+    .close = findOverlaps(.gr, .gr_custom, minoverlap=5)
+    .txname = unique(unlist(elementMetadata(.gr[unique(.close@queryHits),"TXNAME"])$TXNAME))
+    .gname = unique(unlist(elementMetadata(.gr[unique(.close@queryHits),"GENEID"])$GENEID))
+    return(list(tx=.txname,gene=.gname))
+}
+
+```
+
+Get genes 1M close to lincrRNA. Need table with trasncript id for lincRNA, log2 normalized matrix,
+ metatable of DE analysis.
+```{r analysis}
+lincrna = read.table("selected_lincrna.tsv", stringsAsFactors = FALSE)
+exp = read.table("rlog_counts.tsv", row.names = 1)
+deg = read.table("metatable_simple_de.tsv", header=1,sep="\t", strip.white = T, row.names = 1)
+
+cor_res = lapply(lincrna[,1], function(gene){
+  res = .get_tx(txdb, gene, 1000000)
+  target = exp[setdiff(intersect(res$tx, rownames(exp)),gene),,drop=F]
+  linc = exp[gene,]
+  if (nrow(target)>0){
+    cortab = apply(target,1, function(x){
+      c=cor.test(x,unlist(linc), method="kendall")
+      return(list(tau=c$estimate[[1]],pvalue=c$p.value))
+    })
+    cortab = cbind(target=names(cortab),as.data.frame(do.call(rbind,cortab)))
+    cortab$symbol = convertIDs(rownames(cortab), "ENSEMBLTRANS", "SYMBOL", org.Mm.eg.db, "useFirst")
+    cortab$ensembl = convertIDs(rownames(cortab), "ENSEMBLTRANS", "ENSEMBL", org.Mm.eg.db, "useFirst")
+    cortab$lincrna = gene
+    
+    # cortab$lincrna_name = convertIDs(gene, "ENSEMBLTRANS", "SYMBOL", org.Mm.eg.db, "useFirst")
+    return(cortab)
+  }
+})
+
+res = do.call(rbind, cor_res)
+res$description <- convertIDs(rownames(res), "ENSEMBLTRANS", "GENENAME", org.Mm.eg.db, "useFirst")
+t = cbind(res,deg[rownames(res),5:ncol(deg)])
+head(t)
+```
+
