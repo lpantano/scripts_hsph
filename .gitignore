@@ -1,0 +1,7 @@
+*cache*
+*swp*
+*swo*
+*rda*
+.Rhistory
+.RData
+# *.R*
