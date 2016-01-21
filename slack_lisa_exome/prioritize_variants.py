@@ -23,11 +23,15 @@ def _info_sample(name, info, tag):
 def _is_in_any_control(samples, t, n):
     c = set()
     for s in n:
-       c.add(_gtp(samples[s]))
+        if s == "./.":
+            continue
+        c.add(s)
+        c.add(s[::-1])
+    skip = 0
     for s in t:
         if _gtp(samples[s]) in c:
-            return True
-    return False
+           skip += 1
+    return skip
 
 def _get_info(info):
     cols = info.split(";")
@@ -44,7 +48,8 @@ def _get_info(info):
                 type_e = e.split("(")[0]
                 gene_e = e.split("(")[1].split("|")[5]
                 level_e = e.split("(")[1].split("|")[0]
-                effect.append("_".join([type_e, level_e]))
+                aa_e = e.split("(")[1].split("|")[3]
+                effect.append("|".join([type_e, level_e, aa_e]))
                 genes.append(gene_e)
     return [status, effect, genes]
 
@@ -86,14 +91,26 @@ def _add_to_genes(record, t, n, d):
                     d[g][s].append(record)
     return d
 
-def _clean_variants(fn, genes):
+def _read_vcf(fn, n):
+    genotypes = defaultdict(list)
+    with gzip.open(fn, 'rb') as vcf_reader:
+        for record in vcf_reader:
+            if not record.startswith("#"):
+                samples = record.strip().split("\t")[9:]
+                rs = "".join(record.strip().split("\t")[:2])
+                for s in n:
+                    genotypes[rs].append(_gtp(samples[s]))
+    return genotypes
+
+def _clean_variants(fn, genes, control):
     """
-    Read variants and keep the ones in controls
+    Read variants and keep the ones in tumor
     """
     t = [0, 2, 4]
     n = [1, 3, 5]
     genes = _read_genes(genes)
-    print "\t".join(["chrom", "pos", "rs", "change", "gt:tumor|normal",
+    controls = _read_vcf(control, n)
+    print "\t".join(["chrom", "pos", "rs", "change", "gt:N2N3N4|C2W3W4",
                      "af:tumor|normal", "status", "effects",
                      "in_gene_list", "num_samples_seen", "filter"])
     var_by_genes = defaultdict(dict)
@@ -102,15 +119,17 @@ def _clean_variants(fn, genes):
             skip = 0
             if not record.startswith("#"):
                 samples = record.strip().split("\t")[9:]
+                rs = "".join(record.strip().split("\t")[:2])
                 for s in [0, 1, 2]:
                     skip += _gtp(samples[t[s]]) == "./." or _gtp(samples[n[s]]) == "./."
+                reject = _is_in_any_control(samples, t, controls[rs])
+                if reject > 0:
+                    continue
                 if skip > 1:
                     if _moderate(record):
                         var_by_genes = _add_to_genes(record, t, n, var_by_genes)
-                    continue
-                # if _is_in_any_control(samples, t, n):
-                #    continue
                 frmt = _frmt(record, t, n, genes)
+                #print "skip %s reject %s" % (skip, reject)
                 print "%s\t%s\t%s" % (frmt, 3 - skip, "variant")
     var_seen = set()
     for g in var_by_genes:
@@ -125,7 +144,8 @@ def _clean_variants(fn, genes):
 if __name__ == "__main__":
     parser = ArgumentParser(description="Detect enhancer activity.")
     parser.add_argument("--genes", help="List of genes to annotate.")
+    parser.add_argument("--control", help="vcf with all genotypes.")
     parser.add_argument("files", nargs="*", help="vcf files.")
     args = parser.parse_args()
 
-    clean_vcf = _clean_variants(args.files, args.genes)
+    clean_vcf = _clean_variants(args.files, args.genes, args.control)
