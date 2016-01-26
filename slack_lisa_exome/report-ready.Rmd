@@ -23,11 +23,10 @@ path_results = "~/orch/scratch/exome_slack/tumor_mm10/final/2015-12-07_tumor_mm1
 ```{r create-report, echo=FALSE, eval=FALSE}
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=TRUE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
-                      eval=TRUE, fig.width= 9, echo=FALSE,
+                      eval=TRUE, fig.width= 10, echo=FALSE,
                       message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
 render_2_drop("report-ready.Rmd",dn = "slack_mouse_exomeseq")
 ```
-
 
 
 ## Basic sample metrics
@@ -430,7 +429,11 @@ The columns in the below table means:
 * **gt.tumor.normal**: genotype for each sample. First 3 tumor, then 3 control samples. Genotype for each sample has the format `Allele1/Allele2`. If there is no
 allele, you will see a `.` instead.
 * **af.tumor.normal**: allele frequency for each sample. First 3 tumor, then 3 control samples.
-* **effect**: effect of the variant predicted by **snpeff**. The format is `effect`_`level` = `gene`. The `effect` label is explained  [here](http://snpeff.sourceforge.net/SnpEff_manual.html#input). The `level` can be LOW, MODERATE, HIGH and MODIFIER. These are orientative labels, so if there is any variant in an interested gene should be studied no matters what this tag says.
+* **effect**: effect of the variant predicted by **snpeff**. The format is `effect`_`level`_`change` = `gene`. The `effect` label is explained  [here](http://snpeff.sourceforge.net/SnpEff_manual.html#input). The `level` can be LOW, MODERATE, HIGH and MODIFIER. These are orientative labels, so if there is any variant in an interested gene should be studied no matters what this tag says. The `change` is the aa change or whatever the variant produce to the protein or DNA.
+
+**We are looking at exact same genotype in control to remove variants.** So if in tumor 1/0 and control 1/1 then the variant pass. Do we want this?
+
+**./. means that the varian was not detected or was rejected for some reason.**
 
 ```{r ranked-variants, results='asis'}
 vrn = read.table(file.path(path_results, "..", "common_variants_all.tsv"),
@@ -444,7 +447,26 @@ kable(vrn %>% filter(num_samples_seen==3))
 
 Complete table at common_variats.tsv attached file.
 
-```{r chr-figures}
+## Distribution by chrom 
+
+### For variants with at least 2 tumors with the SNP
+
+```{r chr-2tumor,fig.width= 14}
+dd = melt(table(vrn[vrn$num_samples_seen==2, c("chrom")]), varnames = "chrom")
+
+ggplot(dd, aes(x=chrom, y=value)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_log10() +
+  xlab("# of variants") +
+  ggtitle("Variants supported by 2 tumors")
+```
+
+
+### For unique variants
+
+Variants only detected in one of the tumor but not in any control.
+
+```{r chr-figures,fig.width= 14}
 samples = c("N2", "N3", "N4")
 .give_sample = function(gt){
     .samples = unlist(strsplit(gt,split = "[::|::]"))[1:3]
@@ -452,6 +474,14 @@ samples = c("N2", "N3", "N4")
 }
 seen = sapply(as.character(vrn[vrn$num_samples_seen==1,5]), .give_sample)
 vrn$sample[vrn$num_samples_seen==1] = seen
-table(vrn[vrn$num_samples_seen==1, c("sample","chrom")])
+
+dd = melt(table(vrn[vrn$num_samples_seen==1, c("sample","chrom")]))
+
+ggplot(dd, aes(x=chrom, y=value, fill=sample)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_y_log10() +
+  facet_wrap(~sample, nrow=3) +
+  xlab("# of variants") +
+  ggtitle("Variants supported by 1 tumor sample")
 ```
 

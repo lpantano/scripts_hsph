@@ -33,7 +33,7 @@ knitr::opts_chunk$set(dev="png",echo=FALSE,
                       comment='', fig.cap='',
                       tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
                       cache=TRUE,warning=FALSE,message=FALSE,
-                      error=FALSE, fig.width = 10, fig.height = 7)
+                      error=FALSE, fig.width = 12, fig.height = 9)
 options(bitmapType = 'cairo')
 ```
 
@@ -95,7 +95,7 @@ get_heatmap_fn = function(summarydata) {
     else {
     # rownames(metadata) = summarydata$Name
     heatmap_fn = function(data, ...) {
-        pheatmap(data, annotation=metadata, clustering_method = "ward.D2", ...)
+        pheatmap(data, annotation=metadata, clustering_method = "ward.D2", clustering_distance_cols = "correlation", ...)
     }
     return(heatmap_fn)
 }}
@@ -297,6 +297,8 @@ dds = DESeq(dds)
 
 ## Effect of variance stabilization
 
+Different methods for log2 transformation and the effect of the variance.
+
 ```{r deseq-diagnostics, results='asis'}
 notAllZero <- (rowSums(counts(dds))>0)
 rld <- rlog(dds)
@@ -304,10 +306,10 @@ vsd <- varianceStabilizingTransformation(dds)
 rlogMat <- assay(rld)
 vsdMat <- assay(vsd)
 
-p1=meanSdPlot(log2(counts(dds,normalized=TRUE)[notAllZero,] + 1))
-p2=meanSdPlot(rlogMat[notAllZero,])
-p3=meanSdPlot(vsdMat[notAllZero,])
-grid.arrange(p1$gg,p2$gg,p3$gg)
+p1=meanSdPlot(log2(counts(dds,normalized=TRUE)[notAllZero,] + 1), plot=F)$gg + ggtitle("log2 transformation")
+p2=meanSdPlot(rlogMat[notAllZero,], plot=F)$gg + ggtitle("variance stabilization transformation")
+p3=meanSdPlot(vsdMat[notAllZero,], plot=F)$gg + ggtitle("regularized log transformation")
+grid.arrange(p1,p2,p3)
 ```
 
 ## Dispersion estimates
@@ -462,7 +464,7 @@ name_res = compress_results(path_results)
 sessionInfo()
 ```
 
-Ignore next section, only for validation purpose.
+**Ignore next section, only for validation purpose.**
 
 # DE from transcripts quantification 
 ```{r tximport-load}
