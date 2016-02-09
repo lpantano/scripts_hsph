@@ -23,6 +23,8 @@ def _info_sample(name, info, tag):
 def _is_in_any_control(samples, t, n):
     c = set()
     for s in n:
+        if s == "1/1" or s.find("1") > -1:
+            return 1
         if s == "./.":
             continue
         c.add(s)
@@ -128,17 +130,19 @@ def _clean_variants(fn, genes, control):
                 if skip > 1:
                     if _moderate(record):
                         var_by_genes = _add_to_genes(record, t, n, var_by_genes)
+
                 frmt = _frmt(record, t, n, genes)
-                #print "skip %s reject %s" % (skip, reject)
+                # print "skip %s reject %s" % (skip, reject)
                 print "%s\t%s\t%s" % (frmt, 3 - skip, "variant")
+
     var_seen = set()
     for g in var_by_genes:
-        if len(var_by_genes[g]) > 2:
+        if len(var_by_genes[g]) >= 2:
             for s in var_by_genes[g]:
                 for var in var_by_genes[g][s]:
                     var_frmt = _frmt(var, t, n, genes)
                     if var_frmt not in var_seen:
-                        print "%s\t%s\t%s" % (var_frmt, 1, "gene")
+                        print "%s\t%s\t%s" % (var_frmt, len(var_by_genes[g]), "gene")
                         var_seen.add(var_frmt)
 
 if __name__ == "__main__":
