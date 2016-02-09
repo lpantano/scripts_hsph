@@ -262,16 +262,21 @@ heatmap_fn(ma)
 ## Removing MT genes
 ```{r top-counts-remove-mit, fig.height=10}
 mt = read.table("chrMT.txt", sep="\t", header=T)
-y = DGEList(counts=counts[!(rownames(counts) %in% as.character(mt[,1])),])
-y = calcNormFactors(y)
-normalized_counts_mt = cpm(y, normalized.lib.sizes=TRUE,log = TRUE)
-select = order(rowMeans(normalized_counts_mt),decreasing=TRUE)[1:50]
-select_names = rownames(normalized_counts_mt[select,])
-select_names = .ens2name(select_names)
-ma = normalized_counts_mt[select,]
-rownames(ma) = select_names
+library(org.Hs.eg.db)
+library(AnnotationDbi)
+mit_counts = counts[(rownames(counts) %in% as.character(mt[,1])),]
+clean_samples = names(counts)[colSums(mit_counts)/colSums(counts) < 0.1]
 
-heatmap_fn(ma)
+# y = DGEList(counts=counts[!(rownames(counts) %in% as.character(mt[,1])),])
+# y = calcNormFactors(y)
+# normalized_counts_mt = cpm(y, normalized.lib.sizes=TRUE,log = TRUE)
+# select = order(rowMeans(normalized_counts_mt),decreasing=TRUE)[1:50]
+#select_names = rownames(normalized_counts_mt[select,])
+#select_names = .ens2name(select_names)
+# ma = normalized_counts_mt[select,]
+#rownames(ma) = select_names
+
+# heatmap_fn(ma)
 ```
 
 Seems two clusters, but one of the marker Sca1 is part of the genes that make these
@@ -295,6 +300,7 @@ heatmap_fn(ma[names(select)[select],])
 
 * remove samples with less than 1800 genes
 * remove samples with less than 0.5 exonic rate
+* remove samples wit less 0.1 of MT reads
 * remove genes that are not seen in a sufficient number of cells (5)
 * remove genes that don't have many reads (10)
 
@@ -312,6 +318,9 @@ cd <- cd[, colSums(cd>0)>1.8e3]
 cd <- cd[rowSums(cd)>10, ]
 # remove genes that are not seen in a sufficient number of cells
 cd <- cd[rowSums(cd>0)>5, ]
+
+cd <- cd[,intersect(clean_samples, names(cd))]
+
 # check the final dimensions of the read count matrix
 dim(cd)
 valid_summary = subset(summaryfilter, summaryfilter$Name %in% colnames(cd))
@@ -343,6 +352,16 @@ We cannot detect the two markers. If sca1 should be expressed in all of them,
 then we have a limit in the power to detect the genes, that means if we cluster and we see
 two groups, it is hard to support that they are really two group of cells and not technology noise.
 
+```{r deseq2, eval=FALSE, echo=FALSE}
+dss = DESeq2::DESeqDataSetFromMatrix(cd, summaryfilter[names(cd),], ~1)
+dss = DESeq2::estimateSizeFactors(dss)
+dss = DESeq2::estimateDispersions(dss)
+rlg = DESeq2::rlog(dss)
+plotDispEsts(dss)
+DESeq2::plotPCA(rlg, intgroup="Mapped", ntop=2000)
+```
+
+
 ### Clustering of all genes after filtering
 
 Top figure considering previous filtering. 
@@ -353,7 +372,7 @@ Bottom figure considering harder filter, gene should be expressed > 10 cells.
 
 pheatmap(normalized_counts, show_rownames = FALSE, clustering_method = "ward.D2", clustering_distance_cols = "correlation", annotation=valid_summary[,c("mapped_mill", "Mapping.Rate"), drop=F])
 
-# mds(assay(rld),condition = ma["Ly6a",],d = "cor",xi = 1,yi = 2) + ggtitle("Colored by expression of sca1")
+mds(normalized_counts,condition = ma["Ly6a",],d = "cor",xi = 1,yi = 2) + ggtitle("Colored by expression of sca1")
 # mds(assay(rld),condition = valid_summary$mapped_log10,d = "cor",xi = 1,yi = 2) + ggtitle("Colored by mapped reads.")
 
 cd_hard <- cd[rowSums(cd>5)>10, ]

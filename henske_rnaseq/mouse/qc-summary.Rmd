@@ -9,9 +9,9 @@ output:
 ---
 
 ```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
-project="mitobridge - RNAseq"
-labPI="Dleyfer"
-lablocation="cambridge"
+project="Rap-regulated miRNA - RNAseq"
+labPI="Henske"
+lablocation="Loongwood"
 analystname="Lorena Pantano"
 analystemail="lpantano@hsph.harvard.edu"
 ```
@@ -39,7 +39,7 @@ options(bitmapType = 'cairo')
 
 ```{r project-options, echo=FALSE}
 source("~/repos/myRfunctions/transactions.R")
-path_results = "~/orch/scratch/mitobridge/musdis/final/2016-01-22_musdis/files"
+path_results = "~/orch/scratch/henske_mirs/final/2016-02-01_mouse/files"
 dir.create(path_results, showWarnings = FALSE)
 ```
 
@@ -49,18 +49,12 @@ dir.create(path_results, showWarnings = FALSE)
 
 # Overview
 
-The sample names and groups are named as:
-
-* control* : WT
-* musdis*: affected mice
-* musdis_drug*: affected mice treated with drug
-
 ```{r qc-setup}
 library(ggplot2)
 library(reshape)
 library(gplots)
 library(edgeR)
-devtools::load_all("~/repos/CHBUtils")
+library(CHBUtils)
 library(pheatmap)
 library(DESeq2)
 library(tximport)
@@ -71,23 +65,27 @@ library(org.Mm.eg.db)
 library(DT)
 
 basicConfig()
-project_summary = "/home/lpantano/orch/scratch/mitobridge/musdis/final/2016-01-22_musdis/project-summary.csv"
-counts_file = "/home/lpantano/orch/scratch/mitobridge/musdis/final/2016-01-22_musdis/combined.counts"
-tx2genes_file = "/home/lpantano/orch/scratch/mitobridge/musdis/final/2016-01-22_musdis/txgene.csv"
+project_summary = "/home/lpantano/orch/scratch/henske_mirs/final/2016-02-01_mouse/project-summary.csv"
+counts_file = "/home/lpantano/orch/scratch/henske_mirs/final/2016-02-01_mouse/combined.counts"
+tx2genes_file = "/home/lpantano/orch/scratch/henske_mirs/final/2016-02-01_mouse/tx2gene.csv"
+
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 "#0072B2", "#D55E00", "#CC79A7")
+
 summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
 summarydata$Name = rownames(summarydata)
 summarydata = summarydata[order(summarydata$Name),]
+
 if (file.exists(tx2genes_file)) {
   loginfo("Using gene counts calculated from the Sailfish transcript counts.")
-  sf_files = file.path("/home/lpantano/orch/scratch/mitobridge/musdis/final",
+  sf_files = file.path("/home/lpantano/orch/scratch/henske_mirs/work/",
                        rownames(summarydata), "sailfish",
                        rownames(summarydata), "quant.sf")
   names(sf_files) = rownames(summarydata)
   tx2gene = read.table(tx2genes_file, sep=",")
-  txi.salmon = tximport(sf_files, type="salmon", gene2tx=tx2gene,
-                        reader=readr::read_tsv)
+  txi.salmon = tximport(sf_files, type="salmon", tx2gene = tx2gene,
+                        reader=readr::read_tsv,
+                        countsFromAbundance="lengthScaledTPM")
   counts = txi.salmon$counts
 } else {
   loginfo("Using gene counts calculated from featureCounts.")
@@ -107,14 +105,6 @@ known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.qual
     "avg_coverage_per_region", "Mapped.Reads")
 metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
 ```
-
-Samples naming
-
-```{r naming}
-csv = read.csv("/home/lpantano/orch/scratch/mitobridge/musdis/config/musdis.csv")
-kable(csv)
-```
-
 
 ```{r heatmap-function}
 get_heatmap_fn = function(summarydata) {
@@ -141,7 +131,7 @@ ggplot(summarydata, aes(x=Name, y=Mapped)) +
     theme(panel.grid.major = element_line(size = .5, color = "grey"),
           axis.text.x = element_text(angle=90)) +
     geom_bar(stat="identity") +
-    ylab("mapped reads") + xlab("")
+    ylab("mapped reads") + xlab("") 
 ```
 
 ```{r mapped-plot-noqualimap, eval="Mapped.reads" %in% colnames(summarydata)}
@@ -155,7 +145,7 @@ ggplot(summarydata, aes(x=Name, y=Mapped.reads)) +
 
 ## Genomic mapping rate
 ```{r mapping-rate-plot, eval="Mapping.Rate" %in% colnames(summarydata)}
-ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) +
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate, fill=batch)) +
     geom_bar(stat="identity") +
     ylab("mapping rate") + xlab("") +
     theme_bw(base_size=10) +
@@ -164,7 +154,7 @@ ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) +
 ```
 
 ```{r mapping-rate-plot-noqualimap, eval="Mapped.reads.pct" %in% colnames(summarydata)}
-ggplot(summarydata, aes(x=Name, y=Mapped.reads.pct)) +
+ggplot(summarydata, aes(x=Name, y=Mapped.reads.pct, fill=batch)) +
     geom_bar(stat="identity") +
     ylab("mapping rate") + xlab("") +
     theme_bw(base_size=10) +

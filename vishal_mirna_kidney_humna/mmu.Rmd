@@ -1,0 +1,17 @@
+```{r}
+setwd("~/orch/scratch/vishal_mirna_kidney/mmu/controls/work")
+mi_files = list.files("mirbase", ".mirna$", recursive = T, full.names = T)
+design = data.frame(row.names=c("c1", "c2", "c3"), condition=c("c", "c", "c"))
+devtools::load_all("~/repos/isomiRs")
+obj <- IsomirDataSeqFromFiles(files = mi_files, design = design ,header = T)
+library(DESeq2)
+dse = DESeqDataSetFromMatrix(counts(obj), design, design = ~ 1)
+dse = estimateSizeFactors(dse)
+rlg = rlog(dse)
+
+write.table(counts(obj), "mirbase/raw_counts.tsv", sep="\t", quote=F)
+write.table(counts(dse, normalized=T), "mirbase/norm_counts.tsv", sep="\t", quote=F)
+write.table(assay(rlg), "mirbase/log_counts.tsv", sep="\t", quote=F)
+
+```
+

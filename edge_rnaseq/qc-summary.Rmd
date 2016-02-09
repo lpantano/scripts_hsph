@@ -55,12 +55,14 @@ library(ggplot2)
 library(reshape)
 library(gplots)
 library(edgeR)
-library(CHBUtils)
+devtools::load_all("~/repos/CHBUtils")
 library(pheatmap)
 library(org.Mm.eg.db)
 library(tximport)
 library(readr)
 library(DESeq2)
+library(clusterProfiler)
+library(org.Mm.eg.db)
 
 mt_file = "/home/lpantano/orch/scratch/edge_rnaseq/edge/final/2016-01-13_edge/files/mt_genes.txt"
 project_summary = "/home/lpantano/orch/scratch/edge_rnaseq/edge/final/2016-01-13_edge/project-summary.csv"
@@ -336,7 +338,9 @@ handle_deseq2 = function(dds, summarydata, column, all_combs) {
 ```
 
 ```{r deseq2-format}
-format_de_output = function(all_results){
+format_de_output = function(all_results, prefix="",vsd_local=NULL, skip=-1){
+  if (is.null(vsd_local))
+    vds_local = vsd
   for(i in seq(length(all_results))) {
     cat(paste0("### Lowest adjusted p-value hits for **", names(all_results)[i]),"** \n")
     out_df = as.data.frame(all_results[[i]])
@@ -348,19 +352,30 @@ format_de_output = function(all_results){
     cat("\n### Heatmap most significand, padj<0.05\n")
     sign = row.names(out_df)[out_df$padj<0.05 & !is.na(out_df$padj)]
     g = unlist(strsplit(names(all_results)[i], split = "_vs_"))
-    samples = grepl(g[1], summarydata$condition) | grepl(g[2], summarydata$condition)
-    heatmap_fn(assay(vst)[sign, samples], show_rownames = F)
+    samples = setdiff(summarydata$Name[grepl(g[1], summarydata$condition) | grepl(g[2], summarydata$condition)], skip)
+    heatmap_fn(assay(vsd)[sign, samples], show_rownames = F)
     cat("\n")
     stats = as.data.frame(all_results[[i]][,c(2,6)])
     cat("\n### Volcano plot\n")
     volcano_density_plot(stats, title=names(all_results)[i], lfc.cutoff=1.5)
     cat("\n\n### Top significant genes\n")
     print(knitr::kable(head(out_df)))
-    fn = paste(names(all_results)[i], ".tsv", sep="")
+    fn = paste(names(all_results)[i], prefix,".tsv", sep="")
     write.table(out_df, file=file.path(path_results, fn),
                 quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
     cat("\n\nDifferential expression file at: ", fn)
-    cat("\n\n\n")
+    cat("\n\n")
+    cat("\n\n### GO ontology of DE genes (FDR < 1%):\n\n")
+    .res = as.data.frame(out_df)
+    .idx = .res$padj<0.01 
+    .idx[is.na(.idx)] = FALSE
+    .de = out_df$symbol[.idx]
+    .accnum = convertIDs(.de, "SYMBOL", "ENTREZID", org.Mm.eg.db, "useFirst")
+    ego <- enrichGO(gene = .accnum[!is.na(.accnum)], 
+                    organism = "mouse", ont = "BP", pAdjustMethod = "BH",
+                    pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
+    print(print_enrichGO(ego, 30))
+    cat("\n\n")
   }
 }
 ```
@@ -439,6 +454,41 @@ if(length(plots) > 0) {
 format_de_output(all_results)
 ```
 
+## Removing P7 from the model to reduce variation
+
+```{r deseq2-expression-analysis-P4, results='asis'}
+counts_filter <- counts[rowSums(counts>0)>3, 1:6]
+dds_filter = DESeqDataSetFromMatrix(countData=counts_filter,
+    colData=summarydata[1:6,], design = ~ condition)
+dds_filter = DESeq(dds_filter)
+
+vsd_local <- varianceStabilizingTransformation(dds_filter)
+# pheatmap_fn(cor(assay(vsd_local), method = "kendall"))
+
+plotPCA(vsd_local, intgroup=c("condition"), ntop=100) + geom_text(aes(label=summarydata$Name[1:6]),hjust = 0, nudge_x = 0.3)
+
+all_results_filter = handle_deseq2(dds_filter, summarydata[1:6,], "condition",list(c("plusP4", "minusP4")))
+format_de_output(all_results_filter, prefix = "_P4_only_")
+```
+
+## Removing P7 and P4_2_m from the model to reduce variation
+
+```{r deseq2-expression-analysis-P4-5samples, results='asis'}
+idx = c(1,2,4:6)
+counts_filter <- counts[rowSums(counts>0)>2, idx]
+dds_filter = DESeqDataSetFromMatrix(countData=counts_filter,
+    colData=summarydata[idx,], design = ~ condition)
+dds_filter = DESeq(dds_filter)
+
+vsd_local <- varianceStabilizingTransformation(dds_filter)
+
+plotPCA(vsd_local, intgroup=c("condition"), ntop=100) + geom_text(aes(label=summarydata$Name[idx]),hjust = 0, nudge_x = 0.3)
+
+all_results_filter = handle_deseq2(dds_filter, summarydata[idx,], "condition",list(c("plusP4", "minusP4")))
+format_de_output(all_results_filter, prefix = "_P42m_removed_", skip="P4_2_m")
+```
+
+
 ## Differential expression of P4 vs P7
 
 ```{r time-deseq2-expression-analysis, results='asis'}
@@ -464,10 +514,10 @@ name_res = compress_results(path_results)
 sessionInfo()
 ```
 
-**Ignore next section, only for validation purpose.**
+# **Ignore next section, only for validation purpose.**
 
-# DE from transcripts quantification 
-```{r tximport-load}
+DE from transcripts quantification 
+```{r tximport-load, eval=FALSE}
 gene2tx <- read.table("~/orch/scratch/edge_rnaseq/edge/work/htseq-count/isoform_to_gene.txt")
 gene2tx <- gene2tx[,2:1]
 files <- list.files("~/orch/scratch/edge_rnaseq/edge/work/sailfish", "quant.sf",recursive = T, full.names = T)
@@ -475,15 +525,15 @@ names(files) <- summarydata$Name
 txi <- tximport(files, type="salmon", gene2tx=gene2tx, reader=read_tsv)
 ```
 
-```{r tx-deseq2}
+```{r tx-deseq2, eval=FALSE}
 dds <- DESeqDataSetFromTximport(txi, summarydata, ~ condition)
 dds = DESeq(dds)
 plotDispEsts(dds)
 ```
 
 
-## MA-plots
-```{r tx-DESeq-output, results='asis'}
+MA-plots
+```{r tx-DESeq-output, results='asis', eval=FALSE}
 all_results = handle_deseq2(dds, summarydata, "condition", list(c("plusP4","plusP7"),c("plusP4","minusP4"),c("plusP7","minusP7"))
 )
 len = length(all_results)
@@ -496,8 +546,8 @@ for(i in seq(length(all_results))) {
 }
 ```
 
-## Differentially expressed genes
-```{r tx-DESeq-tables, results='asis'}
+Differentially expressed genes
+```{r tx-DESeq-tables, results='asis', eval=FALSE}
 format_de_output(all_results)
 ```
 

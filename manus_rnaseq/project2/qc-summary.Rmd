@@ -39,7 +39,7 @@ options(bitmapType = 'cairo')
 
 ```{r project-options, echo=FALSE}
 source("~/repos/myRfunctions/transactions.R")
-path_results = "~/orch/scratch/edge_rnaseq/edge/final/2016-01-13_edge/files"
+path_results = "~/orch/scratch/Project_ManusBiosynthesis/rnaseq-merged/final/2016-01-14_rnaseq-merged/files"
 dir.create(path_results, showWarnings = FALSE)
 ```
 
@@ -59,6 +59,7 @@ library(pheatmap)
 library(DESeq2)
 library(gridExtra)
 library(org.EcK12.eg.db)
+library(clusterProfiler)
 
 project_summary = "/home/lpantano/orch/scratch/Project_ManusBiosynthesis/rnaseq-merged/final/2016-01-14_rnaseq-merged/project-summary.csv"
 counts_file = "/home/lpantano/orch/scratch/Project_ManusBiosynthesis/rnaseq-merged/final/2016-01-14_rnaseq-merged/annotated_combined.counts"
@@ -259,6 +260,15 @@ vsd <- varianceStabilizingTransformation(dds)
 rlogMat <- assay(rld)
 vstMat <- assay(vsd)
 
+out_df = as.data.frame(rlogMat)
+out_df$symbol = as.character(symbol$symbol[match(as.character(rownames(out_df)), symbol$id)])
+write.table(out_df, file.path(path_results, "log2_normalized_counts.tsv"), quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+
+out_df = as.data.frame(counts(dds, normalized=TRUE))
+out_df$symbol = as.character(symbol$symbol[match(as.character(rownames(out_df)), symbol$id)])
+write.table(out_df, file.path(path_results, "normalized_counts.tsv"), quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
+
+
 p1=meanSdPlot(log2(counts(dds,normalized=TRUE)[notAllZero,] + 1), plot=F)$gg + ggtitle("log2 transformation")
 p2=meanSdPlot(rlogMat[notAllZero,], plot=F)$gg + ggtitle("variance stabilization transformation")
 p3=meanSdPlot(vstMat[notAllZero,], plot=F)$gg + ggtitle("regularized log transformation")
@@ -303,7 +313,8 @@ get_groups <- function(d, comp, condition)
 ```
 
 ```{r DESeq-output, results='asis'}
-all_combs =  combn(levels(summarydata[,condition]), 2, simplify=FALSE)[1:9]
+all_combs = lapply(combn(levels(summarydata[,condition]), 2, simplify=FALSE)[1:9],
+                   function(x){rev(x)})
 all_combs[[10]] = c("C", "D")
 all_results = handle_deseq2(dds, summarydata, condition, all_combs)
 for(i in seq(length(all_results))) {
@@ -351,7 +362,25 @@ for(i in seq(length(all_results))) {
   ego <- enrichGO(gene = .accnum[!is.na(.accnum)], 
                   organism = "ecolik12", ont = "BP", pAdjustMethod = "BH",
                   pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
+  cat("\n\n")
   print(print_enrichGO(ego, 30))
+  cat("\n\n")
+  fn = paste(names(all_results)[i], "_goenrichment.tsv", sep="")
+  if (class(ego) == "enrichResult"){
+    write.table(summary(ego), file.path(path_results, fn), quote=FALSE, sep="\t",
+                row.names=TRUE, col.names=TRUE)
+  }
+  cat("\n\n### KEGG of DE genes (logFC>3 and FDR < 1%):")
+  ego <- enrichKEGG(gene = .accnum[!is.na(.accnum)], use_internal_data = T,
+                    organism = "ecolik12", readable = TRUE)
+  cat("\n\n")
+  print(print_enrichGO(ego, 30))
+  cat("\n\n")
+  fn = paste(names(all_results)[i], "_KEGGenrichment.tsv", sep="")
+  if (class(ego) == "enrichResult"){
+    write.table(summary(ego), file.path(path_results, fn), quote=FALSE, sep="\t",
+                row.names=TRUE, col.names=TRUE)
+  }
   cat("\n\n")
 }
 ```
@@ -359,7 +388,7 @@ for(i in seq(length(all_results))) {
 
 #R Session Info
 
-```{r compress, echo=FALSE}
+```{r compress, echo=FALSE,cache=FALSE}
 name_res = compress_results(path_results)
 ```
 
