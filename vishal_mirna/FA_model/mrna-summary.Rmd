@@ -62,7 +62,7 @@ library(logging)
 library(gridExtra)
 library(clusterProfiler)
 library(org.Mm.eg.db)
-library(DT)
+# library(DT)
 
 basicConfig()
 project_summary = "/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/project-summary.csv"
@@ -258,7 +258,7 @@ ggplot(melted, aes(x=count, group=sample)) +
 heatmap_fn(cor(normalized_counts, method="spearman"))
 ```
 
-## PCA plot
+## MDS plot
 ```{r pca, eval=ncol(counts) > 1}
 dds = DESeqDataSetFromTximport(txi.salmon, colData=metadata, design=~1)
 vst = varianceStabilizingTransformation(dds)
@@ -292,10 +292,12 @@ do_propcor = function(x) {
 
 heatmap_fn(do_propcor(normalized_counts))
 ```
+
+
 ```{r de-setup}
 library(DESeq2)
-library(DEGreport)
-library(vsn)
+# library(DEGreport)
+# library(vsn)
 design = ~ group
 condition = "group"
 ```
@@ -311,7 +313,6 @@ dds = DESeq(dds, test="LRT", reduced = ~ 1)
 ## Effect of variance stabilization
 
 ```{r deseq-diagnostics, results='asis'}
-par(mfrow=c(1,3))
 notAllZero <- (rowSums(counts(dds))>0)
 rld <- rlog(dds)
 vsd <- varianceStabilizingTransformation(dds)
@@ -350,7 +351,7 @@ handle_deseq2 = function(dds, summarydata, column, all_combs=NULL) {
 }
 
 plot_genes = function(dds, gene){
-  DESeq2::plotCounts(dds, "ENSMUSG00000040405", intgroup = "group")
+  DESeq2::plotCounts(dds, gene, intgroup = "group")
 }
 
 
@@ -372,6 +373,7 @@ get_groups <- function(d, comp, condition)
 ```
 
 ```{r DESeq-output, results='asis'}
+all_results = list()
 all_results[[1]] = results(dds)
 for(i in seq(length(all_results))) {
   cat(paste("## Comparison: ", names(all_results)[i]))
@@ -399,8 +401,7 @@ for(i in seq(length(all_results))) {
   
   cat("\n\n### Heatmap most significand, padj<0.05\n")
   sign = row.names(out_df)[out_df$padj<0.05 & !is.na(out_df$padj) & abs(out_df$log2FoldChange) > 2]
-  # g = unlist(strsplit(names(all_results)[i], split = "_vs_"))
-  
+
   if (length(sign)<2){
     cat("Too few genes to plot.")
   }else{
@@ -427,6 +428,59 @@ for(i in seq(length(all_results))) {
   print(print_enrichGO(summary(ego), 30))
   cat("\n\n")
 }
+```
+
+```{r}
+
+d = as.dist(1-cor(t(rlogMat[sign,])))
+c = diana(d,diss = TRUE)
+
+groups = cutree(as.hclust(c), h = c$dc)
+
+
+norm_sign = t(apply(rlogMat[sign,], 1, function(e){
+  m = sapply(seq(1,18,3), function(i){
+    mean(e[i:(i+2)])
+  })
+  (e - min(m))/(max(m) - min(m))
+}))
+
+
+plot_cluster  = function(norm_sign, g_in_c, metadata) {
+  # g_in_c = names(groups[groups==1])
+  ma = as.data.frame(norm_sign)[g_in_c,]
+  ma_long = suppressMessages(melt(cbind(gene=row.names(ma), ma), variable_name = "sample"))
+  ma_long$group = metadata[ma_long$sample, "group"]
+  ma_sum = ma_long %>% group_by(gene, group) %>% summarise(average=mean(value)) %>%
+    ungroup()
+  
+  ma_group = ma_sum %>% group_by(group) %>% summarise(average=mean(average)) %>% ungroup()
+  
+  ggplot(ma_sum, aes(x=group, y=average)) + 
+    geom_boxplot() + 
+    stat_smooth(data=ma_group, aes(x=group, y=average, group=1),se=F,method = "lm",formula = y~poly(x,3))
+}
+
+plot_cluster(norm_sign, names(groups[groups==2]), metadata)
+
+
+```
+
+
+```{r maSigPro, eval=FALSE}
+## Time series nanalysis
+
+library(maSigPro)
+
+time <- c(rep(c(0,1,2,3,7,14), each = 3))
+replicates <- c(rep(c(1:6), each = 3))
+group <- rep(1, 18)
+edesign <- cbind(time, replicates, group)
+rownames(edesign) <- colnames(counts)
+
+t =  maSigPro (rlogMat, edesign, degree = 6, vars = "each", main = "Test", pdf=FALSE)
+
+p = see.genes(t$sig.genes$time3, k=3, newX11 = F)
 ```
 
 
