@@ -11,7 +11,7 @@ output:
 ```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
 project="Rap-regulated miRNA - RNAseq"
 labPI="Henske"
-lablocation="Loongwood"
+lablocation="Longwood"
 analystname="Lorena Pantano"
 analystemail="lpantano@hsph.harvard.edu"
 ```
@@ -49,7 +49,7 @@ dir.create(path_results, showWarnings = FALSE)
 
 # Individual samples
 
-Controls for the smaller experiment has **e2** in the sample name.
+Controls for the mir_21 experiment has **e2** in the sample name.
 
 
 ```{r qc-setup}
@@ -520,6 +520,10 @@ vsd <- varianceStabilizingTransformation(dds)
 rlogMat <- assay(rld)
 vstMat <- assay(vsd)
 
+
+save_file(vstMat, "rlog2_expression.tsv", path_results)
+save_file(counts(dds, normalized=TRUE), "normalized_counts_expression.tsv", path_results)
+
 p1=meanSdPlot(log2(counts(dds,normalized=TRUE)[notAllZero,] + 1), plot=F)$gg + ggtitle("log2 transformation")
 p2=meanSdPlot(rlogMat[notAllZero,], plot=F)$gg + ggtitle("variance stabilization transformation")
 p3=meanSdPlot(vstMat[notAllZero,], plot=F)$gg + ggtitle("regularized log transformation")
@@ -628,5 +632,34 @@ for(i in seq(length(all_results))) {
   print(print_enrichGO(summary(ego), 30))
   cat("\n\n")
 }
+```
+
+### mir_21 known targets
+
+Tp53 didn't show up in the table, maybe has it another name?
+
+```{r mir_21-targets, results='asis'}
+genes = c("Ppif", "Tp53", "Tgfbr3", "Pdcd4")
+
+out_df = all_results$mir_21_vs_control_e2
+out_df$symbol = convertIDs(rownames(out_df), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
+
+for (g in genes){
+  r = as.data.frame(out_df[grepl(g, out_df$symbol),])
+  if (nrow(r) > 0)
+    print(kable(r))
+}
+```
+
+#R Session Info
+
+```{r compress, echo=FALSE}
+name_res = compress_results(path_results)
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
 ```
 
