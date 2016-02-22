@@ -67,7 +67,7 @@ design <- data.frame(row.names=files$sample_id, condition=files$group)
 
 ```
 
-This analysis only takes into account sequences < 40nt.
+This analysis only takes into account sequences < 40nt and appeared in more than 2 samples and with more than 2 counts.
 
 # Exploratory analysis
 
@@ -286,11 +286,11 @@ do_norm = function(dss, root_path, prefix){
     rlog_ma = assay(rlog(dss))
     count_ma = counts(dss, normalized=TRUE)
     raw = counts(dss, normalized=FALSE)
-    fn_log = paste0(path_results, prefix, "log_matrix.txt")
+    fn_log = file.path(path_results, paste0(prefix, "log_matrix.txt"))
     write.table(rlog_ma,fn_log,sep="\t")
-    fn_count = paste0(path_results, prefix, "count_matrix.txt")
+    fn_count = file.path(path_results, paste0(prefix, "count_matrix.txt"))
     write.table(count_ma,fn_count,sep="\t")
-    fn_raw = paste0(path_results, prefix, "raw_matrix.txt")
+    fn_raw = file.path(path_results, paste0(prefix, "raw_matrix.txt"))
     write.table(count_ma,fn_raw,sep="\t")
 }
 
@@ -315,7 +315,7 @@ plot_MA(all_results)
 
 clust_des = all_results[[1]]
 ann_des = clus[rownames(clust_des),]
-fn = paste0(path_results, "clusters_de.tsv")
+fn = file.path(path_results, "clusters_de.tsv")
 write.table(cbind(clust_des, ann_des),fn,sep="\t")
     
 kable(head(cbind(clust_des, ann_des)))
@@ -339,7 +339,7 @@ all_results = handle_deseq2(dds, design, condition)
 plot_MA(all_results)
 
 clust_des = head(all_results[[1]])
-fn = paste0(path_results, "mirna_de.tsv")
+fn = file.path(path_results, "mirna_de.tsv")
 write.table(clust_des,fn,sep="\t")
 
 kable(clust_des)

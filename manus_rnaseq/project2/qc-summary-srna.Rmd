@@ -69,6 +69,13 @@ gene2sym = function(p){
   as.data.frame(cbind(id=rownames(ma),symbol=as.character(ma[,"symbol"])))
 }
 
+get_short_genes = function(counts){
+  df = read.table(counts, header=T, sep="\t")
+  df_sum = df %>% filter(length<250) %>% group_by(name) %>% summarize(seen = n())
+  g = as.character(df_sum$name[df_sum$seen>2])
+  gsub("T", "", g)
+}
+
 ```
 
 
@@ -77,7 +84,7 @@ library(ggplot2)
 library(reshape)
 library(gplots)
 library(edgeR)
-devtools::load_all("~/repos/CHBUtils")
+library(CHBUtils)
 library(pheatmap)
 library(DESeq2)
 library(gridExtra)
@@ -92,13 +99,17 @@ summarydata$Name = rownames(summarydata)
 summarydata = summarydata[order(summarydata$Name),]
 
 counts_file = "/home/lpantano/orch/scratch/Project_ManusBiosynthesis/srnaseq-rnaseq-run/final_nosp/2016-02-02_srnaseq-merged"
+counts_sf_file = "/home/lpantano/orch/scratch/Project_ManusBiosynthesis/srnaseq-rnaseq-run/final_nosp/2016-02-02_srnaseq-merged/combined.sf"
 txi.salmon = load_sailfish(counts_file)
 counts = round(data.frame(txi.salmon$counts, check.names=FALSE))
 counts = counts[, order(colnames(counts))]
 counts[is.na(counts)] = 0
 symbol = gene2sym(counts_file)
+keep = get_short_genes(counts_sf_file)
 
+kcounts_sf_file = "/home/lpantano/orch/scratch/Project_ManusBiosynthesis/srna-rnaseq-k12/final/2016-01-29_srnaseq-merged/combined.sf"
 kcounts_file = "/home/lpantano/orch/scratch/Project_ManusBiosynthesis/srna-rnaseq-k12/final/2016-01-29_srnaseq-merged"
+k12_keep = get_short_genes(kcounts_sf_file)
 txi.salmon.k12 = load_sailfish(kcounts_file)
 kcounts = round(data.frame(txi.salmon.k12$counts, check.names=FALSE))
 kcounts = kcounts[, order(colnames(kcounts))]
@@ -168,7 +179,7 @@ ggplot(summarydata, aes(x=Name, y=Mapped.reads.pct)) +
           axis.text.x = element_text(angle=90))
 ```
 
-### tRNA/rRNA ratio
+### tRNA and rRNA ratio
 
 ```{r mapping-trna-plot-noqualimap}
 ggplot(summarydata, aes(x=Name, y=rRNA_rate)) +
@@ -328,6 +339,16 @@ vstMat = make_diagnostic(dds)
 plotDispEsts(dds)
 ```
 
+```{r get-groups}
+get_groups <- function(d, comp, condition)
+{
+  g <- unlist(strsplit(comp,"_"))
+  g1 <- d$Name[d[, (names(d)==condition)]==g[1]]
+  g2 <- d$Name[d[, (names(d)==condition)]==g[3]]
+  list(g1,g2)
+}
+```
+
 ```{r deseq2-handler}
 handle_deseq2 = function(dds, summarydata, column, all_combs=NULL) {
   if (is.null(all_combs)){
@@ -347,10 +368,11 @@ handle_deseq2 = function(dds, summarydata, column, all_combs=NULL) {
   return(all_results)
 }
 
-make_results  = function(all_results, symbol){
+make_results  = function(all_results, symbol, prefix=""){
   for(i in seq(length(all_results))) {
-  cat(paste("## Lowest adjusted p-value hits for", names(all_results)[i]))
+  cat(paste("## Lowest adjusted p-value hits for", names(all_results)[i], ":",prefix,"\n"))
   out_df = as.data.frame(all_results[[i]])
+  out_df = out_df[!is.na(out_df$padj),]
   out_df$symbol = as.character(symbol$symbol[match(as.character(rownames(out_df)), symbol$id)])
   out_df$description = convertIDs(as.character(out_df$symbol), "SYMBOL", "GENENAME", org.EcK12.eg.db, "useFirst")
   
@@ -361,12 +383,13 @@ make_results  = function(all_results, symbol){
   title(paste("MA plot for contrast", names(all_results)[i]))
   
   cat("\n\n### Volcano plot\n\n")
-  stats = as.data.frame(all_results[[i]][,c(2,6)])
+  stats = as.data.frame(out_df[,c(2,6)])
   volcano_density_plot(stats, title=names(all_results)[i], lfc.cutoff=1.5)
 
   cat("\n\n### QC for DE genes mean/variance\n")
   g <- get_groups(summarydata, names(all_results)[i], condition)
-  p = degMV(g[[1]], g[[2]], all_results[[i]]$padj, counts(dds,normalized=TRUE)) +
+  cnts = counts(dds, normalized=TRUE)
+  p = degMV(g[[1]], g[[2]], out_df$padj, cnts[row.names(out_df),]) +
   ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i]))
   print(p)
   
@@ -379,7 +402,7 @@ make_results  = function(all_results, symbol){
   
   cat("\n\n### Top DE genes\n\n")
   print(knitr::kable(head(out_df)))
-  fn = paste(names(all_results)[i], ".tsv", sep="")
+  fn = paste(names(all_results)[i], prefix, ".tsv", sep="")
   write.table(out_df, file.path(path_results, fn), quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n\nDifferential expression file at: ", fn)
   cat("\n\n")
@@ -391,21 +414,21 @@ make_results  = function(all_results, symbol){
   .de = out_df$symbol[.idx]
   .accnum = convertIDs(.de, "SYMBOL", "ENTREZID", org.EcK12.eg.db, "useFirst")
   ego <- enrichGO(gene = .accnum[!is.na(.accnum)], 
-                  organism = "ecolik12", ont = "BP", pAdjustMethod = "BH",
+                  OrgDb = "org.EcK12.eg.db", ont = "BP", pAdjustMethod = "BH",
                   pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
   print(print_enrichGO(summary(ego), 30))
   cat("\n\n")
-  fn = paste(names(all_results)[i], "_goenrichment.tsv", sep="")
+  fn = paste0(names(all_results)[i], prefix, "_goenrichment.tsv")
   if (class(ego) == "enrichResult"){
     write.table(summary(ego), file.path(path_results, fn), quote=FALSE, sep="\t",
                 row.names=TRUE, col.names=TRUE)
   }
   cat("\n\n### KEGG of DE genes (logFC>3 and FDR < 1%):\n\n")
   ego <- enrichKEGG(gene = .accnum[!is.na(.accnum)], use_internal_data = T,
-                    organism = "ecolik12", readable = TRUE)
-  print(print_enrichGO(summary(ego), 30))
+                    organism = "ecolik12")
+  print(kable(summary(ego)[,1:7]))
   cat("\n\n")
-  fn = paste(names(all_results)[i], "_KEGGenrichment.tsv", sep="")
+  fn = paste0(names(all_results)[i], prefix, "_KEGGenrichment.tsv")
   if (class(ego) == "enrichResult"){
     write.table(summary(ego), file.path(path_results, fn), quote=FALSE, sep="\t",
                 row.names=TRUE, col.names=TRUE)
@@ -418,21 +441,15 @@ make_results  = function(all_results, symbol){
 ```
 
 
-```{r get-groups}
-get_groups <- function(d, comp, condition)
-{
-  g <- unlist(strsplit(comp,"_"))
-  g1 <- d$Name[d[, (names(d)==condition)]==g[1]]
-  g2 <- d$Name[d[, (names(d)==condition)]==g[3]]
-  list(g1,g2)
-}
-```
 
 ## Results
 
 ```{r DESeq-output, results='asis'}
 all_results = handle_deseq2(dds, summarydata, condition)
-make_results(all_results, symbol)
+make_results(all_results, symbol, "_custom")
+save_file(vstMat, "custom_rlog2_counts.tsv", path_results)
+# filter = all_results[[1]][keep,]
+# make_results(list(G_vs_H=filter), symbol, "_custom_short")
 ```
 
 # Differential expression using assembly from cufflinks
@@ -474,7 +491,8 @@ plotDispEsts(dds)
 
 ```{r DESeq-output-cuff, results='asis'}
 cuff_all_results = handle_deseq2(dds, summarydata, condition)
-make_results(cuff_all_results, cuff2gene)
+make_results(cuff_all_results, cuff2gene, "_cufflinks")
+save_file(vstMat, "cufflinks_rlog2_counts.tsv", path_results)
 ```
 
 # Differential expression using k12 strain
@@ -515,7 +533,10 @@ plotDispEsts(dds)
 
 ```{r DESeq-output-k12, results='asis'}
 k12_all_results = handle_deseq2(dds, summarydata, condition)
-make_results(k12_all_results, ksymbol)
+make_results(k12_all_results, ksymbol, "_k12")
+save_file(vstMat, "k12_rlog2_counts.tsv", path_results)
+filter = k12_all_results[[1]][k12_keep,]
+make_results(list(G_vs_H=filter), ksymbol, "_k12_short")
 ```
 
 #R Session Info

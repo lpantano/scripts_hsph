@@ -38,7 +38,7 @@ options(bitmapType = 'cairo')
 ```
 
 ```{r project-options, echo=FALSE}
-source("~/repos/myRfunctions/transactions.R")
+library(myRfunctions)
 path_results = "~/orch/scratch/henske_mirs/human/final/2016-02-12_human/files"
 dir.create(path_results, showWarnings = FALSE)
 ```
@@ -60,6 +60,8 @@ library(pheatmap)
 library(DESeq2)
 library(tximport)
 library(logging)
+library(dplyr)
+library(DT)
 basicConfig()
 project_summary = "/home/lpantano/orch/scratch/henske_mirs/human/final/2016-02-12_human/project-summary.csv"
 counts_file = "/home/lpantano/orch/scratch/henske_mirs/human/final/2016-02-12_human/combined.counts"
@@ -292,7 +294,7 @@ heatmap_fn(cor(normalized_counts, method="spearman"))
 dds = DESeqDataSetFromMatrix(countData=counts, colData=summarydata, design=~Name)
 vst = varianceStabilizingTransformation(dds)
 # plotPCA(vst, intgroup=c("Name"))
-mds(assay(vst), d="cor", k=3)
+mds(assay(vst), k=3)
 ```
 
 ## Heatmap by concordance correlation coefficient
@@ -320,4 +322,103 @@ do_propcor = function(x) {
     return(mat)}
 
 heatmap_fn(do_propcor(normalized_counts))
+```
+
+# Expression ratio bweteen DK16 and DK19|DK22
+
+Since we don't have enough replicates I can not give p-values. So I will
+calculate the ration bewteen 19|22 and 16 samples. Expression values
+are normalized and transformed to log2. 
+
+```{r dk-ratio, cache=FALSE}
+library(org.Hs.eg.db)
+ma = data.frame(assay(vst))
+pkp4 = rowMeans(ma[,c("DK19", "DK22")])
+control = ma$DK16
+ratio = cbind(data.frame(genes = as.character(rownames(ma)), 
+                   log2FC = pkp4 - control,
+                   stringsAsFactors = FALSE),
+              data.frame(assay(vst)[,1:3])
+              ) 
+ratio = ratio[order(abs(ratio$log2FC), decreasing = TRUE),]
+ratio$symbol = convertIDs(as.character(ratio$genes), "ENSEMBL",
+                          "SYMBOL", org.Hs.eg.db, "useFirst")
+ratio$desc = convertIDs(as.character(ratio$genes), "ENSEMBL",
+                          "GENENAME", org.Hs.eg.db, "useFirst")
+
+cat("\n\n")
+sanitize_datatable(head(ratio, 200), 
+                   style='bootstrap', 
+                   filter="top") %>%
+formatRound(2:5)
+cat("\n\n")
+
+fn = "pkp4_ratio.tsv"
+save_file(ratio, fn, path_results)
+
+```
+
+In this table, only top 200 are shown,
+to look at the whole table open **`r fn`**
+
+# Expression ratio bweteen HL samples
+
+
+```{r hl-ratio, cache=FALSE, results='asis'}
+cmb = list(c("HL11", "HL10"),
+           c("HL12", "HL10"),
+           c("HL12", "HL11"))
+.void = lapply(cmb, function(names){
+  s1 = ma[, names[1] ]
+  s2 = ma[, names[2] ]
+  ratio = cbind(data.frame(genes = as.character(rownames(ma)), 
+                           log2FC = s1 - s2,
+                           stringsAsFactors = FALSE),
+                data.frame(assay(vst)[, names])
+  ) 
+  ratio = ratio[order(abs(ratio$log2FC), decreasing = TRUE),]
+  ratio$symbol = convertIDs(as.character(ratio$genes), "ENSEMBL",
+                            "SYMBOL", org.Hs.eg.db, "useFirst")
+  ratio$desc = convertIDs(as.character(ratio$genes), "ENSEMBL",
+                          "GENENAME", org.Hs.eg.db, "useFirst")
+  fn = paste0(names[1], "_vs_", names[2], "_ratio.tsv")
+  save_file(ratio, fn, path_results)
+  cat("\nFull table at ", fn, "\n")
+  head(ratio, 200)
+})
+
+
+cat("\n##HL11 vs HL10\n")
+sanitize_datatable(.void[[1]], 
+                   style='bootstrap', 
+                   filter="top") %>%
+  formatRound(2:4)
+cat("\n\n")
+
+cat("\n##HL12 vs HL10\n")
+sanitize_datatable(.void[[2]], 
+                   style='bootstrap', 
+                   filter="top") %>%
+  formatRound(2:4)
+cat("\n\n")
+
+cat("\n##HL12 vs HL11\n")
+sanitize_datatable(.void[[3]], 
+                   style='bootstrap', 
+                   filter="top") %>%
+  formatRound(2:4)
+cat("\n\n")
+```
+
+
+#R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+name_res = compress_results(path_results, "human_pilot")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
 ```

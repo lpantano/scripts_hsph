@@ -9,7 +9,7 @@ output:
 ---
 
 ```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
-project=" FA model - RNAseq "
+project=" UUO model - RNAseq "
 labPI="Vishal"
 lablocation="Longwood"
 analystname="Lorena Pantano"
@@ -38,13 +38,13 @@ options(bitmapType = 'cairo')
 ```
 
 ```{r project-options, echo=FALSE}
-source("~/repos/myRfunctions/transactions.R")
-path_results = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/files"
+library(myRfunctions)
+path_results = "~/orch/scratch/vishal_mirna_kidney/UUO-model/mrna/final/2016-02-03_mrna/files"
 dir.create(path_results, showWarnings = FALSE)
 ```
 
 ```{r create-report, echo=FALSE, eval=FALSE}
-#render_2_drop("mrna-summary.Rmd", "vishal_kidney/FA_mrna")
+#render_2_drop("mrna-summary.Rmd", "vishal_kidney/UUO_mrna")
 ```
 
 # Overview
@@ -68,9 +68,9 @@ library(dplyr)
 # library(DT)
 
 basicConfig()
-project_summary = "/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/project-summary.csv"
-counts_file = "/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/combined.counts"
-tx2genes_file = "/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/tx2gene.csv"
+project_summary = "/home/lpantano/orch/scratch/vishal_mirna_kidney/UUO-model/mrna/final/2016-02-03_mrna/project-summary.csv"
+counts_file = "/home/lpantano/orch/scratch/vishal_mirna_kidney/UUO-model/mrna/final/2016-02-03_mrna/combined.counts"
+tx2genes_file = "/home/lpantano/orch/scratch/vishal_mirna_kidney/UUO-model/mrna/final/2016-02-03_mrna/tx2gene.csv"
 
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 "#0072B2", "#D55E00", "#CC79A7")
@@ -81,10 +81,10 @@ summarydata = summarydata[order(summarydata$Name),]
 
 if (file.exists(tx2genes_file)) {
   loginfo("Using gene counts calculated from the Sailfish transcript counts.")
-  sf_files = file.path("/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final",
+  sf_files = file.path("/home/lpantano/orch/scratch/vishal_mirna_kidney/UUO-model/mrna/final/",
                        rownames(summarydata), "sailfish",
                        rownames(summarydata), "quant.sf")
-  names(sf_files) = summarydata$descritiption
+  names(sf_files) = summarydata$Name
   tx2gene = read.table(tx2genes_file, sep=",")
   txi.salmon = tximport(sf_files, type="salmon", tx2gene = tx2gene,
                         reader=readr::read_tsv,
@@ -105,8 +105,8 @@ known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.qual
     "Median.insert.size", "Mapped.reads.pct", "Total.reads",
     "avg_coverage_per_region", "Mapped.Reads", "descritiption")
 metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
-rownames(metadata) = summarydata$descritiption
-metadata$group = factor(metadata$group, levels = c("control", "day1",
+rownames(metadata) = summarydata$Name
+metadata$group = factor(metadata$group, levels = c("normal", "day1",
                                                    "day2", "day3",
                                                    "day7", "day14"))
 ```
@@ -258,7 +258,7 @@ ggplot(melted, aes(x=count, group=sample)) +
 
 ## Correlation (Spearman) heatmap of TMM-normalized counts
 ```{r spearman-heatmap-normalized, eval=ncol(counts) > 1}
-heatmap_fn(cor(normalized_counts, method="spearman"))
+heatmap_fn(cor(normalized_counts, method="spearman"), clustering_distance_rows="correlation")
 ```
 
 ## MDS plot
@@ -377,7 +377,7 @@ get_groups <- function(d, comp, condition)
 
 ```{r DESeq-output, results='asis'}
 all_results = list()
-all_results[["fa_model"]] = results(dds)
+all_results[["uuo_model"]] = results(dds)
 for(i in seq(length(all_results))) {
   cat(paste("## Comparison: ", names(all_results)[i]))
   out_df = as.data.frame(all_results[[i]])
@@ -402,8 +402,8 @@ for(i in seq(length(all_results))) {
 #   ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i]))
 #   print(p)
   
-  cat("\n\n### Heatmap most significand, padj<0.05 and log2FC > 2\n")
-  sign = row.names(out_df)[out_df$padj<0.05 & !is.na(out_df$padj) & abs(out_df$log2FoldChange) > 2]
+  cat("\n\n### Heatmap most significand, padj<0.05 and log2FC > 4\n")
+  sign = row.names(out_df)[out_df$padj<0.01 & !is.na(out_df$padj) & abs(out_df$log2FoldChange) > 4]
 
   if (length(sign)<2){
     cat("Too few genes to plot.")
@@ -421,14 +421,15 @@ for(i in seq(length(all_results))) {
 
   cat("\n\n### GO ontology of DE genes (logFC>3 and FDR < 1%):\n\n")
   .res = as.data.frame(out_df)
-  .idx = .res$padj<0.01 & abs(.res$log2FoldChange) > 3
+  .idx = .res$padj<0.01 & abs(.res$log2FoldChange) > 4
   .idx[is.na(.idx)] = FALSE
   .de = out_df$symbol[.idx]
   .accnum = convertIDs(.de, "SYMBOL", "ENTREZID", org.Mm.eg.db, "useFirst")
   ego <- enrichGO(gene = .accnum[!is.na(.accnum)], 
                   OrgDb = "org.Mm.eg.db", ont = "BP", pAdjustMethod = "BH",
                   pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
-  save_file(summary(ego), paste0(names(all_results)[i], "_goenrich.tsv"), path_results)
+  if (is.data.frame(summary(ego)))
+    save_file(summary(ego), paste0(names(all_results)[i], "_goenrich.tsv"), path_results)
   print(print_enrichGO(summary(ego), 30))
   cat("\n\n")
 }
@@ -461,8 +462,9 @@ groups = cutree(as.hclust(c), h = c$dc)
 
 
 norm_sign = t(apply(rlogMat[sign,], 1, function(e){
-  m = sapply(seq(1,18,3), function(i){
-    mean(e[i:(i+2)])
+  m = sapply(metadata$group, function(i){
+    idx = which(metadata$group == i)
+    mean(e[idx], na.rm=TRUE)
   })
   (e - min(m))/(max(m) - min(m))
 }))
@@ -505,8 +507,9 @@ cat("\n\n\n")
                        "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
   ego <- enrichKEGG(gene = .accnum[!is.na(.accnum)], 
                   organism = "mouse",use_internal_data = TRUE)
-  if (nrow(summary(ego))>0)
-    print(kable(summary(ego)))
+  if ( is.data.frame(summary(ego)) )
+    if ( nrow(summary(ego)) >0 )  print(kable(summary(ego)[,1:7]))
+  
   cat("\n\n")
   ego <- enrichGO(gene = .accnum[!is.na(.accnum)], 
                   OrgDb = "org.Mm.eg.db", ont = "BP", pAdjustMethod = "BH",
@@ -541,7 +544,7 @@ p = see.genes(t$sig.genes$time3, k=3, newX11 = F)
 #R Session Info
 
 ```{r compress, echo=FALSE, cache=FALSE}
-name_res = compress_results(path_results)
+name_res = compress_results(path_results,prefix = "uuo_results")
 ```
 
 (useful if replicating these results)
