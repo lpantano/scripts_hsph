@@ -322,6 +322,8 @@ vsd <- varianceStabilizingTransformation(dds)
 rlogMat <- assay(rld)
 vstMat <- assay(vsd)
 
+save_file(rlogMat, "rlog_counts.tsv", path_results)
+
 p1=meanSdPlot(log2(counts(dds,normalized=TRUE)[notAllZero,] + 1), plot=F)$gg + ggtitle("log2 transformation")
 p2=meanSdPlot(rlogMat[notAllZero,], plot=F)$gg + ggtitle("variance stabilization transformation")
 p3=meanSdPlot(vstMat[notAllZero,], plot=F)$gg + ggtitle("regularized log transformation")
