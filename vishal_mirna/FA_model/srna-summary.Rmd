@@ -33,19 +33,19 @@ knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heig
 
 root_path = "/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final"
 root_file = file.path(root_path, "files")
-dir.create(path_results, showWarnings = FALSE)
+dir.create(root_file, showWarnings = FALSE)
 
 metadata_fn =  list.files(file.path(root_path), pattern = "summary_re.csv",recursive = T, full.names = T)
 metadata = read.csv(metadata_fn, row.names="sample_id")
-metadata = metadata[2:nrow(metadata), ]
+metadata = metadata[1:nrow(metadata), ]
 condition = "condition"
 design = data.frame(row.names=rownames(metadata), condition=metadata$group)
 ```
 
 ```{r render,eval=FALSE, echo=FALSE}
-library(rmarkdown)
-library(knitrBootstrap)
-render("report.rmd")
+#library(rmarkdown)
+#library(knitrBootstrap)
+#render("report.rmd")
 ```
 
 # Exploratory analysis
@@ -104,7 +104,7 @@ names(files) = sapply(files, function(x){
   gsub("-mirbase-ready.counts", "", basename(x))
 })
 
-obj <- IsomirDataSeqFromFiles(files = files, design = design , header = T)
+obj <- IsomirDataSeqFromFiles(files = files[rownames(design)], design = design , header = T)
 ```
 
 
@@ -172,7 +172,7 @@ names(files) = sapply(files, function(x){
   gsub("-novel-ready.counts", "", basename(x))
 })
 
-obj_mirdeep <- IsomirDataSeqFromFiles(files = files, design = design , header = T)
+obj_mirdeep <- IsomirDataSeqFromFiles(files = files[ronames(design)], design = design , header = T)
 ```
 
 
@@ -453,14 +453,19 @@ print_out = function(dss, rlog=NULL, res=NULL, prefix="data_"){
   cat("\n\n### MA plot plot\n\n")
   DESeq2::plotMA(res)
   
-  sign = row.names(out_df)[out_df$padj<0.05 & !is.na(out_df$padj) & abs(out_df$log2FoldChange) > 0.5]
+  sign = row.names(out_df)[out_df$padj<0.001 & !is.na(out_df$padj) ]
   
   cat("\n\n### Heatmap most significand(", length(sign), "), padj<0.05 and log2FC > 0.5\n")
   if (length(sign)<2){
     cat("Too few genes to plot.")
   }else{
-    pheatmap(rlogmat[sign, ], show_rownames = F, clustering_distance_cols = "correlation", clustering_method = "ward.D2")
-    mds(rlogmat[sign,], condition = colData(dss)$condition)
+    pheatmap(rlogmat[sign, ], show_rownames = F,
+             clustering_distance_cols = "correlation",
+             clustering_method = "ward.D2", 
+             annotation_col =  data.frame(colData(dss)))
+    
+    print(mds(rlogmat[sign,], condition = colData(dss)$condition))
+    
   }
   cat("\n\n###Clustering miRNAs by expression pattern:\n")
   
@@ -507,13 +512,13 @@ dss = DESeqDataSetFromMatrix(countData = counts[rowSums(counts>0)>3,],
                              design = ~ condition)
 dss = DESeq(dss, reduced = ~ 1, test = "LRT")
 
-print_out(dss, prefix="mirna")
+print_out(dss, prefix="mirna_")
 
 ```
 
 
 ```{r DESeq-confirmation, eval=FALSE}
-DESeq2::plotCounts(dds, put_gene_name_here)
+DESeq2::plotCounts(dss, "mmu-let-7a-5p", "condition" )
 
 ```
 
@@ -526,7 +531,7 @@ dss_mirdeep2 = DESeqDataSetFromMatrix(countData = counts[rowSums(counts>0)>3,],
                              design = ~ condition)
 dss_mirdeep2 = DESeq(dss_mirdeep2, reduced = ~ 1, test = "LRT")
 
-print_out(dss_mirdeep2)
+print_out(dss_mirdeep2, prefix="novel_")
 
 ```
 
@@ -540,7 +545,7 @@ dss_iso = DESeqDataSetFromMatrix(countData = counts_iso[rowSums(counts_iso>0)>3,
                              design = ~ condition)
 dss_iso = DESeq(dss_iso, reduced = ~ 1, test = "LRT")
 
-print_out(dss_iso)
+print_out(dss_iso, prefix="isomirna_")
 
 ```
 
@@ -559,7 +564,7 @@ dss_clus = DESeqDataSetFromMatrix(countData = clus_ma[rowSums(clus_ma>0)>3,],
                                  design = ~ condition)
 dss_clus = DESeq(dss_clus, reduced = ~ 1, test = "LRT")
 
-print_out(dss_clus)
+print_out(dss_clus, prefix="clus_")
 
 ```
 
