@@ -1,0 +1,350 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+Report last updated `r date()`.
+
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",echo=FALSE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+#render_2_drop("srna-summary.Rmd", "vishal_kidney/FA_small_rna")
+```
+
+```{r setup}
+
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(tidyr)
+library(isomiRs)
+library(pheatmap)
+library(cluster)
+library(myRfunctions)
+
+root_path = "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final"
+root_file = file.path(root_path, "files")
+dir.create(root_file, showWarnings = FALSE)
+
+```
+
+Only considered genes and miRNAs with FDR < 5%. Targets from targetscan
+were filtered using total context score value of -0.1 or lower. 
+This value correlates with the effect on the gene expression. 
+In this case will be at leas 1% of effect. As well aggregate Pct should be 
+higher of 0.1 that is the probability to be a real miRNA binding site
+for the gene.
+
+```{r load-files}
+ma_rda = "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/files/ma.rda"
+mirna_results = "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/files/mirna_log_matrix.txt"
+mirna_design = "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/2016-02-08_mirna_bio/report/summary_re.csv"
+mirna_de = "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/files/mirna_de.tsv"
+
+mrna_results = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/files/rlog_counts.tsv"
+mrna_design = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/project-summary.csv"
+mrna_de = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/files/fa_model_simple.tsv"
+
+mirna_ma = as.matrix(read.table(mirna_results, header=T, row.names=1))
+mrna_ma = as.matrix(read.table(mrna_results, header=T, row.names=1))
+mrna_ma=mrna_ma[rowSums(mrna_ma)>0,]
+
+mirna_des = read.csv(mirna_design, row.names="sample_id")
+mrna_des = read.csv(mrna_design, row.names="descritiption")
+
+mirna_sign = read.table(mirna_de, header=T, sep="\t", row.names = 1)
+mrna_sign = read.table(mrna_de, header = T, sep = "\t", row.names = 1)
+
+mirna_keep = row.names(mirna_sign)[mirna_sign$padj<0.05]
+write.table(data.frame(m=mirna_keep), "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/files/mirna_diff.txt",row.names=F, col.names=F, quote=F)
+mrna_keep = row.names(mrna_sign)[mrna_sign$padj<0.05 & abs(mrna_sign$log2FoldChange)]
+mrna_keep = intersect(mrna_keep, row.names(mrna_ma)) #' fix this
+
+if ( !file.exists(ma_rda) ){
+    pairs=read.table("~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/files/matrix.tsv") %>% filter(V3< -.1)
+    map = data.frame(tx=unique(pairs$V1))
+    map_gene = annotate_df(map, "tx", 'mmusculus_gene_ensembl', "ensembl_transcript_id", "ensembl_gene_id")
+    idx = match(pairs$V1, map_gene$tx)
+    pairs$gene = map_gene[idx,2]
+    pairs$value = 1
+    ma = pairs %>% dplyr::select(gene,V2,value) %>%
+        dplyr::distinct() %>% spread(V2,value, fill=0) %>% filter(!is.na(gene))
+    row.names(ma) = ma$gene
+    save(ma, file=ma_rda)
+}else{
+    load(ma_rda)    
+}
+
+```
+
+```{r norm-exp}
+# get median expresion by group
+.median_by_group = function(e, g){
+  sapply(levels(g), function(i){
+    idx = which(g == i)
+    mean(e[idx], na.rm=TRUE)
+  })
+}
+
+mirna_norm = t(apply(mirna_ma, 1, function(x, g){
+  .median_by_group(x, g)
+}, mirna_des$group))
+
+mrna_norm = t(apply(mrna_ma, 1, function(x, g){
+  .median_by_group(x, g)
+}, mrna_des$group))
+
+```
+
+# Interaction between genss and mirna over GO terms
+
+I will do GO enrichment analysis using only the genes that are de-regulated
+and are targeted by any miRNA (as well de-regulated) using targetscan database.
+
+The universe for the analysis is all genes expressed in these samples. So,
+results from GO enrichment will mean that these genes are over represented over
+the expression profile of these samples.
+
+The I will detect common patterns for genes in each term, and plot the gene
+and miRNA expression in each case.
+
+```{r annotation-preparation}
+library(clusterProfiler)
+library(KEGG.db)
+library(org.Mm.eg.db)
+library(reshape)
+library(cluster)
+
+# GO enrichment with clusterprofile with total mrna expression
+# as universe, then # number of mirna targeting that network.
+mrna_target = intersect(rownames(ma), mrna_keep)
+mirna_target = intersect(colnames(ma), mirna_keep)
+cor = cor(t(mirna_norm[mirna_target, -5]), t(mrna_norm[mrna_target,]), method="kendall")
+
+#get only cor values when gene is a target
+cor[cor > -.6] = 0
+cor_target = cor
+cor_target[t(ma[mrna_target,mirna_target])==0] = 0 
+cor_target = t(cor_target)
+# get genes that only get a negative correlation
+keep = apply(cor_target, 1, min) < -.6
+is_target_and_de = rownames(cor_target)[keep]
+
+
+uni = convertIDs(rownames(mrna_ma)[rowSums(mrna_ma>0)>3],
+                 from = "ENSEMBL", "ENTREZID",db = org.Mm.eg.db )
+genes = convertIDs(is_target_and_de,
+                 from = "ENSEMBL", "ENTREZID",db = org.Mm.eg.db )
+
+# ego = enrichKEGG(genes, "mmu", use_internal_data = TRUE,universe = uni[!is.na(uni)])
+ego = enrichGO(genes, "org.Mm.eg.db", ont = "BP", universe = uni[!is.na(uni)])
+# ego = enrichGO(genes, "org.Mm.eg.db", ont = "BP")
+
+tab = ego@result %>% filter(Count<30)
+ego_s = ego
+ego_s@result = tab
+ego_s = clusterProfiler::simplify(ego_s)
+res =summary(ego_s)
+
+net = do.call(rbind, apply(res, 1, function(x){
+  .genes = unlist(strsplit(x[8],split = "/"))
+  .genes = convertIDs(.genes,
+             "ENTREZID", "ENSEMBL", db = org.Mm.eg.db )
+  .genes = .genes[!is.na(.genes)]
+  .idx = which(colSums(cor_target[.genes,] < -.6) > 0)
+  if (length(.idx) > 0)
+    .tab = data.frame(melt(as.matrix(cor_target[.genes,.idx]))) %>%
+    filter(value < -.6) %>%
+    dplyr::select(gene=X1,mir=X2) %>%
+    mutate(goid=x[1],go=x[2])
+    return(.tab)
+}))
+
+res_by_mir = net %>% group_by(mir, go) %>% summarise() %>%
+  group_by(go) %>% summarise(nmir=n())
+
+res[match(res$Description, res_by_mir$go), "nmir"] = res_by_mir$nmir
+
+res %>% dplyr::select(Description, Count, nmir)
+
+
+scale = function(ma){
+    t(apply(ma, 1, function(e){
+    (e - min(e))/(max(e) - min(e))
+    }))
+}
+
+cluster_exp = function(ma){
+    m = (1-cor(t(ma), method = "kendall"))
+    m[m<0] = 0
+    d = as.dist(m^2)
+    c = diana(d, diss = TRUE, stand = FALSE)
+    
+    cutree(as.hclust(c), h = c$dc)
+}
+```
+
+```{r annotatio-run}
+final_df = data.frame()
+for (x in res_by_mir$go){
+    cat("## GO term:", x)
+    .m = as.character(unique(net[net$go==x, "mir"]))
+    .g = as.character(unique(net[net$go==x, "gene"]))
+    cat("### MDS for each expression profile")
+    p1 = mds(mirna_ma[.m,], condition = mirna_des$group) +
+        ggtitle(paste(x, "in mirs"))
+    p2 = mds(mrna_ma[.g,], condition = mrna_des$group) +
+        ggtitle(paste(x, "in genes"))
+    # print(grid.arrange(p1,p2))
+    
+    ma_g = scale(as.data.frame(mrna_norm)[.g,])
+    ma_m = scale(as.data.frame(mirna_norm)[.m,-5])
+    .groups = cluster_exp(mrna_norm[.g,])
+    .df = melt(scale(rbind(mrna_norm[.g,], mirna_norm[.m,-5]))) %>%
+        mutate(X2=factor(X2, levels=c("control", "day1", "day2", "day3", "day7", "day14")))
+    cat("### Correlation profile for different clusters")
+    for (c in unique(.groups)){
+        .in_g = names(.groups[.groups==c])
+        
+        .reg = intersect(net[net$gene %in% .in_g, "mir"], .m)
+        .net = .df %>% filter(X1 %in% c(.in_g, .reg)) %>% mutate(type="gene")
+        .net[grepl("mmu", .net$X1), "type"] = "miR"
+         out = data.frame(gene = paste(convertIDs(.in_g, "ENSEMBL", "SYMBOL", 
+                                           db = org.Mm.eg.db ),
+                                collapse=","),
+                   mir = paste(.reg, collapse=","),
+                   group = c,
+                   term = x)
+        final_df = rbind(final_df, out)
+        if ( length(.in_g) < 4)
+            next
+        p = ggplot(.net, aes(x=X2, y=value, colour=type, group=X1)) + 
+            geom_line(size=0.2) +
+            stat_smooth(aes(x=X2, y=value, group=type),se=F,method = "lm",formula = y~poly(x,3)) +
+            ggtitle(paste("Group:", x, "(", length(.in_g), " genes )")) +
+            theme_bw(base_size = 11) +
+            theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+            xlab("") + ylab("scaled normalized expression.")
+        print(p)
+    }
+}
+
+# do.call(grid.arrange, pp)
+# save_file(final_df,"mir_gene_cluster.tsv",root_file)
+```
+
+```{r null, echo=F, eval=F}
+# kegg annotation
+# change to the specie you want
+library(goseq) #For getting KEGG pathways easily
+library(KEGG.db)
+
+kegg = getgo(row.names(mrna_ma), fetch.cats = "KEGG", genome = "mm10", id = "ensGene")
+kegg2ens = Biobase::reverseSplit(kegg)
+kname = mget(names(kegg2ens), env = KEGGPATHID2NAME)
+names(kegg2ens) = kname
+
+# mirPath
+cor = cor(t(mirna_norm[, -5]), t(mrna_norm), method="kendall")
+
+target = lapply(colnames(ma)[2:ncol(ma)], function(x){
+  ma$gene[ma[,x]==1]
+})
+names(target) = colnames(ma)[2:ncol(ma)]
+
+Zmi = mirna_sign$stat ; names(Zmi) = row.names(mirna_sign)
+Zg = mrna_sign$stat; names(Zg) = row.names(mrna_sign)
+
+output = mirPath(DEmirs = mirna_keep, Zmi = Zmi, Zg = Zg,
+                 cor = cor,
+                 targets = target, pathways = kegg2ens,
+                 fdr="bonferroni")
+rownames(output) = output$path
+output$true = 0
+output[names(others),"true"] = others
+output$score = output$genes/output$weight
+resEnrichment = output
+
+# network
+library(igraph)
+g = graph.data.frame(pairs[,c("V2", "gene")] %>% filter(gene %in% mrna_keep), directed = F)
+
+# plot.igraph(g, vertex.color=V(g)$color, vertex.label=NA)
+ebc <- edge.betweenness.community(g, directed=T)
+dist = table(ebc$membership)
+big = names(dist[dist>3])
+del = ebc$names[!(ebc$membership %in% big)]
+g = delete.vertices(g, del)
+V(g)$color[V(g)$name %in%  mirna_keep]<-"grey80"
+V(g)$color[V(g)$name %in%  mrna_keep]<-"orange"
+g
+# plot.igraph(g, vertex.color=V(g)$color, vertex.label=NA)
+
+# custom
+sum(colSums(cor[mirna_keep,mrna_keep]< -.7) > 1)
+
+#' go through all kegg names
+enrich = lapply(names(kegg2ens)[3], function(x){
+   print(x)
+  .genes = kegg2ens[[x]]
+  if (length(.genes)<3)
+    return(NULL)
+  .is_regulator = rowSums(cor[mirna_keep,.genes]< -.7) > 1
+  .is_target = colSums(cor[mirna_keep,.genes]< -.7) > 1
+  .ts = ma[intersect(.genes, rownames(ma)), ]
+  if (nrow(.ts)==0)
+    return(NULL)
+  .ts_target = names(rowSums(.ts[,intersect(mirna_keep, colnames(.ts))] > 0))
+  .total_target = intersect(.genes[.is_target], .ts_target)
+  # .total_mirs = rownames(cor)[.is_regulator]
+  # .de_reg_mirna = intersect(.total_mir, mirna_keep)
+  .de_target_gene = intersect(.total_target, mrna_keep)
+  .de_here = intersect(.genes, mrna_keep)
+  phyper(length(.de_target_gene),
+         length(.total_target),
+         length(.genes) - length(.total_target),
+         length(.de_here)
+  )
+})
+
+
+#
+library(STATegRa)
+
+mirna_b1 <- createOmicsExpressionSet(Data=as.matrix(mirna_ma[,row.names(mirna_de)]),
+                               pData=mirna_de[,"group",drop=FALSE],
+                               pDataDescr=c("classname"))
+
+mrna_b2 <- createOmicsExpressionSet(Data=as.matrix(mrna_ma[,row.names(mrna_de)]),
+                                     pData=mrna_de[,"group",drop=FALSE],
+                                     pDataDescr=c("classname"))
+
+
+cc <- selectCommonComps(X=mirna_ma, Y=mrna_ma, Rmax=3)
+cc$common
+```
+
