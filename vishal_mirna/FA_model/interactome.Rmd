@@ -101,24 +101,6 @@ if ( !file.exists(ma_rda) ){
 
 ```
 
-```{r norm-exp}
-# get median expresion by group
-.median_by_group = function(e, g){
-  sapply(levels(g), function(i){
-    idx = which(g == i)
-    mean(e[idx], na.rm=TRUE)
-  })
-}
-
-mirna_norm = t(apply(mirna_ma, 1, function(x, g){
-  .median_by_group(x, g)
-}, mirna_des$group))
-
-mrna_norm = t(apply(mrna_ma, 1, function(x, g){
-  .median_by_group(x, g)
-}, mrna_des$group))
-
-```
 
 # Interaction between genss and mirna over GO terms
 
@@ -139,121 +121,30 @@ library(org.Mm.eg.db)
 library(reshape)
 library(cluster)
 
-# GO enrichment with clusterprofile with total mrna expression
-# as universe, then # number of mirna targeting that network.
-mrna_target = intersect(rownames(ma), mrna_keep)
-mirna_target = intersect(colnames(ma), mirna_keep)
-cor = cor(t(mirna_norm[mirna_target, -5]), t(mrna_norm[mrna_target,]), method="kendall")
+mirna_clean = mirna_ma[,order(mirna_des$group)]
+gr = mirna_des$group[order(mirna_des$group)]
+mirna_clean = mirna_clean[,gr!="Day28"]
+mirna_g = factor( gsub("day0", "control", 
+                       sort(
+                           as.character(tolower(gr[gr!="Day28"]))
+                           ) ),
+                 levels=c("control", "day1", "day2", "day3", "day7", "day14"))
 
-#get only cor values when gene is a target
-cor[cor > -.6] = 0
-cor_target = cor
-cor_target[t(ma[mrna_target,mirna_target])==0] = 0 
-cor_target = t(cor_target)
-# get genes that only get a negative correlation
-keep = apply(cor_target, 1, min) < -.6
-is_target_and_de = rownames(cor_target)[keep]
+mrna_clean = mrna_ma[,order(mrna_des$group)]
+gr = mrna_des$group[order(mrna_des$group)]
 
-
-uni = convertIDs(rownames(mrna_ma)[rowSums(mrna_ma>0)>3],
-                 from = "ENSEMBL", "ENTREZID",db = org.Mm.eg.db )
-genes = convertIDs(is_target_and_de,
-                 from = "ENSEMBL", "ENTREZID",db = org.Mm.eg.db )
-
-# ego = enrichKEGG(genes, "mmu", use_internal_data = TRUE,universe = uni[!is.na(uni)])
-ego = enrichGO(genes, "org.Mm.eg.db", ont = "BP", universe = uni[!is.na(uni)])
-# ego = enrichGO(genes, "org.Mm.eg.db", ont = "BP")
-
-tab = ego@result %>% filter(Count<30)
-ego_s = ego
-ego_s@result = tab
-ego_s = clusterProfiler::simplify(ego_s)
-res =summary(ego_s)
-
-net = do.call(rbind, apply(res, 1, function(x){
-  .genes = unlist(strsplit(x[8],split = "/"))
-  .genes = convertIDs(.genes,
-             "ENTREZID", "ENSEMBL", db = org.Mm.eg.db )
-  .genes = .genes[!is.na(.genes)]
-  .idx = which(colSums(cor_target[.genes,] < -.6) > 0)
-  if (length(.idx) > 0)
-    .tab = data.frame(melt(as.matrix(cor_target[.genes,.idx]))) %>%
-    filter(value < -.6) %>%
-    dplyr::select(gene=X1,mir=X2) %>%
-    mutate(goid=x[1],go=x[2])
-    return(.tab)
-}))
-
-res_by_mir = net %>% group_by(mir, go) %>% summarise() %>%
-  group_by(go) %>% summarise(nmir=n())
-
-res[match(res$Description, res_by_mir$go), "nmir"] = res_by_mir$nmir
-
-res %>% dplyr::select(Description, Count, nmir)
+data = sync_terms_with_mirs(mirna_clean, mrna_clean, as.matrix(ma), 
+                     mrna_keep, mirna_keep, mirna_g, org.Mm.eg.db)
 
 
-scale = function(ma){
-    t(apply(ma, 1, function(e){
-    (e - min(e))/(max(e) - min(e))
-    }))
-}
+data$summary %>% dplyr::select(Description, Count, nmir)
 
-cluster_exp = function(ma){
-    m = (1-cor(t(ma), method = "kendall"))
-    m[m<0] = 0
-    d = as.dist(m^2)
-    c = diana(d, diss = TRUE, stand = FALSE)
-    
-    cutree(as.hclust(c), h = c$dc)
-}
+
 ```
 
-```{r annotatio-run}
-final_df = data.frame()
-for (x in res_by_mir$go){
-    cat("## GO term:", x)
-    .m = as.character(unique(net[net$go==x, "mir"]))
-    .g = as.character(unique(net[net$go==x, "gene"]))
-    cat("### MDS for each expression profile")
-    p1 = mds(mirna_ma[.m,], condition = mirna_des$group) +
-        ggtitle(paste(x, "in mirs"))
-    p2 = mds(mrna_ma[.g,], condition = mrna_des$group) +
-        ggtitle(paste(x, "in genes"))
-    # print(grid.arrange(p1,p2))
-    
-    ma_g = scale(as.data.frame(mrna_norm)[.g,])
-    ma_m = scale(as.data.frame(mirna_norm)[.m,-5])
-    .groups = cluster_exp(mrna_norm[.g,])
-    .df = melt(scale(rbind(mrna_norm[.g,], mirna_norm[.m,-5]))) %>%
-        mutate(X2=factor(X2, levels=c("control", "day1", "day2", "day3", "day7", "day14")))
-    cat("### Correlation profile for different clusters")
-    for (c in unique(.groups)){
-        .in_g = names(.groups[.groups==c])
-        
-        .reg = intersect(net[net$gene %in% .in_g, "mir"], .m)
-        .net = .df %>% filter(X1 %in% c(.in_g, .reg)) %>% mutate(type="gene")
-        .net[grepl("mmu", .net$X1), "type"] = "miR"
-         out = data.frame(gene = paste(convertIDs(.in_g, "ENSEMBL", "SYMBOL", 
-                                           db = org.Mm.eg.db ),
-                                collapse=","),
-                   mir = paste(.reg, collapse=","),
-                   group = c,
-                   term = x)
-        final_df = rbind(final_df, out)
-        if ( length(.in_g) < 4)
-            next
-        p = ggplot(.net, aes(x=X2, y=value, colour=type, group=X1)) + 
-            geom_line(size=0.2) +
-            stat_smooth(aes(x=X2, y=value, group=type),se=F,method = "lm",formula = y~poly(x,3)) +
-            ggtitle(paste("Group:", x, "(", length(.in_g), " genes )")) +
-            theme_bw(base_size = 11) +
-            theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-            xlab("") + ylab("scaled normalized expression.")
-        print(p)
-    }
-}
+```{r annotation-run}
+final_df = viz_mirna_gene_enrichment(data, mirna_clean, mrna_clean, mirna_g, org.Mm.eg.db)
 
-# do.call(grid.arrange, pp)
 # save_file(final_df,"mir_gene_cluster.tsv",root_file)
 ```
 
