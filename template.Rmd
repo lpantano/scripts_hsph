@@ -11,7 +11,7 @@ output:
 ---
 
 ```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
-project=""
+project="RNA-seq"
 labPI=""
 lablocation=""
 analystname="Lorena Pantano"
@@ -21,6 +21,9 @@ analystemail="lpantano@hsph.harvard.edu"
 
 
 ```{r knitrsetup, echo=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+library(myRfunctions)
 knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
                       cache=TRUE, highlight=TRUE, autodep=TRUE, 
                       warning=FALSE, error=FALSE,
@@ -31,9 +34,7 @@ options(bitmapType = 'cairo')
 
 
 ```{r render,echo=FALSE,eval=FALSE}
-library(knitrBootstrap)
-library(rmarkdown)
-source("~/repos/myRfunctions/transactions.R")
+
 # render_2_drop("feinberg-report.Rmd", "dropbox_folder")
 ```
 
@@ -58,8 +59,7 @@ The sections below provide code to reproduce the included results and plots.
 ```{r functions}
 library(ggplot2)
 library(gplots)
-devtools::load_all("~/repos/CHBUtils")
-source("~/repos/myRfunctions/transactions.R")
+library(CHBUtils)
 ```
 
 ```{r compress, echo=F}
