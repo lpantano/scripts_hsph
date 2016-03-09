@@ -143,7 +143,7 @@ data$summary %>% dplyr::select(Description, Count, nmir)
 ```
 
 ```{r annotation-run}
-final_df = viz_mirna_gene_enrichment(data, mirna_clean, mrna_clean, mirna_g, org.Mm.eg.db)
+viz_info = viz_mirna_gene_enrichment(data, mirna_clean, mrna_clean, mirna_g, org.Mm.eg.db)
 
 # save_file(final_df,"mir_gene_cluster.tsv",root_file)
 ```
