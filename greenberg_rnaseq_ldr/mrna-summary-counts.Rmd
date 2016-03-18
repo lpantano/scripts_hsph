@@ -1,0 +1,340 @@
+---
+title: "RNA-seq analysis."
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="LDR - RNAseq - counts version "
+labPI="Greenberg"
+lablocation="Longwood"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+```
+
+RNA-seq analysis for`r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",echo=FALSE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r project-options, echo=FALSE}
+library(myRfunctions)
+path_results = "~/orch/scratch/greenberg_rnaseq/ldr_model/final/files_counts"
+dir.create(path_results, showWarnings = FALSE)
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+#render_2_drop("mrna-summary-counts.Rmd", "greenberg_ldr/ldr-counts")
+
+```
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(DESeq2)
+library(tximport)
+library(logging)
+library(gridExtra)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(cluster)
+library(dplyr)
+
+# library(DT)
+
+basicConfig()
+project_summary = "~/orch/scratch/greenberg_rnaseq/ldr_model/final/2016-02-29_ldr_model/project-summary.csv"
+counts_file = "~/orch/scratch/greenberg_rnaseq/ldr_model/final/2016-02-29_ldr_model/combined.counts"
+tx2genes_file = "~/orch/scratch/greenberg_rnaseq/ldr_model/final/2016-02-29_ldr_model/tx2gene.csv"
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+
+summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
+summarydata$Name = rownames(summarydata)
+summarydata = summarydata[order(summarydata$Name),]
+
+loginfo("Using gene counts calculated from featureCounts.")
+counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE)
+counts = counts[,rownames(summarydata)]
+# this is a list of all non user-supplied metadata columns that could appear
+known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.quality",
+    "Fragment.Length.Mean", "Intronic.Rate", "Intergenic.Rate",
+    "Mapping.Rate", "Quality.format", "Duplication.Rate.of.Mapped", "Mapped",
+    "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
+    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "complexity", "X5.3.bias", "Duplicates.pct", "Duplicates", "Mapped.reads",
+    "Median.insert.size", "Mapped.reads.pct", "Total.reads",
+    "avg_coverage_per_region", "Mapped.Reads")
+metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
+rownames(metadata) = summarydata$Name
+metadata$group = relevel(metadata$group, "ctl")
+```
+
+```{r heatmap-function}
+get_heatmap_fn = function(summarydata) {
+    # return the pheatmap function with or without metadata
+    if(ncol(metadata) == 0) {
+       return(pheatmap)
+    }
+    else {
+    # rownames(metadata) = summarydata$Name
+    heatmap_fn = function(data, ...) {
+        pheatmap(data, annotation=metadata, clustering_method = "ward.D2", clustering_distance_cols = "correlation", ...)
+    }
+    return(heatmap_fn)
+}}
+heatmap_fn = get_heatmap_fn(summarydata)
+```
+
+
+# Differential expression
+
+```{r deseq2-handler}
+handle_deseq2 = function(dds, summarydata, column, all_combs=NULL) {
+  if (is.null(all_combs)){
+    all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  }
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="_vs_")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+
+plot_genes = function(dds, gene){
+  DESeq2::plotCounts(dds, gene, intgroup = "group")
+}
+
+
+```
+
+```{r de-functions}
+get_groups <- function(d, comp, condition)
+{
+  g <- unlist(strsplit(comp,"_"))
+  g1 <- d$Name[d[, (names(d)==condition)]==g[1]]
+  g2 <- d$Name[d[, (names(d)==condition)]==g[3]]
+  list(g1,g2)
+}
+
+plot_top = function(dds, res, n=9, col="group", shape="time"){
+    metadata = data.frame(colData(dds))
+    pp = lapply(1:n, function(i){
+        gene=row.names(res[order(res$padj),])[i]
+        dd = plotCounts(dds, gene,
+                        intgroup=col, returnData = T, transform = T)
+        dd$group = metadata[row.names(dd), shape]
+        if (!is.factor(dd$group))
+            dd$group = Hmisc::cut2(dd$group, g=3)
+        dd$col = metadata[row.names(dd), col]
+        dd$time = metadata[row.names(dd), "time"]
+        p=ggplot(dd, aes(x=time,y=count,color=col,shape=group, group=group)) +
+            geom_jitter(size=1) +
+            stat_smooth(aes(x=time, y=count, group=col),size=0.5, fill="grey80") +
+            theme_bw(base_size = 7) +
+            ggtitle(gene)
+        p
+    })
+    n = ceiling(length(pp))
+    do.call(grid.arrange,pp)
+    # marrangeGrob(pp, ncol=2, nrow=n)
+}
+
+
+print_out = function(res, rlog, metadata, prefix, FDR = 0.01, FC=2){
+  # cat(paste("## Comparison: ", prefix))
+  out_df = as.data.frame(res)
+  out_df = out_df[!is.na(out_df$padj),]
+  out_df = out_df[order(out_df$padj),]
+  out_df$symbol = convertIDs(rownames(out_df), 
+                             "ENSEMBL", "SYMBOL", 
+                             org.Mm.eg.db, "useFirst")
+  out_df$description = convertIDs(rownames(out_df),
+                                  "ENSEMBL", "GENENAME",
+                                  org.Mm.eg.db, "useFirst")
+  
+  cat("\n",paste(capture.output(summary(res))[1:8], collapse = "<br>"),"\n")
+
+  cat("\n\n### MA plot plot\n\n")
+  DESeq2::plotMA(res)
+  title(paste("MA plot for contrast", prefix))
+  
+  cat("\n\n### Volcano plot\n\n")
+  stats = as.data.frame(res[,c(2,6)])
+  volcano_density_plot(stats, title=prefix, lfc.cutoff=FC, pval.cutoff = FDR)
+
+  cat("\n\n### Heatmap most significand, padj<",FDR,"and log2FC > ",FC,"\n")
+  sign = row.names(out_df)[out_df$padj<FDR & abs(out_df$log2FoldChange) > FC]
+
+  if ( length(sign)<2 ){
+    cat("Too few genes to plot.")
+  }else{
+    pheatmap(rlog[sign, ], show_rownames = F, clustering_distance_rows = "correlation", clustering_method = "ward.D2", annotation_col = metadata)
+    print(mds(rlog[sign,],condition = metadata$group))
+  }
+  cat("\n")
+  
+  cat("\n\n### Top DE genes\n\n")
+  print(kable(head(out_df, 10)))
+  fn = paste(prefix, ".tsv", sep="")
+  save_file(out_df, fn, path_results)
+  cat("\n\nDifferential expression file at: ", fn)
+  cat("\n\n")
+
+  cat("\n\n### GO ontology of DE genes (logFC>",FC," and FDR < ",FDR,"):\n\n")
+  .res = out_df
+  .idx = .res$padj<FDR & abs(.res$log2FoldChange) > FC
+  .idx[is.na(.idx)] = FALSE
+  .de = out_df$symbol[.idx]
+  .accnum = convertIDs(.de, 
+                       "SYMBOL", "ENTREZID", 
+                       org.Mm.eg.db, "useFirst")
+  if (sum(.idx) > 0){
+      cat("doing GOenrich with ",sum(.idx), "genes.\n")
+      ego <- enrichGO(gene = .accnum[!is.na(.accnum)], 
+                      OrgDb = "org.Mm.eg.db", ont = "BP", 
+                      pAdjustMethod = "BH",
+                      pvalueCutoff = 0.01, qvalueCutoff = 0.05, 
+                      readable = TRUE)
+      
+      if (!is.null(ego)){
+          if (nrow(ego@result) > 0){
+              fn = paste0(prefix, "_goenrich.tsv")
+              save_file(ego@result, fn, path_results)
+              print(print_enrichGO(ego@result, 30))
+              cat("\n\n")
+          }
+      }
+  }
+  cat("\n\n")
+}
+
+```
+
+```{r clustering-fig}
+
+plot_cluster  = function(norm_sign, g_in_c, groups, title) {
+    # g_in_c = names(groups[groups==1])
+    ma = as.data.frame(norm_sign)[g_in_c,]
+    ma_long = suppressMessages(melt(cbind(gene=row.names(ma), ma), variable_name = "sample"))
+    ma_long$group = groups[ma_long$sample]
+    ma_sum = ma_long %>% group_by(gene, group) %>% summarise(average=mean(value)) %>%
+        ungroup()
+    
+    ma_group = ma_sum %>% group_by(group) %>% summarise(average=median(average)) %>% ungroup()
+    
+    ggplot(ma_sum, aes(x=group, y=average)) + 
+        geom_boxplot() + 
+        stat_smooth(data=ma_group, aes(x=group, y=average, group=1),se=F,method = "lm",formula = y~poly(x,3)) +
+        ggtitle(paste("Group:", title, "(", length(g_in_c), " genes )")) +
+        theme_bw(base_size = 11) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1))
+}
+
+
+make_patterns = function(ma, metadata, minc=15, col="group"){
+
+    m = (1-cor(t(ma), method = "kendall"))
+    m[m<0] = 0
+    d = as.dist(m^2)
+    c = diana(d, diss = TRUE, stand = FALSE)
+    
+    groups = cutree(as.hclust(c), h = c$dc)
+    
+    norm_sign = t(apply(ma, 1, function(e){
+        m = sapply(levels(metadata[,col]), function(i){
+            idx = which(metadata[,col] == i)
+            mean(e[idx], na.rm=TRUE)
+        })
+        (e - min(m))/(max(m) - min(m))
+    }))
+    to_plot = names(table(groups))[table(groups) > minc]
+    plots = lapply(to_plot, function(x){
+        plot_cluster(norm_sign, as.character(names(groups[groups==x])), metadata[,col], x)
+    })
+    
+    do.call(grid.arrange, plots)
+}
+```
+
+# ctl vs CDR over time
+
+This comparison will give any gene that change over time but
+in different way between the two groups.
+
+```{r deseq2-ctl-CDR, results='asis'}
+samples = ( grepl("ctl", summarydata$Name) | 
+    grepl("CDR", summarydata$Name) ) &
+    grepl("P", summarydata$Name)
+samples = summarydata$Name[samples]
+counts_keep = counts[,samples]
+metadata_keep = metadata[samples,]
+dds = DESeqDataSetFromMatrix(counts_keep[rowSums(counts_keep>1)>3,],
+    colData=metadata_keep, design = ~ time + group + time:group)
+dds = DESeq(dds, test="LRT", reduced = ~ time + group)
+```
+
+## Dispersion plot and MDS clustering
+
+```{r ctl-CDR, results='asis'}
+plotDispEsts(dds)
+all_results = list()
+all_results[["ctl_CDR"]] = results(dds)
+rlog = rlog(dds)
+mds(assay(rlog), condition = metadata_keep$group) + ggtitle("MDS of these samples")
+```
+
+## Results
+
+```{r print-ctg-CDR, results='asis'}
+print_out(all_results[["ctl_CDR"]], assay(rlog), metadata_keep, "ctl_CDR", FDR=0.1, FC=1)
+cat("\n\n### top DE genes: \n")
+plot_top(dds, all_results[["ctl_CDR"]], 8, shape="time")
+```
+
+
+#R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+name_res = compress_results(path_results,prefix = "ldr_results_counts")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```

@@ -14,6 +14,9 @@ counts = counts[, order(colnames(counts))]
 colnames(counts) = gsub(".counts", "", colnames(counts))
 counts <- counts[rowSums(counts>0)>3,]
 
+
+
+
 library(DESeq2)
 library(reshape)
 library(ggplot2)
@@ -66,14 +69,23 @@ corrplot(cor_mat, p.mat = pval_mat, insig = "n",
 remove = which(summarydata$Name %in%
                  c("24_AGCGATAG-ATAGAGGC", "38_TCCGGAGA-GGCTCTGA", "56_TAATGCGC-AGGCGAAG")
                )
+
+row.names(summarydata) = paste0(1:nrow(summarydata),"_",
+                                summarydata$treatment,"_",summarydata$time,
+                                   "_", summarydata$concentration)
+names(counts) = row.names(summarydata)
+
+# change gene names and column names. commented since needed to do once only.
+# counts_exp = cbind(gene=row.names(counts), counts)
+# map_gene = annotate_df(counts_exp, "gene", 'hsapiens_gene_ensembl', "ensembl_gene_id", "external_gene_name")
+# map_gene$external_gene_name[is.na(map_gene$external_gene_name)] = map_gene$gene
+# map_gene$external_gene_name = paste0(map_gene$external_gene_name,"_",1:nrow(map_gene))
+# counts_exp = map_gene[ ,c( ncol(counts_exp)+1, 2:ncol(counts_exp) ) ]
+# write.table(counts_exp, "combined.counts.symbol", row.names = F, quote=F, sep="\t")
+counts_exp = read.table("combined.counts.symbol", row.names=1, sep="\t", header = T, check.names = F)
+
 metadata = summarydata[-remove,]
-counts_clean = counts[,-remove]
-
-row.names(metadata) = paste0(1:nrow(metadata),"_",
-                             metadata$treatment,"_",metadata$time,
-                                   "_", metadata$concentration)
-names(counts_clean) = row.names(metadata)
-
+counts_clean = counts_exp[,row.names(metadata)]
 
 ### Differential expression by time only for DMSO
 samples = row.names(metadata[metadata$treatment=="DMSO",])

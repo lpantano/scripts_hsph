@@ -1,21 +1,33 @@
 ---
 output:
-  knitrBootstrap::bootstrap_document:
-    theme: readable
-    highlight: zenburn
-    theme.chooser: TRUE
-    highlight.chooser: TRUE
   html_document:
     toc: true
+    toc_depth: 2
+    theme: readable
     highlight: zenburn
 ---
 
 Report last updated `r date()`.
 
+## Overview
 
-```{r knitrsetup, echo=FALSE}
+The goal of this analysis is trying to put together GO terms,
+expression progiles, miRNA expression, 
+and gene expression from the same data. Several files are generated
+to dig into Go enrichment analysis, genes and miRNAs are 
+all together. The final figure intends to show the most populated
+GO terms and the most used miRNAs classified in different gene
+expression profiles.
+
+It was used data from [RNAseq report](https://dl.dropboxusercontent.com/u/20050186/hsph/vishal_kidney/FA_mrna/mrna-summary.html#differential-expression)
+and [miRNA report](https://dl.dropboxusercontent.com/u/20050186/hsph/vishal_kidney/FA_small_rna/srna-summary.html#Differential_expression)
+
+```{r knitrsetup, echo=FALSE, cache=FALSE}
 library(rmarkdown)
 library(knitr)
+library(myRfunctions)
+source("~/repos/isomiRs/R/targets.R")
+
 knitr::opts_chunk$set(dev="png",echo=FALSE,
                       highlight=TRUE, autodep=TRUE,
                       comment='', fig.cap='',
@@ -26,11 +38,10 @@ options(bitmapType = 'cairo')
 ```
 
 ```{r create-report, echo=FALSE, eval=FALSE}
-#render_2_drop("srna-summary.Rmd", "vishal_kidney/FA_small_rna")
+# render_2_drop("interactome.Rmd", "vishal_kidney/FA_small_rna")
 ```
 
 ```{r setup}
-
 library(ggplot2)
 library(reshape)
 library(DESeq2)
@@ -44,7 +55,6 @@ library(tidyr)
 library(isomiRs)
 library(pheatmap)
 library(cluster)
-library(myRfunctions)
 
 root_path = "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final"
 root_file = file.path(root_path, "files")
@@ -52,12 +62,24 @@ dir.create(root_file, showWarnings = FALSE)
 
 ```
 
+### Methods
+
 Only considered genes and miRNAs with FDR < 5%. Targets from targetscan
 were filtered using total context score value of -0.1 or lower. 
 This value correlates with the effect on the gene expression. 
 In this case will be at leas 1% of effect. As well aggregate Pct should be 
 higher of 0.1 that is the probability to be a real miRNA binding site
 for the gene.
+
+I will cluster in common expression profiles with diana.
+
+I will do GO enrichment analysis using only the genes that are de-regulated
+and are targeted by any miRNA (as well de-regulated) using targetscan database.
+
+The universe for the analysis is all genes expressed in these samples. So,
+results from GO enrichment will mean that these genes are over represented compared to
+the expression profile of these samples.
+
 
 ```{r load-files}
 ma_rda = "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/files/ma.rda"
@@ -101,19 +123,6 @@ if ( !file.exists(ma_rda) ){
 
 ```
 
-
-# Interaction between genss and mirna over GO terms
-
-I will do GO enrichment analysis using only the genes that are de-regulated
-and are targeted by any miRNA (as well de-regulated) using targetscan database.
-
-The universe for the analysis is all genes expressed in these samples. So,
-results from GO enrichment will mean that these genes are over represented over
-the expression profile of these samples.
-
-The I will detect common patterns for genes in each term, and plot the gene
-and miRNA expression in each case.
-
 ```{r annotation-preparation}
 library(clusterProfiler)
 library(KEGG.db)
@@ -136,15 +145,32 @@ gr = mrna_des$group[order(mrna_des$group)]
 data = sync_terms_with_mirs(mirna_clean, mrna_clean, as.matrix(ma), 
                      mrna_keep, mirna_keep, mirna_g, org.Mm.eg.db)
 
-
-data$summary %>% dplyr::select(Description, Count, nmir)
-
-
+save_file(data$network, "go_terms_network.tsv", root_file)
+save_file(data$summary, "go_term_summary.tsv", root_file)
+#data$summary %>% dplyr::select(Description, Count, nmir)
 ```
 
-```{r annotation-run}
-viz_info = viz_mirna_gene_enrichment(data, mirna_clean, mrna_clean, mirna_g, org.Mm.eg.db)
+Tables with full information at : `go_terms_network.tsva` and `go_term_summary.tsv`.
 
+### Summary of the GO enrichment classify by expression profiles.
+
+Only terms with profiles with more than 4 genes are shown. 
+
+Only miRNAs that appear more than 1 times are shown.
+
+* Top-left panel shows the terms and the number of genes in that term with a specific expression profile(x axis). Bigger points mean more genes (number indicate number of genes). 
+* Bottom panel shows the different expression profiles detected. Profiles are in the same order than the top-left x axis labels.
+* Top-right panel shows what miRNAs target what terms.
+
+```{r annotation-calc}
+viz_info = viz_mirna_gene_enrichment(data, mirna_clean, mrna_clean, mirna_g, org.Mm.eg.db)
+save_file(viz_info$table, "interaction.tsv", root_file)
+```
+
+Table with summarized information for the figure at `interaction.tsv`.
+
+```{r annotation-run, cache=FALSE, fig.width=15, fig.height=12}
+summary_targets(viz_info)
 # save_file(final_df,"mir_gene_cluster.tsv",root_file)
 ```
 
