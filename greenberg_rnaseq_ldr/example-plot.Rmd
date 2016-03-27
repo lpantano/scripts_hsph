@@ -4,34 +4,18 @@
 ```{r qc-setup}
 library(ggplot2)
 library(reshape)
-library(gplots)
-library(DESeq2)
-library(tximport)
-library(dplyr)
 
 # library(DT)
 
 basicConfig()
-project_summary = "/n/data1/cores/bcbio/greenberg_rnaseq/ldr_model/final/2016-02-29_ldr_model/project-summary.csv"
-tx2genes_file = "/n/data1/cores/bcbio/greenberg_rnaseq/greenberg_rnaseq/ldr_model/final/2016-02-29_ldr_model/tx2gene.csv"
+project_summary = "project-summary.csv"
+counts_files = "rlog_norm.tsv"
 
-cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
-"#0072B2", "#D55E00", "#CC79A7")
-
+counts = read.table(counts_files, header=T, row.names=1)
 summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
 summarydata$Name = rownames(summarydata)
 summarydata = summarydata[order(summarydata$Name),]
 
-sf_files = file.path("/n/data1/cores/bcbio/greenberg_rnaseq/greenberg_rnaseq/ldr_model/final",
-                       rownames(summarydata), "sailfish",
-                       rownames(summarydata), "quant.sf")
-  names(sf_files) = summarydata$Name
-  tx2gene = read.table(tx2genes_file, sep=",")
-  txi.salmon = tximport(sf_files, type="salmon", tx2gene = tx2gene,
-                        reader=readr::read_tsv,
-                        countsFromAbundance="lengthScaledTPM")
-  counts = txi.salmon$counts
-# this is a list of all non user-supplied metadata columns that could appear
 metadata = summarydata[, c("group", "time")]
 rownames(metadata) = summarydata$Name
 metadata$group = relevel(metadata$group, "ctl")
@@ -39,37 +23,17 @@ metadata$group = relevel(metadata$group, "ctl")
 
 
 ```{r de-functions}
-
-plot_top = function(dds, genes){
-    metadata = data.frame(colData(dds))
-    pp = lapply(genes, function(gene){
-        print(gene)
-        dd = plotCounts(dds, gene,
-                        intgroup="group", returnData = T, transform = T)
-        dd$group = metadata[row.names(dd), "group"]
-        dd$time = metadata[row.names(dd), "time"]
-        dd = dd %>% filter(group!="LDR")
-        p=ggplot(dd, aes(x=time,y=count,color=group,shape=group, group=group)) +
-            geom_jitter(size=1) +
-            stat_smooth(aes(x=time, y=count, group=group),size=0.5, fill="grey80") +
-            theme_bw(base_size = 7) +
-            ggtitle(gene)
-        p
-    })
-    n = ceiling(length(pp))
-    do.call(grid.arrange,pp)
-    # marrangeGrob(pp, ncol=2, nrow=n)
-}
-
-
-dds = DESeqDataSetFromTximport(txi.salmon,
-    colData=metadata, design = ~ group + time)
-dds = DESeq2::estimateSizeFactors(dds)
-
 genes = "ENSMUSG00000039904"
-#pdf("file.pdf") This to save it to a pdf file
-plot_top(dds, genes)
-#dev.off()
+dd = melt(counts[genes,,drop=F])
+dd$group = metadata[dd[,1], "group"]
+dd$time = metadata[dd[,1], "time"]
+dd = dd %>% filter(group!="LDR")
+ggplot(dd, aes(x=time,y=value,color=group)) +
+    geom_jitter(aes(group=group), size=1) +
+    geom_boxplot(aes(x=time,y=value,fill=group)) +
+    stat_smooth(aes(x=time, y=value, group=group),size=0.5, fill="grey80") +
+    theme_bw(base_size = 7) +
+    ggtitle(genes)
 ```
 
 (useful if replicating these results)

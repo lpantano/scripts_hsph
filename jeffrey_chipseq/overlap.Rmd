@@ -1,0 +1,390 @@
+---
+output:
+  knitrBootstrap::bootstrap_document:
+    theme: readable
+    highlight: zenburn
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+  html_document:
+    toc: true
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="chip-seq"
+labPI="Kate Jeffrey’s"
+lablocation=""
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+
+```
+
+
+```{r knitrsetup, echo=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+library(myRfunctions)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, 
+                      warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+# render_2_drop("overlap.Rmd", "jeffrey_chipseq")
+```
+
+---
+
+# Chip-seq analysis
+
+Analysis for`r labPI` group.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+# Setup
+
+## Libraries
+
+```{r functions}
+## loading packages
+require(ChIPseeker)
+require(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+require(clusterProfiler)
+library(dplyr)
+library(ggplot2)
+library(UpSetR)
+```
+
+```{r load}
+baseDir = "/Users/lpantano/orch/scratch/chipseq_ma_shannan/peak_anno"
+files <- list(sp140_0h = c(file.path(baseDir, "SP140_0h_merged_peaks.narrowPeak")), 
+              sp140_4h = c(file.path(baseDir, "SP140_4h_merged_peaks.narrowPeak")))
+enhancer = read.table(file.path(baseDir, "only_H3K27ac.bed"), header=F,stringsAsFactors = F) %>%
+    filter(!grepl("_",V1)) 
+names(enhancer) = c("chrom", "start", "end", "peak", "foldchange")
+enhancer = makeGRangesFromDataFrame(enhancer, keep.extra.columns = TRUE, 
+                                    ignore.strand = TRUE, end.field = "end",
+                                    start.field = "start", seqnames.field = "chrom")
+k4me3 = read.table(file.path(baseDir, "H3K4me3_merged_peaks.scores.narrowPeak"), header=F,stringsAsFactors = F) %>%
+    filter(!grepl("_",V1))
+names(k4me3) = c("chrom", "start", "end", "score", "foldchange")
+k4me3 = makeGRangesFromDataFrame(k4me3, keep.extra.columns = TRUE, 
+                                    ignore.strand = TRUE, end.field = "end",
+                                    start.field = "start", seqnames.field = "chrom")
+
+
+k4me1 = read.table(file.path(baseDir, "GSM785498_MAK_H3K4me1_peaks.bed"), header=F,stringsAsFactors = F) %>%
+    filter(!grepl("_",V1))
+names(k4me1) = c("chrom", "start", "end", "peak", "foldchange")
+k4me1 = makeGRangesFromDataFrame(k4me1, keep.extra.columns = TRUE, 
+                                    ignore.strand = TRUE, end.field = "end",
+                                    start.field = "start", seqnames.field = "chrom")
+
+
+k27ac = read.table(file.path(baseDir, "GSE54972_macs_H3K27ac_macrophage_peaks.bed"), header=F,stringsAsFactors = F) %>%
+    filter(!grepl("_",V1))
+names(k27ac) = c("chrom", "start", "end", "score", "foldchange")
+k27ac = makeGRangesFromDataFrame(k27ac, keep.extra.columns = TRUE, 
+                                    ignore.strand = TRUE, end.field = "end",
+                                    start.field = "start", seqnames.field = "chrom")
+
+
+```
+
+## Standard annotation
+
+```{r anno}
+peakAnnoList <- lapply(files, annotatePeak, TxDb = txdb, tssRegion = c(-5000,5000), 
+                        annoDb = "org.Hs.eg.db", verbose = FALSE)
+
+histAnnoList <- lapply(list(k27ac,k4me3,enhancer), annotatePeak, TxDb = txdb, tssRegion = c(-5000,5000), 
+                        annoDb = "org.Hs.eg.db", verbose = FALSE)
+names(histAnnoList) = c("k27ac", "k4me3", "enhancer")
+```
+
+
+## Overlap with histone marks
+
+I tried to get the best value as the maximum gap between the two peaks set
+to calculate the overlap.
+
+To calculate the distance that gives the most enrichment value I created a saturation
+curve trying different distances, from 0 to 5kb with steps of 250 nt.
+
+Then I calculated the number of peaks that it gains one distance respect to the previous one,
+and divided by 250 to normalize by the distance. This way we get a value that represents
+how many new co-binding peaks you get for each nt gap you allow when calculating the overlap.
+
+
+```{r overlap, results='asis'}
+
+get_overlap = function(range,d=0,print=FALSE){
+    idx = findOverlaps(range, k27ac, maxgap = d)
+    o_sp140 = length(unique(queryHits(idx)))
+    o_his = length(unique(subjectHits(idx)))
+    u_sp140 = idx@nLnode - length(unique(queryHits(idx)))
+    u_his = idx@nRnode - length(unique(subjectHits(idx)))
+    if (print){
+        cat("\n\n **Maximum distance", d, "**\n\n")
+        cat("\n\nSP140 peaks overlapping k27ac:", o_sp140,"\n")
+        cat("\n\nk27ac peaks overlapping SP140:", o_his,"\n")
+        cat("\n\nSP140 peaks no overlapping k27ac:", u_sp140,"\n")
+        cat("\n\nk27ac peaks no overlapping SP140:", u_his,"\n")
+    }
+    return(list(query_o=o_sp140, query_u=u_sp140, target_u=u_his))
+}
+
+best_overlap = lapply(names(peakAnnoList), function(name){
+    class_anno = peakAnnoList[[name]]
+    # cat("\n\n### ", name)
+    range = slot(class_anno,"anno")
+    x = seq(1, 5300, 250)
+    saturation = sapply(x, function(d){get_overlap(range, d)})
+    colnames(saturation) = x
+    dif = unlist(saturation[1,2:length(x)]) - unlist(saturation[1,1:length(x)-1])
+    dif_norm = dif / (x[2:length(x)] - x[1:length(x)-1])
+    df = data.frame(diff=dif_norm, gap=factor(x[2:length(x)]))
+    p = ggplot(df, aes(x=gap, y=diff)) +
+        geom_point() +
+        theme_bw() +
+        xlab("gap between peaks") +
+        ylab("# peaks / size_gap_difference")
+    print(p)
+    list(name=name, best=saturation[,which.max(df$diff)+1], gap=x[which.max(df$diff)+1])
+})
+```
+
+```{r print_overlap}
+.void = lapply(best_overlap, function(x){
+    cat("\n\n###", x$name,"\n\n")
+    cat("\n\nUsing ", x$gap, " as maximum distance to count as overlap\n")
+    cat("\n\nSP140 peaks overlapping k27ac:", x$best$query_o,"\n")
+    cat("\n\nSP140 peaks no overlapping k27ac:", x$best$query_u,"\n")
+    cat("\n\nk27ac peaks no overlapping SP140:", x$best$target_u,"\n")
+})
+
+```
+
+### Overlap with all histone marks
+
+It is tricky to overlap 4 peaks of sets, because first you need to define an
+unique set of peaks in the whole data set. For instance, it happens than two peaks overlap
+with one peak in other data set. When comparing 4 sets, the problem is complex, and
+my approach is to define an unique set of peaks, and then overlap this one with 
+every other set of peaks.
+
+To define an unique set of peaks, I put all peaks together and merge the ones that
+overlap. This will cause that the total peaks in each data set, will differ slightly 
+in the total peaks seen in the figure. For instance, it happens than one region has:
+
+```
+SP140_0h has 3 peaks
+H3K27ac has 1 peak
+H3K4me3 has 2 peaks
+H3K4me1 has 0 peaks
+```
+
+This will end up as 1 unique peak, and will be counted only once for SP140_0h, H3K27ac
+and H3K4me3.
+
+
+```{r full-overlap, fig.width=10}
+
+.void = lapply(names(peakAnnoList), function(name){
+    class_anno = peakAnnoList[[name]]
+    range = slot(class_anno,"anno")
+    all_peaks = reduce(sort(c(k4me1, k4me3, k27ac, range, ignore.mcols=TRUE)))
+    
+    sets = list(sp140=range, H3K4me1=k4me1, H3K4me3=k4me3, H3K27ac=k27ac)
+    names(sets)[1] = name
+    .void = lapply(names(sets), function(s){
+        r = sets[[s]]
+        idx = findOverlaps(all_peaks, r, maxgap = 501)
+        mcols(all_peaks)[,s] <<- FALSE
+        mcols(all_peaks)[queryHits(idx), s] <<- TRUE
+    })
+    ma = as.matrix(mcols(all_peaks)[,names(sets)])
+    ma[ma] = 1
+    UpSetR::upset(as.data.frame(ma),sets = names(sets))
+
+})
+
+```
+
+
+## New annotation with enhancer
+
+```{r local_fn}
+
+getGenomicAnnoStat <- function(peakAnno) {
+    if ( class(peakAnno) == "GRanges" )
+        peakAnno <- as.data.frame(peakAnno)
+    anno <- peakAnno$annotation
+    ## anno <- sub(" \\(.+", "", anno)
+
+    anno[grep("exon 1 of", anno)] <- "1st Exon"
+    anno[grep("intron 1 of", anno)] <- "1st Intron"
+    anno[grep("Exon \\(", anno)] <- "Other Exon"
+    anno[grep("Intron \\(", anno)] <- "Other Intron"
+    anno[grep("Downstream", anno)] <- "Downstream (<=3kb)"
+    
+    ## count frequency
+    anno.table <- table(anno)
+    
+    ## calculate ratio
+    anno.ratio <- anno.table/ sum(anno.table) * 100
+    anno.df <- as.data.frame(anno.ratio)
+    colnames(anno.df) <- c("Feature", "Frequency")
+    anno.df$Numbers <- anno.table
+    lvs <- c(## "Promoter (<=1kb)",
+             ## "Promoter (1-2kb)",
+             ## "Promoter (2-3kb)",
+             "Promoter (<= 3kb)",
+             "Promoter",
+             "Enhancer",
+             "Enhancer-distal",
+             "Enhancer-promoter",
+             "5' UTR",
+             "3' UTR",
+             "1st Exon",
+             "Other Exon",
+             "1st Intron",
+             "Other Intron",
+             "Downstream (<=3kb)",
+             "Distal Intergenic",
+             "Others")
+
+    anno.df$Feature <- factor(anno.df$Feature, levels=lvs[lvs %in% anno.df$Feature])
+    anno.df <- anno.df[order(anno.df$Feature),]
+    return(anno.df)
+}
+
+```
+
+Promoter defined as the region at +/- 5Kb from TSS
+
+Enhancer defined as peaks that overlap H3K27ac +  (+/- 5kb far aways from any TSS or gene)
+
+```{r new-annotation, results='asis'}
+peakAnnoList_mod = lapply(names(peakAnnoList), function(name){
+    class_anno = peakAnnoList[[name]]
+    range = slot(class_anno,"anno")
+    idx = findOverlaps(range[,"annotation"], k27ac, maxgap = 501)
+    
+    mcols(range)[,"enhancer"] = FALSE
+    mcols(range)[queryHits(idx),"enhancer"] = TRUE
+    # idx = findOverlaps(range[,"annotation"], k4me3)
+    # mcols(range)[,"promoter"] = FALSE
+    # mcols(range)[queryHits(idx),"promoter"] = TRUE
+    ann = mcols(range)
+    ann_col = ann[,"annotation"]
+    
+    new_col = ann_col
+    # new_col[1:length(ann_col)] = "Others"
+    new_col[grepl("Promoter", ann_col)] = "Promoter"
+    new_col[ann[,"enhancer"] & new_col != "Promoter"] = "Enhancer"
+    logic_df = cbind(slot(class_anno, "detailGenomicAnnotation"),
+                     Enhancer = new_col=="Enhancer")
+    logic_df$Promoter = new_col == "Promoter"
+    # new_col[grepl("Promoter", ann_col) & (ann[,"enhancer"])] = "Enhancer-promoter"
+    # new_col[grepl("Distal", ann_col) & (ann[,"enhancer"])] = "Enhancer"
+    
+    mcols(range)[,"annotation"] = new_col
+    df = getGenomicAnnoStat(range)
+    slot(class_anno, "anno") <- range
+    slot(class_anno, "annoStat") <- df
+    slot(class_anno, "detailGenomicAnnotation") <- logic_df
+    cat("\n###",name,"\n")
+    print(kable(df))
+    cat("\n")
+    print(plotAnnoBar(class_anno))
+    plotAnnoPie(class_anno)
+    class_anno
+})
+names(peakAnnoList_mod) = names(peakAnnoList)
+```
+
+## Ranked plot
+
+According to the paper, they plot the same protein/histone mark, for instance, 
+it would be ranked SP140_4h against the signal of SP140_4h. 
+
+Only for enhancers peaks for H3K27ac and H3K27ac+/H3K4me3-. And Promoters
+for H3K4me3.
+
+```{r ranked}
+
+    # idx = findOverlaps(k27ac, k27ac)
+    # df = data.frame(histone = mcols(k27ac)[,"foldchange"])
+    # df$sp140 = 0
+    # df$sp140[subjectHits(idx)] = mcols(k27ac)[queryHits(idx),"foldchange"]
+    # plot((df[order(df$histone),"sp140"]), pch=20, 
+    #      xlab = "ranked H3K27ac signal", ylab="score", main=name)
+
+.void=lapply(names(peakAnnoList), function(name){
+    class_anno = peakAnnoList_mod[[name]]
+    range = slot(class_anno,"anno")
+    # Only in enchancer
+    idx_promoter=grep("Enhancer", mcols(range)[,"annotation"])
+    promoter_range = range[idx_promoter,]
+    
+    hist_range = slot(histAnnoList[['k27ac']], "anno")
+    hist_keep = hist_range[!grepl("Promoter", mcols(hist_range)[,"annotation"]),]
+    idx = findOverlaps(promoter_range, hist_keep)
+    df = data.frame(histone = mcols(hist_keep)[,"foldchange"])
+    df$sp140 = 0
+    df$sp140[subjectHits(idx)] = mcols(promoter_range)[queryHits(idx),4]
+    plot((df[order(df$histone),"sp140"]), pch=20, 
+         xlab = "ranked H3K27ac signal", ylab="fold change enrichment", main=name)
+
+    hist_range = slot(histAnnoList[['enhancer']], "anno")
+    hist_keep = hist_range[!grepl("Promoter", mcols(hist_range)[,"annotation"]),]
+    idx = findOverlaps(promoter_range, hist_keep)
+    df = data.frame(histone = mcols(hist_keep)[,"foldchange"])
+    df$sp140 = 0
+    df$sp140[subjectHits(idx)] = mcols(promoter_range)[queryHits(idx),4]
+    df$rank = order(df$histone)
+    #plot(density(df$rank[df$sp140>0]))
+    #ggplot(df_group, aes(x=cut,y=n)) + geom_bar(stat = "identity")
+    plot((df[order(df$histone),"sp140"]), pch=20,
+         xlab = "ranked H3K27ac+/H3K4me3- signal", ylab="fold change enrichment", main=name)
+    
+    # Only in promoters
+    idx_promoter=grep("Promoter", mcols(range)[,"annotation"])
+    promoter_range = range[idx_promoter,]
+    hist_range = slot(histAnnoList[['k4me3']], "anno")
+    hist_keep = hist_range[grepl("Promoter", mcols(hist_range)[,"annotation"]),]
+    idx = findOverlaps(promoter_range, hist_keep)
+    df = data.frame(histone = mcols(hist_keep)[,"foldchange"])
+    df$sp140 = 0
+    df$sp140[subjectHits(idx)] = mcols(promoter_range)[queryHits(idx),4]
+    df$rank = order(df$histone)
+    #plot(density(df$rank[df$sp140>0]))
+    plot((df[order(df$histone),"sp140"]), pch=20,
+         xlab = "ranked H3K4me3 signal", ylab="fold change enrichment", main=name)
+
+    
+})
+```
+
+
+#R Session Info
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+
