@@ -1,0 +1,154 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="RNA-seq"
+labPI=""
+lablocation=""
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+path_results = "~/orch/scratch/chipseq_ma_shannan/diffbind/files"
+dir.create(path_results, showWarnings = FALSE)
+```
+
+
+```{r knitrsetup, echo=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+library(myRfunctions)
+
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, 
+                      warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+# render_2_drop("diffbind.Rmd", "jeffrey_chipseq_diffbind")
+```
+
+---
+
+# DiffBind analysis of SP140
+
+RNA-seq analysis for `r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+## Differential peaks binding
+
+The DE analysis was done with 3 methods: edgeR, deseq2, and deseq. The ideal is
+to take the ones that overlap to be sure is a real peak.
+
+```{r functions, eval=FALSE}
+setwd("~/orch/scratch/chipseq_ma_shannan/diffbind")
+sp140 = dba(sampleSheet="config.txt")
+sp140 = dba.count(sp140, minOverlap=2)
+sp140 = dba.contrast(sp140, categories=DBA_CONDITION, minMembers = 2)
+sp140 = dba.analyze(sp140, method=DBA_ALL_METHODS)
+save(sp140, file="~/orch/scratch/chipseq_ma_shannan/diffbind/sp140_dba.rda")
+```
+
+### PCA
+
+```{r pca}
+library(DiffBind)
+library(UpSetR)
+library(pheatmap)
+library(GenomicRanges)
+load("~/orch/scratch/chipseq_ma_shannan/diffbind/sp140_dba.rda")
+
+# df = dba.plotVenn(sp140.db,1:3,label1="edgeR",label2="DESeq",label3="DESeq2",DataType = DBA_DATA_RANGEDDATA,bReturnPeaksets=TRUE)
+# dba.plotMA(sp140)
+dba.plotPCA(sp140)
+# dba.plotHeatmap(sp140, contrast = 1, correlations = FALSE, main="Binding affinity of DE peaks")
+```
+
+
+
+### Overlap using 3 differents methods
+
+```{r de}
+# plot(sp140)
+sp140.edger.db = dba.report(sp140, method=DBA_EDGER,th=1)
+sp140.deseq.db = dba.report(sp140, method=DBA_DESEQ,th=1)
+sp140.deseq2.db = dba.report(sp140, method=DBA_DESEQ2,th=1)
+sets = list(edger=sp140.edger.db, deseq=sp140.deseq.db, deseq2=sp140.deseq2.db)
+all_peaks = reduce(sort(c(sp140.edger.db, sp140.deseq.db, sp140.deseq2.db, ignore.mcols=TRUE)))
+.v= lapply(names(sets), function(name){
+    de = sets[[name]]
+    keep = mcols(de)[,"FDR"]<=0.1
+    idx = findOverlaps(all_peaks, de[keep,])
+    cols =  rep(FALSE, nrow(mcols(all_peaks)))
+    cols[queryHits(idx)] = TRUE
+    cols
+})
+ma = as.matrix(do.call(cbind,.v))
+ma[ma] = 1
+colnames(ma) = names(sets)
+UpSetR::upset(as.data.frame(ma),sets = names(sets))
+```
+
+The hits for deseq2 is super low.
+
+### Non detected by DESeq2
+
+Plotting the peaks only detected by edgeR and DESeq to evaluate
+if they seem ok.
+
+```{r non-deseq2}
+idx_non_ds2 = ma[,"deseq2"] == FALSE & ma[,"deseq"] == TRUE & ma[,"edger"] == TRUE
+
+sp140$allvectors[,"chrom"] = sp140$chrmap[sp140$allvectors$CHR]
+sp140_counts = makeGRangesFromDataFrame(sp140$allvectors, keep.extra.columns = TRUE, 
+                                    ignore.strand = TRUE, end.field = "END",
+                                    start.field = "START", seqnames.field = "chrom")
+
+idx = findOverlaps(sp140_counts, all_peaks[idx_non_ds2,])
+
+# sp140_counts[queryHits(idx),]
+.mcols=mcols(sp140_counts)
+ma_counts=as.matrix(as.data.frame(.mcols[queryHits(idx),2:5]))
+pheatmap(log2(ma_counts+1))
+
+de_peaks = findOverlaps(sp140.edger.db, sp140.deseq.db)
+de_df = sp140.edger.db
+mcols(de_df) = cbind(mcols(de_df), mcols(sp140.deseq.db[subjectHits(de_peaks)])[,4:6])
+names(mcols(de_df))[4:9] =
+    apply(expand.grid(c("Fold", "pval", "FDR"), c("edgeR", "deseq")), 1, paste, collapse="_")
+save_file(as.data.frame(de_df), "peaks_diffbind.txt", path_results)
+```
+
+The peaks look good, the problem is the FDR of deseq2, is higher in general.
+So I think we can go with the deseq/edger overlapping peaks.
+
+
+```{r compress, echo=F}
+name_res = compress_results(path_results)
+```
+
+#R Session Info
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+
