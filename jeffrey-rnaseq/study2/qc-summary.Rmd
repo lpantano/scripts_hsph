@@ -1,34 +1,41 @@
 ---
 output:
-  knitrBootstrap::bootstrap_document:
-    theme: readable
-    highlight: zenburn
-    theme.chooser: TRUE
-    highlight.chooser: TRUE
   html_document:
     toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: readable
     highlight: zenburn
 ---
 
-Last updated `r date()` by Lorena Pantano
+Report last updated `r date()`.
 
 ```{r setup, echo=FALSE}
-options(bitmapType = "cairo")
-knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", bootstrap.show.code = FALSE, fig.width = 9, 
-               cache=FALSE, highlight=TRUE, autodep=TRUE, warning=FALSE, error=FALSE,
-               message=FALSE, prompt=TRUE, comment='', fig.cap='')
+library(rmarkdown)
+library(knitr)
+library(myRfunctions)
+
+knitr::opts_chunk$set(dev="png",echo=FALSE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
 ```
 
 ```{r render}
-library(rmarkdown)
-library(knitrBootstrap)
-source("~/repos/myRfunctions/transactions.R")
-# render_2_drop("qc-summary.Rmd", dn = "jeffrey_chron_w_snps")
+# render_2_drop("qc-summary.Rmd", dn = "jeffrey_chron_w_snps_2016")
 ```
 
 # Overview
 
 ```{r qc-setup}
+
+root_path = "~/orch/scratch/jeffreys_chron_snp/chron_snp/final"
+root_file = file.path(root_path, "files")
+dir.create(root_file, showWarnings = FALSE)
+
 library(ggplot2)
 library(reshape)
 library(gplots)
@@ -38,8 +45,8 @@ library(pheatmap)
 library(gridExtra)
 library(dplyr)
 library(knitr)
-project_summary = "/home/lpantano/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/project-summary.csv"
-counts_file = "/home/lpantano/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/combined.counts"
+project_summary = "~/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/project-summary.csv"
+counts_file = "~/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/combined.counts"
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 "#0072B2", "#D55E00", "#CC79A7")
 summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
@@ -274,6 +281,7 @@ handle_deseq2 = function(dds, summarydata, column, all_combs) {
     contrast = c(column, comb)
     res = results(dds, contrast=contrast)
     res = res[order(res$padj),]
+    print(resultsNames(res))
     all_results = c(all_results, res)
     contrast_strings = c(contrast_strings, contrast_string)
   }
@@ -316,17 +324,19 @@ reduce = function(genes){
 
 goenrichment = function(g){
   select_entrez = .ens2entrez(g)
-  ego= enrichGO(gene = select_entrez, organism = "human", ont = "BP", pAdjustMethod = "BH",
+  ego= enrichGO(gene = select_entrez, 'org.Hs.eg.db', ont = "BP", pAdjustMethod = "BH",
   pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
 
-  if (nrow(summary(ego))>0){
-    idx =reduce(summary(ego)$geneID)
-    
-    cat("GO enrichment for Biological processes:\n\n")
-    
-    print(kable(summary(ego)[idx, 1:7]))
-    
-    cat("\n\n")
+  if ("result" %in% slotNames(ego)){
+    if (nrow(ego@result) > 0){
+        idx =reduce(ego@result$geneID)
+        
+        cat("GO enrichment for Biological processes:\n\n")
+        
+        print(kable(ego@result[idx, 1:7]))
+        
+        cat("\n\n")
+    }
   }  
 }
   
@@ -345,15 +355,14 @@ library(org.Hs.eg.db)
     symbol$ENTREZID
 }
 
-setMethod( "plotMA", signature( object="data.frame" ),
-function( object, ylim = NULL,
+#setMethod( "plotMA", signature( object="data.frame" ),
+my_plotMA <- function( object, ylim = NULL,
   colNonSig = "gray32", colSig = "red3", colLine = "#ff000080",
   log = "x", cex=0.45, xlab="mean expression", ylab="log fold change", ... )
 {
-   if( !( ncol(object) == 3 & inherits( object[[1]], "numeric" ) & inherits( object[[2]], "numeric" )
-         & inherits( object[[3]], "logical" ) ) ) {
-      stop( "When called with a data.frame, plotMA expects the data frame to have 3 columns, two numeric ones for mean and log fold change, and a logical one for significance.")
-   }
+   object <- data.frame(mean = object$baseMean,
+               lfc = object$log2FoldChange,
+               isDE = ifelse(is.na(object$padj), FALSE, object$padj < 0.05))
    colnames(object) <- c( "mean", "lfc", "sig" )
    object = subset( object, mean != 0 )
    py = object$lfc
@@ -367,7 +376,7 @@ function( object, ylim = NULL,
        cex=cex, col=advance_colors, xlab=xlab, ylab=ylab, ylim=ylim, ...)
   abline( h=0, lwd=4, col=colLine )
 }
-)
+#)
 ```
 
 ## Differentially expressed genes between 4h and 0h
@@ -391,8 +400,8 @@ nc = ceiling( len / nr )
 par(mfrow=c(nr,nc))
 scale_factor=9
 for(i in seq(length(all_results))) {
-  DESeq2::plotMA(all_results[[i]])
-  title(paste("MA plot for contrast", names(all_results)[i]))
+  my_plotMA(all_results[[i]])
+  title(paste("MA plot for ", names(all_results)[i]))
 }
 ```
 
@@ -435,11 +444,11 @@ for(i in seq(length(all_results))) {
   ma[[paste0("c",names(all_results)[i])]] = genes$ensembl
   
   print(knitr::kable(head(out_df,20)))
-  write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
+  write.table(out_df, file=file.path(root_file, paste(names(all_results)[i], ".tsv", sep="")),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
   
-  goenrichment(genes$ensembl)
+  # goenrichment(genes$ensembl)
   
 }
 ```
@@ -461,15 +470,15 @@ heatmap_fn(as.matrix(assay(rld)[de_genes,corder]), scale='row',show_rownames=F,c
 
 comparisons:
 
-* Wt vs Cd with snp at 0h = 0hwtnon vs 0hcdsnp
-* Wt vs Cd without snp at 0h = 0hwtnon vs 0hcdnon
+* Wt vs Cd with snp at 0h = 0hcdsnp vs 0hwtnon
+* Wt vs Cd without snp at 0h = 0hcdnon vs 0hwtnon
 * Cd with snp vs Cd without snp at 0h = 0hcdsnp vs 0hcdnon
 
 ### MA-plots
 
 ```{r group-DESeq-output, results='asis'}
-comps = list(wt=c("0hwtnon", "0hcdnon"),
-             cdnon=c("0hwtnon", "0hcdsnp"),
+comps = list(wt=c("0hcdnon", "0hwtnon"),
+             cdnon=c("0hcdsnp", "0hwtnon"),
              cdsnp=c("0hcdsnp", "0hcdnon"))
 all_results = handle_deseq2(dds, summarydata, "covariate", comps)
 len = length(all_results)
@@ -477,8 +486,8 @@ nr = ceiling( len / 3 )
 nc = ceiling( len / nr )
 par(mfrow=c(nr,nc))
 for(i in seq(length(all_results))) {
-  DESeq2::plotMA(all_results[[i]])
-  title(paste("MA plot for contrast", names(all_results)[i]))
+  my_plotMA(all_results[[i]])
+  title(paste("MA plot for ", names(all_results)[i]))
 }
 ```
 
@@ -511,11 +520,11 @@ for(i in seq(length(all_results))) {
   ma[[paste0("c",names(all_results)[i])]] = genes$ensembl
   
   print(knitr::kable(head(out_df,20)))
-  write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
+  write.table(out_df, file=file.path(root_file, paste(names(all_results)[i], ".tsv", sep="")),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
   
-  goenrichment(genes$ensembl)
+  # goenrichment(genes$ensembl)
   
   
 }
@@ -535,15 +544,15 @@ heatmap_fn(as.matrix(assay(rld)[de_genes,corder]), scale='row',show_rownames=F,c
 
 comparisons:
 
-* Wt vs Cd with snp at 4h = 4hwtnon vs 4hcdsnp
-* Wt vs Cd without snp at 4h = 4hwtnon vs 4hcdnon
+* Wt vs Cd with snp at 4h =  4hcdsnp vs 4hwtnon
+* Wt vs Cd without snp at 4h = 4hcdnon vs 4hwtnon
 * Cd with snp vs Cd without snp at 4h = 4hcdsnp vs 4hcdnon
 
 ### MA-plots
 
 ```{r group4h-DESeq-output, results='asis'}
-comps = list(wt=c("4hwtnon", "4hcdnon"),
-             cdnon=c("4hwtnon", "4hcdsnp"),
+comps = list(wt=c("4hcdnon", "4hwtnon"),
+             cdnon=c("4hcdsnp", "4hwtnon"),
              cdsnp=c("4hcdsnp", "4hcdnon"))
 all_results = handle_deseq2(dds, summarydata, "covariate", comps)
 len = length(all_results)
@@ -551,8 +560,8 @@ nr = ceiling( len / 3 )
 nc = ceiling( len / nr )
 par(mfrow=c(nr,nc))
 for(i in seq(length(all_results))) {
-  DESeq2::plotMA(all_results[[i]])
-  title(paste("MA plot for contrast", names(all_results)[i]))
+  my_plotMA(all_results[[i]])
+  title(paste("MA plot for ", names(all_results)[i]))
 }
 ```
 
@@ -585,11 +594,11 @@ for(i in seq(length(all_results))) {
   out_df$name = .ens2name(rownames(out_df))
   
   print(knitr::kable(head(out_df,20)))
-  write.table(out_df, file=paste(names(all_results)[i], ".tsv", sep=""),
+  write.table(out_df, file=file.path(root_file, paste(names(all_results)[i], ".tsv", sep="")),
                          quote=FALSE, sep="\t", row.names=TRUE, col.names=TRUE)
   cat("\n")
   
-  goenrichment(genes$ensembl)
+  # goenrichment(genes$ensembl)
   
 }
 ```
@@ -614,14 +623,14 @@ hr = hclust(as.dist(1-cor(t(ma))), method = "ward.D2")
 heatmap_fn(ma[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
 name_genes = .ens2name(hr$labels[hr$order])
 name_genes[is.na(name_genes)] = hr$labels[hr$order][is.na(name_genes)]
-write.table(data.frame(symbol=name_genes, ensembl=hr$labels[hr$order]),"all_de_genes_order.tsv",row.names = F,col.names = F)
+write.table(data.frame(symbol=name_genes, ensembl=hr$labels[hr$order]),file.path(root_file, "all_de_genes_order.tsv"),row.names = F,col.names = F)
 
 heatmap_fn(ma[hr$order,], scale='row', cluster_row=FALSE, show_rownames=F, color=my_palette)
 ```
 
 [genes sorted](`r get_report_links("all_de_genes_order.tsv")`)
 
-# Custom hetmpas
+# Custom heatmaps
 
 sheet 1 in excel
 
@@ -636,7 +645,7 @@ ma_sub = ma[genes,]
 hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
 heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
 name_genes = hr$labels[hr$order]
-write.table(data.frame(symbol=name_genes),"sheet1_genes_order.tsv",row.names = F,col.names = F)
+write.table(data.frame(symbol=name_genes),file.path(root_file, "sheet1_genes_order.tsv"),row.names = F,col.names = F)
 ```
 
 sheet 2 in excel
@@ -648,7 +657,7 @@ ma_sub = ma[genes,]
 hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
 heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
 name_genes = hr$labels[hr$order]
-write.table(data.frame(symbol=name_genes),"sheet2_genes_order.tsv",row.names = F,col.names = F)
+write.table(data.frame(symbol=name_genes),file.path(root_file, "sheet2_genes_order.tsv"),row.names = F,col.names = F)
 ```
 
 sheet 3 in excel
@@ -660,8 +669,88 @@ ma_sub = ma[genes,]
 hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
 heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
 name_genes = hr$labels[hr$order]
-write.table(data.frame(symbol=name_genes),"sheet3_genes_order.tsv",row.names = F,col.names = F)
+write.table(data.frame(symbol=name_genes),file.path(root_file, "sheet3_genes_order.tsv"),row.names = F,col.names = F)
 ```
+
+
+sheet 4 in excel
+
+```{r sheet-4}
+genes = read.table("~/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/list4.csv",
+                   skip=1, stringsAsFactors = FALSE)
+genes = intersect(genes$V1, rownames(ma))
+ma_sub = ma[genes,]
+hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
+heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = hr$labels[hr$order]
+write.table(data.frame(symbol=name_genes),
+            file.path(root_file, "sheet4_genes_order.tsv"),
+            row.names = F,col.names = F)
+```
+
+
+sheet 5 in excel
+
+```{r sheet-5}
+genes = read.table("~/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/list5",
+                   stringsAsFactors = FALSE)
+genes = intersect(genes$V1, rownames(ma))
+ma_sub = ma[genes,]
+hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
+heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = hr$labels[hr$order]
+write.table(data.frame(symbol=name_genes),
+            file.path(root_file, "sheet5_genes_order.tsv"),
+            row.names = F,col.names = F)
+```
+
+
+sheet 6 in excel
+
+```{r sheet-6}
+genes = read.table("~/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/list6",
+                   stringsAsFactors = FALSE)
+genes = intersect(genes$V1, rownames(ma))
+ma_sub = ma[genes,]
+hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
+heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = hr$labels[hr$order]
+write.table(data.frame(symbol=name_genes),
+            file.path(root_file, "sheet6_genes_order.tsv"),
+            row.names = F,col.names = F)
+```
+
+List 10_5_16 - 1
+
+```{r sheet-7}
+genes = read.table("~/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/list7",
+                   stringsAsFactors = FALSE)
+genes = intersect(sapply(genes$V1, toupper), rownames(ma))
+ma_sub = ma[genes,]
+hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
+heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = hr$labels[hr$order]
+write.table(data.frame(symbol=name_genes),
+            file.path(root_file, "sheet7_genes_order.tsv"),
+            row.names = F,col.names = F)
+```
+
+
+List 10_5_16 - 2
+
+```{r sheet-7}
+genes = read.table("~/orch/scratch/jeffreys_chron_snp/chron_snp/final/2015-10-01_chron_snp/list8",
+                   stringsAsFactors = FALSE)
+genes = intersect(sapply(genes$V1, toupper), rownames(ma))
+ma_sub = ma[genes,]
+hr = hclust(as.dist(1-cor(t(ma_sub))), method = "ward.D2")
+heatmap_fn(ma_sub[hr$order,], scale='row', cluster_row=FALSE, cluster_cols=FALSE, show_rownames=F, color=my_palette)
+name_genes = hr$labels[hr$order]
+write.table(data.frame(symbol=name_genes),
+            file.path(root_file, "sheet8_genes_order.tsv"),
+            row.names = F,col.names = F)
+```
+
 
 # Files
 
@@ -677,7 +766,7 @@ for (f in fn){
 fpkm = read.table("combined.fpkm", header=T, row.names=1)
 fpkm$name = .ens2name(rownames(fpkm))
 fpkm$ens = rownames(fpkm)
-write.table(fpkm[,c(13,14,1:12)], "combined_w_name.fpkm", quote=F,sep="\t", row.names=F)
+write.table(fpkm[,c(13,14,1:12)], file.path(root_file, "combined_w_name.fpkm"), quote=F,sep="\t", row.names=F)
 ```
 
 [fpkm](`r get_report_links("combined_w_name.fpkm")`)
@@ -690,7 +779,7 @@ iso_names = read.table("~/orch/scratch/jeffreys_chron_snp/chron_snp/work/htseq-c
 idx = match(iso_fpkm$id, iso_names$V1)
 names = .ens2name(iso_names$V2[idx])
 iso_fpkm$name = names
-write.table(iso_fpkm, "combined_iso.fpkm", row.names=F, quote=F, sep="\t")
+write.table(iso_fpkm, file.path(root_file, "combined_iso.fpkm"), row.names=F, quote=F, sep="\t")
 
 kable(rbind(iso_fpkm[grepl("SP140",names),],
             iso_fpkm[grepl("SP110",names),],
@@ -699,3 +788,16 @@ kable(rbind(iso_fpkm[grepl("SP140",names),],
 ```
 
 [fpkm](`r get_report_links("combined_iso.fpkm")`)
+
+# R Session Info
+
+
+```{r compress, echo=FALSE, cache=FALSE}
+name_res = compress_results(root_file, prefix = "snp_chron_")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```

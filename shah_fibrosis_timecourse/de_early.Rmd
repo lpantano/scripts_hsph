@@ -1,0 +1,311 @@
+---
+title: "RNA-seq analysis."
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project=" Fibrosis mice model - RNAseq "
+labPI="Jagesh Shah"
+lablocation="Longwood"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+```
+
+RNA-seq analysis for `r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",echo=FALSE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r project-options, echo=FALSE}
+library(myRfunctions)
+source("~/repos/DEGreport/R/clustering.R")
+path_results = "~/orch/scratch/jshah_fibrosis_rnaseq/time_course_1/final/2016-03-28_time_course_1/de_early"
+dir.create(path_results, showWarnings = FALSE)
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+#render_2_drop("de_early.Rmd", "shah_fibrosis/de_fc_early")
+```
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(DESeq2)
+library(tximport)
+library(logging)
+library(gridExtra)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(cluster)
+library(dplyr)
+
+# library(DT)
+
+basicConfig()
+final_bcbio = "~/orch/scratch/jshah_fibrosis_rnaseq/time_course_1/final/2016-03-28_time_course_1"
+project_summary = file.path(final_bcbio, "project-summary.csv")
+counts_file = file.path(final_bcbio, "combined.counts")
+tx2genes_file = file.path(final_bcbio, "tx2gene.csv")
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+
+summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
+summarydata$Name = rownames(summarydata)
+summarydata = summarydata[order(summarydata$Name),]
+summarydata$Alias = paste(summarydata$Name, summarydata$condition, summarydata$time, sep = "_")
+
+if (file.exists(tx2genes_file)) {
+  loginfo("Using gene counts calculated from the Sailfish transcript counts.")
+  sf_files = file.path(final_bcbio, "..", "..", "work", "sailfish",
+                       rownames(summarydata), 
+                       "quant.sf")
+  names(sf_files) = summarydata$Alias
+  tx2gene = read.table(tx2genes_file, sep=",")
+  txi.salmon = tximport(sf_files, type="salmon", tx2gene = tx2gene,
+                        reader=readr::read_tsv,
+                        countsFromAbundance="lengthScaledTPM")
+  counts = txi.salmon$counts
+} else {
+  loginfo("Using gene counts calculated from featureCounts.")
+  counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE)
+}
+
+# this is a list of all non user-supplied metadata columns that could appear
+known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.quality",
+    "rRNA_rate", "Fragment.Length.Mean", "Intronic.Rate", "Intergenic.Rate",
+    "Mapping.Rate", "Quality.format", "Duplication.Rate.of.Mapped", "Mapped",
+    "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
+    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "complexity", "X5.3.bias", "Duplicates.pct", "Duplicates", "Mapped.reads",
+    "Average.insert.size", "Mapped.reads.pct", "Total.reads",
+    "avg_coverage_per_region", "Mapped.Reads", "descritiption",
+    "Alias")
+
+```
+
+```{r clean, cache=FALSE}
+metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
+rownames(metadata) = summarydata$Alias
+metadata$time = factor(metadata$time, levels = c("P5", "P10",
+                                                   "P15", "P20"))
+metadata$group = as.factor(paste0(metadata$condition, metadata$time))
+metadata$condition = factor(metadata$condition, levels=c("JCK" ,"WT"))
+```
+
+
+```{r heatmap-function}
+get_heatmap_fn = function(summarydata) {
+    # return the pheatmap function with or without metadata
+    if(ncol(metadata) == 0) {
+       return(pheatmap)
+    }
+    else {
+    # rownames(metadata) = summarydata$Name
+    heatmap_fn = function(data, ...) {
+        pheatmap(data, annotation=metadata, clustering_method = "ward.D2", clustering_distance_cols = "correlation", ...)
+    }
+    return(heatmap_fn)
+}}
+heatmap_fn = get_heatmap_fn(metadata)
+```
+
+
+
+```{r de-setup}
+library(DESeq2)
+library(DEGreport)
+library(vsn)
+design = ~ group
+condition = "group"
+```
+
+# Differential expression
+
+```{r deseq2-expression-analysis, results='asis'}
+dds = DESeqDataSetFromTximport(txi.salmon,
+    colData=metadata, design = ~ time + condition + time:condition)
+rlogMat <- assay(rlog(dds))
+mds(rlogMat, condition = metadata$time)
+
+```
+
+remove unwanted variation with ruvseq
+
+```{r ruvseq}
+library(RUVSeq)
+reps = do.call(rbind, lapply(levels(metadata$group), function(x){
+    row = which(metadata$group==x)
+    if (length(row) < 3)
+        row = c(row, rep(-1, 3-length(row)))
+    return(row)
+}))
+ruv = RUVs(x = rlogMat, k = 2, scIdx = reps, isLog = TRUE)
+mds(ruv$normalizedCounts, condition = metadata$time)
+```
+
+
+```{r}
+dds = DESeq(dds, test="LRT", reduced = ~ time + condition)
+```
+
+```{r fc_contrast}
+dds_pairs = DESeqDataSetFromTximport(txi.salmon,
+    colData=metadata, design = ~ group)
+dds_pairs = DESeq(dds_pairs)
+```
+
+
+## Dispersion estimates
+
+```{r dispersion-estimate}
+plotDispEsts(dds)
+```
+
+```{r deseq2-handler}
+handle_deseq2 = function(dds, summarydata, column, all_combs=NULL) {
+  if (is.null(all_combs)){
+    all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  }
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="_vs_")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+
+```
+
+
+```{r DESeq-output-condition, results='asis'}
+dds_condition = DESeqDataSetFromTximport(txi.salmon,
+    colData=metadata, design = ~ condition)
+dds_condition = DESeq(dds_condition)
+
+res_pairs =  results(dds_condition, contrast = c("condition", "JCK", "WT"))
+de_res_pairs = show_deseq2_results(res_pairs, dds, rlogMat, "mice_model_jck_wt", 
+                             FDR=0.1, FC=0, do_go=FALSE, path_results = path_results)
+```
+
+Here, I only considered the condition to get the DE genes. These will contain genes
+where the mean on each condition is different, and will help to detect genes that
+are always UP or DOWN.
+
+
+```{r DESeq-output, results='asis'}
+res =  results(dds)
+de_res = show_deseq2_results(res, dds, rlogMat, "mice_model", FDR=0.1, FC=0, path_results = path_results)
+```
+
+This will detect genes that change differently over time in the two conditions.
+
+```{r contrast_time}
+out_df = de_res$table
+gs =  levels(metadata$time)
+contrast =  c(lapply(1:(length(gs)-1), function(n){
+       c("group", paste0("JCK",gs[n+1]),paste0("JCK",gs[n]))
+   }),
+  lapply(1:(length(gs)-1), function(n){
+       c("group", paste0("WT",gs[n+1]),paste0("WT",gs[n]))
+   }))
+
+fc_df <- .table_w_fc(dds_pairs, contrast)
+cols_names <- names(fc_df)
+out_df <- cbind(out_df, fc_df[rownames(out_df),])
+meta_fc_group = data.frame(row.names=colnames(fc_df), 
+                     condition = c("JCK", "JCK", "JCK", "WT", "WT", "WT"),
+                     time = rep(c("P10.5", "P15.10", "P20.15"),2))
+fc_df_group = fc_df
+save_file(out_df[,-8], "mice_model_fold_changes_atgroup.tsv", path_results)
+```
+
+```{r contrast_group, results='asis'}
+out_df = de_res$table
+gs =  levels(metadata$time)
+contrast =  c(lapply(1:length(gs), function(n){
+    c("group", paste0("JCK",gs[n]),paste0("WT",gs[n]))
+}))
+fc_df <- .table_w_fc(dds_pairs, contrast)
+cols_names <- names(fc_df)
+out_df <- cbind(out_df, fc_df[rownames(out_df),])
+meta_fc_time = data.frame(row.names=colnames(fc_df), 
+                     time = gs)
+fc_df_time=fc_df
+save_file(out_df[,-8], "mice_model_early_fold_changes_attime.tsv", path_results)
+```
+
+## Clustering in common patterns
+
+We used __diana__ function inside __cluster__ R package to separate genes
+using the expression correlation with time. 
+Clusters with more than 3
+genes are shown. Significant genes were those with log2FC bigger than 0.1 and FDR < 5%.
+The file with the information of this analysis is `clusters_genes.tsv`.
+
+### Using expression
+
+```{r clustering-fig, results='asis', fig.width=10, fig.height=10}
+clusters = degPatterns(rlogMat[de_res$sign,], metadata, minc=3)
+save_file(clusters$df, "clusters_genes.tsv", path_results)
+```
+
+### Using fold change with two conditions
+
+```{r clustering-fig-fc, fig.width=10, fig.height=10}
+clusters_fc = degPatterns(as.matrix(fc_df_group[de_res$sign,]), meta_fc_group, minc=3, scale = FALSE)
+save_file(clusters_fc$df, "clusters_genes_foldchange_atgroup.tsv", path_results)
+```
+
+### Using fold change at each time point
+
+```{r clustering-fig-fc-2, fig.width=10, fig.height=10}
+clusters_fc = degPatterns(as.matrix(fc_df_time[de_res$sign,]), meta_fc_time, minc=3, scale = FALSE, col = NULL)
+save_file(clusters_fc$df, "clusters_genes_foldchange_attime.tsv", path_results)
+```
+
+#R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+name_res = compress_results(path_results,prefix = "de_early")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```

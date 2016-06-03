@@ -22,7 +22,7 @@ options(width=200,bitmapType = 'cairo')
 # SETUP
 
 ```{r myR, echo=FALSE}
-source("~/repos/myRfunctions/transactions.R")
+library(myRfunctions)
 ```
 
 
@@ -230,9 +230,9 @@ metadata$sampleclass <- ifelse(metadata$sample==126| metadata$sample==127 | meta
 
 set = newSeqExpressionSet(as.matrix(normed.data.edger))
 difference <- matrix(data=c(c(1:3,7:9,13:15), c(4:6,10:12,16:18)), byrow=TRUE, nrow=2)
-batch_ruv_emp <- RUVs(as.matrix(normed.data.edger), rownames(normed.data.edger), k=2, difference)
+batch_ruv_emp <- RUVs(as.matrix(normed.data.edger), rownames(normed.data.edger), k=2, difference, isLog = T)
 
-normed.suv <- as.data.frame(log2(batch_ruv_emp$normalizedCounts + 0.5))
+normed.suv <- as.data.frame((batch_ruv_emp$normalizedCounts))
 
 normed.suv.m <- melt(normed.suv)
 
@@ -251,7 +251,7 @@ dd$batch = as.factor(unlist(dd$batch))
 
 ma = model.matrix(~ 0 + sampleclass + batch, data=dd)
   
-dat.voom = voom(batch_ruv_emp$normalizedCounts,design = ma, plot = TRUE)
+dat.voom = voom(batch_ruv_emp$normalizedCounts^2,design = ma, plot = TRUE)
 dat.fit <- lmFit(dat.voom, ma)
 
 cont.ma = makeContrasts(condition=sampleclassD4-sampleclassD1, levels=ma)

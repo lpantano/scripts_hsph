@@ -1,0 +1,306 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    toc_depth: 2
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="Methylation data"
+labPI="Shi's"
+lablocation=""
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+
+```
+
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(myRfunctions)
+library(knitr)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, 
+                      warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+render_2_drop("cpg_stats.Rmd", "shi_methylation_cpg_report")
+```
+
+---
+
+# Whole genome comparison
+
+RNA-seq analysis for `r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+# Setup
+
+## Libraries
+
+```{r functions}
+library(ggplot2)
+library(gplots)
+library(CHBUtils)
+library(readr)
+library(dplyr)
+```
+
+```{r load}
+path_file = "~/orch/scratch/shi_wgbs/ox_bs/work/cpg_split/"
+samples = c("s409", "s410", "s411", "s412", "s413", "s414", "s345", "s346", "s347", "s348")
+depth=data.frame()
+ratio=data.frame()
+for (s in samples){
+    fn = read.table(file.path(path_file, s, "depth.tsv"), row.names = 1, check.names = FALSE)
+    depth = rbind(depth, data.frame(depth=as.numeric(as.character(names(fn))), sites=unlist(fn[1,]), sample=s))
+    fn = read.table(file.path(path_file, s, "ratio.tsv"), row.names = 1, check.names = FALSE)
+    ratio = rbind(ratio, data.frame(ratio=as.numeric(as.character(names(fn))), sites=unlist(fn[1,]), sample=s))
+}
+```
+
+# Description
+
+Only working with CpG sites in this report and coverage > 10.
+
+## CpG methylation ratio distribution by sample
+
+A plot to visualize the difference in number of sites with different
+methylation ratio. Lower table shows the number and percentage of sites
+methylated (ratio=1) and non-methylated (ratio=0)
+
+```{r ratio, results='asis'}
+ratio_sum = ratio %>% mutate(ratio=round(ratio/100,1)*100) %>% group_by(ratio, sample) %>% dplyr::summarise(sites=sum(sites)) %>% ungroup()
+ggplot(ratio_sum, aes(x=ratio, y=sites, fill=sample)) +
+    geom_bar(stat = "identity", position = "dodge") 
+
+total = ratio %>% group_by(sample) %>% dplyr::summarise(total=sum(sites)) %>% ungroup()
+
+meth_eff = ratio %>% mutate(ratio=round(ratio/100,0)) %>% group_by(ratio, sample) %>% dplyr::summarise(sites=sum(sites)) %>% ungroup() %>% dplyr::left_join(total, by="sample") %>% mutate(pct=sites/total)
+
+kable(meth_eff)
+
+```
+
+## Depth by site
+
+It should be quite similar
+
+```{r depth}
+depth_sum = depth %>% mutate(depth_cat=cut(depth,breaks = c(0,5,10,20,30,40,51))) %>%
+    group_by(depth_cat,sample) %>% dplyr::summarise(sites_total=sum(sites))
+ggplot(depth_sum, aes(x=depth_cat, y=sites_total, fill=sample)) +
+    geom_bar(stat = "identity", position = "dodge") 
+```
+
+```{r mlml}
+library(ChIPseeker)
+library(GenomicRanges)
+require(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+
+getGenomicAnnoStat <- function(peakAnno) {
+    if ( class(peakAnno) == "GRanges" )
+        peakAnno <- as.data.frame(peakAnno)
+    anno <- peakAnno$annotation
+    ## anno <- sub(" \\(.+", "", anno)
+
+    anno[grep("exon 1 of", anno)] <- "1st Exon"
+    anno[grep("intron 1 of", anno)] <- "1st Intron"
+    anno[grep("Exon \\(", anno)] <- "Other Exon"
+    anno[grep("Intron \\(", anno)] <- "Other Intron"
+    anno[grep("Downstream", anno)] <- "Downstream (<=3kb)"
+    anno[grep("Promoter", anno)] <- "Promoter"
+    ## count frequency
+    anno.table <- table(anno)
+    
+    ## calculate ratio
+    anno.ratio <- anno.table/ sum(anno.table) * 100
+    anno.df <- as.data.frame(anno.ratio)
+    colnames(anno.df) <- c("Feature", "Frequency")
+    anno.df$Numbers <- anno.table
+    lvs <- c(
+             "Promoter",
+             "CpG",
+             "5' UTR",
+             "3' UTR",
+             "1st Exon",
+             "Other Exon",
+             "1st Intron",
+             "Other Intron",
+             "Downstream (<=3kb)",
+             "Distal Intergenic",
+             "Others")
+
+    anno.df$Feature <- factor(anno.df$Feature, levels=lvs[lvs %in% anno.df$Feature])
+    anno.df <- anno.df[order(anno.df$Feature),]
+    return(anno.df)
+}
+
+cpg = readr::read_tsv("http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/cpgIslandExt.txt.gz", col_names = FALSE,progress = FALSE)
+cpg_r = makeGRangesFromDataFrame(cpg, 
+                                keep.extra.columns = FALSE, 
+                                    ignore.strand = TRUE, end.field = "X4",
+                                    start.field = "X3", seqnames.field = "X2")
+cpg_r$name="CpGI"
+
+# http://www.r-bloggers.com/cpg-island-shelves/
+###############################################################
+#             Extract CpG island shores
+###############################################################
+# extract the shore defined by 2000 bp upstream of cpg islands
+shore1=flank(cpg_r, 2000)
+# extract the shore defined by 2000 bp downstream of cpg islands
+shore2=flank(cpg_r,2000,FALSE)
+# perform intersection and combine the shores where they overlap
+shore1_2=GenomicRanges::reduce(c(shore1,shore2))
+# extract the features (ranges) that are present in shores only and not in cpg_islands (ie., shores not overlapping islands)
+cpgi_shores=setdiff(shore1_2, cpg_r)
+cpgi_shores$name="shore"
+###############################################################
+#             Extract CpG island shelves
+###############################################################
+# extract the shore defined by 4000 bp upstream of cpg islands
+shelves1=flank(cpg_r, 4000)
+# extract the shore defined by 2000 bp downstream of cpg islands
+shelves2=flank(cpg_r,4000,FALSE)
+# perform intersection and combine the shelves where they overlap
+shelves1_2=GenomicRanges::reduce(c(shelves1,shelves2))
+# create a set of ranges consisting CpG Islands, Shores
+island_shores=c(cpg_r, cpgi_shores)
+# extract the features (ranges) that are present in shelves only and not in cpg_islands  or shores(ie., shelves not overlapping islands or shores)
+cpgi_shelves=setdiff(shelves1_2, island_shores)
+cpgi_shelves$name="shelf"
+write.table(cpg_r, "~/orch/scratch/shi_wgbs/ox_bs/final/data/cpgi.bed", sep="\t", quote=F, col.names = FALSE, row.names = F)
+write.table(cpgi_shores, "~/orch/scratch/shi_wgbs/ox_bs/final/data/cpgi_shores.bed", sep="\t", quote=F, col.names = FALSE, row.names = F)
+write.table(cpgi_shelves, "~/orch/scratch/shi_wgbs/ox_bs/final/data/cpgi_shelves.bed", sep="\t", quote=F, col.names = FALSE, row.names = F)
+
+make_annotaiton = function(df, prefix){
+
+    cat("\n\n**Annotation of sites using 0.3 cutoff: **\n\n")
+    cat("Number of sites:",nrow(df),"\n\n")
+    obj = file.path(path_file, paste0(prefix, "_ann.rda"))
+    if (!file.exists(obj)){
+        df_r = makeGRangesFromDataFrame(as.data.frame(df), 
+                                        keep.extra.columns = FALSE, 
+                                        ignore.strand = TRUE, end.field = "end",
+                                        start.field = "start", seqnames.field = "chr")
+        
+        an = annotatePeak(df_r, TxDb = txdb, tssRegion = c(-1000,1000), 
+                          annoDb = "org.Hs.eg.db", verbose = FALSE)
+        save(an, file=obj)
+    }else{
+        load(obj)
+    }
+    idx = findOverlaps(an@anno, cpg_r)
+    an@detailGenomicAnnotation[,"cpg"] = FALSE
+    an@detailGenomicAnnotation[queryHits(idx),"cpg"] = TRUE
+    an@anno$annotation[queryHits(idx)] = "CpG"
+    .df = getGenomicAnnoStat(an@anno)
+    slot(an, "annoStat") <- .df
+    pdf(paste0(prefix,"_genomic.pdf"))
+    print(plotAnnoBar(an))
+    dev.off()
+    
+}
+```
+
+## Output using fisher test and MLML data
+
+I am selecting CpG sites that have a coverage > than a cutoff, and %mC in the BS data > 90%
+as we agreed at some point.
+
+```{r fisher,eval=FALSE}
+library(BiocParallel)
+library(dplyr)
+setwd("~/orch/scratch/shi_wgbs/ox_bs/final")
+calculate_pval = function(s){
+    # cat("\n\n## ", s, "\n")
+    fn = readr::read_tsv(paste0(s,"_merged.Rfisher.txt.gz"))
+    fn_f = rowwise(fn) %>%
+        dplyr::mutate(.,pvalR=fisher.test(x=matrix(c(C_counts,CT_counts-C_counts, ox_C_counts,ox_CT_counts-ox_C_counts),ncol=2),
+                        alternative = "greater")$p.value,
+                      pval_mC=pbinom(C_counts, CT_counts,0.1,lower.tail = FALSE))
+    fn_f$mC_fdr = p.adjust(fn_f$pval_mC, method = "fdr")
+    fn_f$hmC_fdr = p.adjust(fn_f$pvalR, method = "fdr")
+    readr::write_tsv(fn_f, paste0(s, "_merged.mC.hmC.txt"))
+
+}
+
+```
+
+```{r load-hmc,eval=FALSE,echo=FALSE, results='asis'}
+res_tab = data.frame()
+path_hmc_file = "~/orch/scratch/shi_wgbs/ox_bs/final"
+# samples[c(1,3,5,7,9)]
+for (s in samples[c(1,3,5,7,9)]){
+    cat("\n\n## ", s, "\n")
+    fn = readr::read_tsv((file.path(path_hmc_file, paste0(s,"_merged.Rfisher.txt"))),progres=FALSE)
+    tests = lapply( c(10,20, 30, 40, 50), function(cuto){
+        # print(cuto)
+        fn_f = fn[fn$CT_counts >= cuto & fn$ox_CT_counts >= cuto,]
+        fn_f$fdr = p.adjust(fn_f$pvalR, method="fdr")
+        fdr = sum(fn_f$fdr<0.05, na.rm = T)
+        total = nrow(fn_f)
+        mlml = sum(fn_f$fdr<0.05 & fn_f$hmC> 0.3 & fn_f$hmC-fn_f$mC > 0.3)
+        data.frame(cutoff=cuto, total=total, fdr_5pct=fdr, hmc_fdr_pct =fdr/total*100, mlml_cutoff_pct=mlml/total*100)
+    })
+    tab = do.call(rbind, tests)
+    tab$sample = s
+    res_tab=rbind(res_tab, tab)
+    fn_f = fn[fn$CT_counts >= 10 & fn$ox_CT_counts >= 10,]
+    fn_f$fdr = p.adjust(fn_f$pvalR, method="fdr")
+    readr::write_tsv(fn_f[fn_f$fdr<0.1, ], file.path(path_hmc_file, paste0(s, "_merged.Rfisher.FDR.txt")))
+    cat("\n\n**Significant hmC sites: ", sum(fn_f$fdr<0.05)/nrow(fn_f)*100,"(", sum(fn_f$fdr<0.05), ")", "**\n\n")
+    cat("\n\n**Significant hmC sites and hmC % > 0.3 and hmC-mC > 0.3: ", sum(fn_f$fdr<0.05  & fn_f$hmC> 0.3 & fn_f$hmC-fn_f$mC > 0.3 )/nrow(fn_f)*100,"**\n\n")
+    
+    make_annotaiton(fn_f %>% filter(fdr<0.05))
+}
+```
+
+```{r load-hmc,eval=FALSE,echo=FALSE, results='asis'}
+path_hmc_file = "~/orch/scratch/shi_wgbs/ox_bs/final"
+# samples[c(1,3,5,7,9)]
+for (s in samples[c(1,3,5,7,9)]){
+    cat("\n\n## ", s, "\n")
+    fn = readr::read_tsv((file.path(path_hmc_file, paste0(s,"_merged.hmC.mC.txt"))),progres=FALSE)
+    fn_f = fn[fn$CT_counts >= 10 & fn$ox_CT_counts >= 10,]
+    
+    cat("### Significant hmC sites")
+    tab = fn_f[fn_f$mhC_fdr<0.05 & fn_f$hmC>0.3,]
+    make_annotaiton(tab, paste0(s, "_hmC"))
+    tab = fn_f[fn_f$mC_fdr<0.05 & fn_f$mC>0.3,]
+    make_annotaiton(tab, paste0(s, "_mC"))
+}
+```
+
+
+```{r output-fisher, eval=FALSE, results='asis'}
+kable(res_tab)
+```
+
+#R Session Info
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+

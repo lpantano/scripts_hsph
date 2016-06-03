@@ -1,12 +1,10 @@
 ---
 output:
-  knitrBootstrap::bootstrap_document:
-    theme: readable
-    highlight: zenburn
-    theme.chooser: TRUE
-    highlight.chooser: TRUE
   html_document:
     toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: readable
     highlight: zenburn
 ---
 
@@ -520,24 +518,40 @@ print_out = function(dss, rlog=NULL, res=NULL, prefix="data_"){
 
 ```{r de, results='asis'}
 counts = counts(obj)
-design$condition = factor(design$condition, levels = c("Day0", "Day1",
+design$group = factor(design$condition, levels = c("Day0", "Day1",
                                                    "Day2", "Day3",
                                                    "Day7", "Day14",
                                                    "Day28"))
+comps = list(c("group", "Day1", "Day0"), 
+             c("group", "Day2","Day0"), 
+             c("group", "Day3", "Day0"),
+             c("group", "Day7","Day0"),
+             c("group", "Day14","Day0"))
+
 dss = DESeqDataSetFromMatrix(countData = counts[rowSums(counts>0)>3,],
                              colData = design,
-                             design = ~ condition)
+                             design = ~ group)
 dss = DESeq(dss, reduced = ~ 1, test = "LRT")
+rlogMat = assay(rlog(dss))
+plotDispEsts(dss)
 
-print_out(dss, prefix="mirna_")
+res =  results(dss)
+deg_res = degResults(res=res, dss, rlogMat, "fa_model_mirna", 
+                    FDR=0.05, FC=1, group=NULL, xs="group",
+                    org=org.Mm.eg.db, 
+                    path_results = root_file, do_go=FALSE,
+                    contrast=comps)
+
 
 ```
 
 
-```{r DESeq-confirmation, eval=FALSE}
-DESeq2::plotCounts(dss, "mmu-let-7a-5p", "condition" )
-
+```{r clustering-mirna}
+clusters = degPatterns(rlogMat[deg_res$sign,], design, minc = 5, summarize = "group", time="group", col = NULL)
+.df=clusters$df
+save_file(.df, "clusters_genes_mirna.tsv", root_file)
 ```
+
 
 ## Analysis for novel miRNA
 
@@ -545,11 +559,24 @@ DESeq2::plotCounts(dss, "mmu-let-7a-5p", "condition" )
 counts = counts(obj_mirdeep)
 dss_mirdeep2 = DESeqDataSetFromMatrix(countData = counts[rowSums(counts>0)>3,],
                              colData = design,
-                             design = ~ condition)
+                             design = ~ group)
 dss_mirdeep2 = DESeq(dss_mirdeep2, reduced = ~ 1, test = "LRT")
+rlogMat = assay(rlog(dss_mirdeep2))
+plotDispEsts(dss_mirdeep2)
 
-print_out(dss_mirdeep2, prefix="novel_")
+res =  results(dss_mirdeep2)
+deg_res = degResults(res=res, dss_mirdeep2, rlogMat, "fa_model_novel", 
+                    FDR=0.05, FC=1, group=NULL, xs="group",
+                    org=org.Mm.eg.db, 
+                    path_results = root_file, do_go=FALSE,
+                    contrast=comps)
 
+```
+
+```{r clustering-mirdeep2}
+clusters = degPatterns(rlogMat[deg_res$sign,], design, minc = 5, summarize = "group", time="group", col = NULL)
+.df=clusters$df
+save_file(.df, "clusters_genes_novel.tsv", root_file)
 ```
 
 ## Analysis for isomiRs
@@ -559,18 +586,26 @@ print_out(dss_mirdeep2, prefix="novel_")
 counts_iso = counts(isoCounts(obj, ref=T, iso5=T, iso3=T, add=T, subs =T))
 dss_iso = DESeqDataSetFromMatrix(countData = counts_iso[rowSums(counts_iso>0)>3,],
                              colData = design,
-                             design = ~ condition)
+                             design = ~ group)
 dss_iso = DESeq(dss_iso, reduced = ~ 1, test = "LRT")
+rlogMat = assay(rlog(dss_iso))
+plotDispEsts(dss_iso)
 
-print_out(dss_iso, prefix="isomirna_")
+res =  results(dss_iso)
+deg_res = degResults(res=res, dss_iso, rlogMat, "fa_model_isomir", 
+                    FDR=0.05, FC=1, group=NULL, xs="group",
+                    org=org.Mm.eg.db, 
+                    path_results = root_file, do_go=FALSE,
+                    contrast=comps)
 
 ```
 
-
-```{r DESeq-confirmation-iso, eval=FALSE}
-DESeq2::plotCounts(dds, put_gene_name_here)
-
+```{r clustering-isomir}
+clusters = degPatterns(rlogMat[deg_res$sign,], design, minc = 5, summarize = "group", time="group", col = NULL)
+.df=clusters$df
+save_file(.df, "clusters_genes_isomir.tsv", root_file)
 ```
+
 
 ## Analysis for clusters
 
@@ -578,13 +613,25 @@ DESeq2::plotCounts(dds, put_gene_name_here)
 
 dss_clus = DESeqDataSetFromMatrix(countData = clus_ma[rowSums(clus_ma>0)>3,],
                                  colData = design,
-                                 design = ~ condition)
+                                 design = ~ group)
 dss_clus = DESeq(dss_clus, reduced = ~ 1, test = "LRT")
+rlogMat = assay(rlog(dss_clus))
+plotDispEsts(dss_clus)
 
-print_out(dss_clus, prefix="clus_")
+res =  results(dss_clus)
+deg_res = degResults(res=res, dss_clus, rlogMat, "fa_model_cluster", 
+                    FDR=0.05, FC=1, group=NULL, xs="group",
+                    org=org.Mm.eg.db, 
+                    path_results = root_file, do_go=FALSE,
+                    contrast=comps)
 
 ```
 
+```{r clustering-cluster}
+clusters = degPatterns(rlogMat[deg_res$sign,], design, minc = 5, summarize = "group", time="group", col = NULL)
+.df=clusters$df
+save_file(.df, "clusters_genes_cluster.tsv", root_file)
+```
 
 # Files
 

@@ -4,6 +4,7 @@ output:
   html_document:
     toc: true
     toc_depth: 2
+    toc_float: true
     theme: readable
     highlight: zenburn
 ---
@@ -38,7 +39,8 @@ options(bitmapType = 'cairo')
 ```
 
 ```{r project-options, echo=FALSE}
-source("~/repos/myRfunctions/transactions.R")
+library(myRfunctions)
+source("~/repos/DEGreport/R/clustering.R")
 path_results = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/files"
 dir.create(path_results, showWarnings = FALSE)
 ```
@@ -68,9 +70,9 @@ library(dplyr)
 # library(DT)
 
 basicConfig()
-project_summary = "/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/project-summary.csv"
-counts_file = "/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/combined.counts"
-tx2genes_file = "/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/tx2gene.csv"
+project_summary = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/project-summary.csv"
+counts_file = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/combined.counts"
+tx2genes_file = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/tx2gene.csv"
 
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 "#0072B2", "#D55E00", "#CC79A7")
@@ -81,7 +83,7 @@ summarydata = summarydata[order(summarydata$Name),]
 
 if (file.exists(tx2genes_file)) {
   loginfo("Using gene counts calculated from the Sailfish transcript counts.")
-  sf_files = file.path("/home/lpantano/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final",
+  sf_files = file.path("~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final",
                        rownames(summarydata), "sailfish",
                        rownames(summarydata), "quant.sf")
   names(sf_files) = summarydata$descritiption
@@ -127,7 +129,7 @@ get_heatmap_fn = function(summarydata) {
 heatmap_fn = get_heatmap_fn(summarydata)
 ```
 
-# Quality control metrics
+# Quality control metrics {.tabset}
 
 ## Mapped reads
 ```{r mapped-plot, eval="Mapped" %in% colnames(summarydata)}
@@ -269,6 +271,17 @@ vst = varianceStabilizingTransformation(dds)
 mds(assay(vst), condition = metadata$group)
 ```
 
+## MDS after variation removal
+
+We used RUVSeq package for this with two factors to explain the unwanted variation.
+```{r ruv-seq}
+library(RUVSeq)
+replicates=matrix(1:nrow(metadata), nrow=6, byrow = TRUE)
+ruv = RUVs(assay(vst), k=2, scIdx=replicates, isLog=TRUE)
+mds(log2(ruv$normalizedCounts), condition = metadata$group)
+```
+
+
 ## Heatmap by concordance correlation coefficient
 http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1004075
 
@@ -299,8 +312,8 @@ heatmap_fn(do_propcor(normalized_counts))
 
 ```{r de-setup}
 library(DESeq2)
-# library(DEGreport)
-# library(vsn)
+library(DEGreport)
+library(vsn)
 design = ~ group
 condition = "group"
 ```
@@ -378,147 +391,69 @@ get_groups <- function(d, comp, condition)
 ```
 
 ```{r DESeq-output, results='asis'}
-all_results = list()
-all_results[["fa_model"]] = results(dds)
-for(i in seq(length(all_results))) {
-  cat(paste("## Comparison: ", names(all_results)[i]))
-  out_df = as.data.frame(all_results[[i]])
-  out_df = out_df[!is.na(out_df$padj),]
-  out_df = out_df[order(out_df$padj),]
-  out_df$symbol = convertIDs(rownames(out_df), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
-  out_df$description = convertIDs(rownames(out_df), "ENSEMBL", "GENENAME", org.Mm.eg.db, "useFirst")
-  
-  cat("\n",paste(capture.output(summary(all_results[[i]]))[1:8], collapse = "<br>"),"\n")
-
-  cat("\n\n### MA plot plot\n\n")
-  DESeq2::plotMA(all_results[[i]])
-  title(paste("MA plot for contrast", names(all_results)[i]))
-  
-  cat("\n\n### Volcano plot\n\n")
-  stats = as.data.frame(all_results[[i]][,c(2,6)])
-  volcano_density_plot(stats, title=names(all_results)[i], lfc.cutoff=1.5)
-
-#   cat("\n\n### QC for DE genes mean/variance\n")
-#   g <- get_groups(summarydata, names(all_results)[i], condition)
-#   p = degMV(g[[1]], g[[2]], all_results[[i]]$padj, counts(dds,normalized=TRUE)) +
-#   ggtitle(paste0("Mean-vs-Variation for ", names(all_results)[i]))
-#   print(p)
-  
-  cat("\n\n### Heatmap most significand, padj<0.05 and log2FC > 2\n")
-  sign = row.names(out_df)[out_df$padj<0.05 & !is.na(out_df$padj) & abs(out_df$log2FoldChange) > 2]
-
-  if (length(sign)<2){
-    cat("Too few genes to plot.")
-  }else{
-    heatmap_fn(vstMat[sign, ], show_rownames = F)
-  }
-  cat("\n")
-  
-  cat("\n\n### Top DE genes\n\n")
-  print(kable(head(out_df, 20)))
-  fn = paste(names(all_results)[i], ".tsv", sep="")
-  save_file(out_df, fn, path_results)
-  cat("\n\nDifferential expression file at: ", fn)
-  cat("\n\n")
-
-  cat("\n\n### GO ontology of DE genes (logFC>3 and FDR < 1%):\n\n")
-  .res = as.data.frame(out_df)
-  .idx = .res$padj<0.01 & abs(.res$log2FoldChange) > 3
-  .idx[is.na(.idx)] = FALSE
-  .de = out_df$symbol[.idx]
-  .accnum = convertIDs(.de, "SYMBOL", "ENTREZID", org.Mm.eg.db, "useFirst")
-  ego <- enrichGO(gene = .accnum[!is.na(.accnum)], 
-                  OrgDb = "org.Mm.eg.db", ont = "BP", pAdjustMethod = "BH",
-                  pvalueCutoff = 0.01, qvalueCutoff = 0.05, readable = TRUE)
-  save_file(summary(ego), paste0(names(all_results)[i], "_goenrich.tsv"), path_results)
-  print(print_enrichGO(summary(ego), 30))
-  cat("\n\n")
-}
+res =  results(dds)
+deg_res = show_deseq2_results(res, dds, rlogMat, "fa_model", 
+                    FDR=0.01, FC=3, group=NULL, xs="group",
+                    org=org.Mm.eg.db, 
+                    path_results = path_results,
+                    contrast=list(c("group", "day1", "control"),
+                                  c("group", "day2", "control"),
+                                  c("group", "day3", "control"),
+                                  c("group", "day7","control"), 
+                                  c("group", "day14", "control")))
 ```
 
 ## Clustering in common patterns
 
 We used __diana__ function inside __cluster__ R package to separate genes
-using the expression correlation with time. Clusters with more than 15
+using the expression correlation with time. Clusters with more than 20
 genes are shown. A GO and KEGG enrichment is done for each group.
 
 A summary of diana function is copied here:
 
 ```
-diana is fully described in chapter 6 of Kaufman and Rousseeuw (1990). It is probably unique in computing a divisive hierarchy, whereas most other software for hierarchical clustering is agglomerative. Moreover, diana provides (a) the divisive coefficient (see diana.object) which measures the amount of clustering structure found; and (b) the banner, a novel graphical display (see plot.diana).
-
 The diana-algorithm constructs a hierarchy of clusterings, starting with one large cluster containing all n observations. Clusters are divided until each cluster contains only a single observation.
 At each stage, the cluster with the largest diameter is selected. (The diameter of a cluster is the largest dissimilarity between any two of its observations.)
 To divide the selected cluster, the algorithm first looks for its most disparate observation (i.e., which has the largest average dissimilarity to the other observations of the selected cluster). This observation initiates the "splinter group". In subsequent steps, the algorithm reassigns observations that are closer to the "splinter group" than to the "old party". The result is a division of the selected cluster into two new clusters.
 ```
 
+Working with `r length(deg_res$sign)` genes.
 
-```{r clustering-fig, results='asis', fig.width=10, fig.height=10}
-m = (1-cor(t(rlogMat[sign,]), method = "kendall"))
-m[m<0] = 0
-d = as.dist(m^2)
-c = diana(d, diss = TRUE, stand = FALSE)
+```{r clustering-res, results='asis', fig.width=12, fig.height=12, cache=FALSE}
+clusters = degPatterns(rlogMat[deg_res$sign,], metadata, minc = 20, summarize = "group", time="group", col = NULL)
+.df=clusters$df
+.df$symbol = convertIDs(rownames(.df), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
+save_file(.df, "clusters_genes.tsv", path_results)
+```
 
-groups = cutree(as.hclust(c), h = c$dc)
-
-
-norm_sign = t(apply(rlogMat[sign,], 1, function(e){
-  m = sapply(seq(1,18,3), function(i){
-    mean(e[i:(i+2)])
-  })
-  (e - min(m))/(max(m) - min(m))
-}))
-
-
-plot_cluster  = function(norm_sign, g_in_c, metadata, title) {
-  # g_in_c = names(groups[groups==1])
-  ma = as.data.frame(norm_sign)[g_in_c,]
-  ma_long = suppressMessages(melt(cbind(gene=row.names(ma), ma), variable_name = "sample"))
-  ma_long$group = metadata[ma_long$sample, "group"]
-  ma_sum = ma_long %>% group_by(gene, group) %>% summarise(average=mean(value)) %>%
-    ungroup()
-  
-  ma_group = ma_sum %>% group_by(group) %>% summarise(average=median(average)) %>% ungroup()
-  
-  ggplot(ma_sum, aes(x=group, y=average)) + 
-    geom_boxplot() + 
-    stat_smooth(data=ma_group, aes(x=group, y=average, group=1),se=F,method = "lm",formula = y~poly(x,3)) +
-    ggtitle(paste("Group:", title, "(", length(g_in_c), " genes )")) +
-    theme_bw(base_size = 11) +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1))
-}
-
-
-to_plot = names(table(groups))[table(groups) > 15]
-plots = lapply(to_plot, function(x){
-  plot_cluster(norm_sign, as.character(names(groups[groups==x])), metadata, x)
-  })
-
-do.call(grid.arrange, plots)
-
-cat("\n\n\n")
-.void = lapply(to_plot, function(x){
+```{r clustering-fig, results='asis'}
+cat("\nWorking with ", nrow(clusters$df), "genes.\n\n")
+.void = lapply(clusters$pass, function(x){
   cat("\n### group:", x)
   cat("\n\n")
-  .g = as.character(names(groups[groups==x]))
+  .df = clusters$df
+  .g = as.character(.df[.df$cluster==x, "genes"])
   .accnum = convertIDs(.g,
                        "ENSEMBL", "ENTREZID", org.Mm.eg.db, "useFirst")
   .symbol = convertIDs(.g,
                        "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
   ego <- enrichKEGG(gene = .accnum[!is.na(.accnum)], 
                   organism = "mouse",use_internal_data = TRUE)
-  if (nrow(summary(ego))>0)
-    print(kable(summary(ego)))
+  
+  if ( "result" %in% slotNames(ego) )
+    if ( nrow(ego@result) >0 )  print(kable(ego@result[,1:7]))
+  
   cat("\n\n")
   ego <- enrichGO(gene = .accnum[!is.na(.accnum)], 
                   OrgDb = "org.Mm.eg.db", ont = "BP", pAdjustMethod = "BH",
                   pvalueCutoff = 0.01, qvalueCutoff = 0.1, readable = TRUE)
-  print(print_enrichGO(summary(ego), 30))
+   if ( "result" %in% slotNames(ego) )
+    print(print_enrichGO(ego@result, 30))
   cat("\n\n")
   cbind(ensembl=.g, symbol=.symbol, group=x)
 })
 
-save_file(data.frame(do.call(rbind, .void)), "clusters_genes.tsv", path_results)
+
   
 ```
 
@@ -543,7 +478,7 @@ p = see.genes(t$sig.genes$time3, k=3, newX11 = F)
 #R Session Info
 
 ```{r compress, echo=FALSE, cache=FALSE}
-name_res = compress_results(path_results)
+name_res = compress_results(path_results, prefix = "FA_results", zip=TRUE)
 ```
 
 (useful if replicating these results)

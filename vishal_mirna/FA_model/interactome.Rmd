@@ -38,7 +38,7 @@ options(bitmapType = 'cairo')
 ```
 
 ```{r create-report, echo=FALSE, eval=FALSE}
-# render_2_drop("interactome.Rmd", "vishal_kidney/FA_small_rna")
+# render_2_drop("interactome.Rmd", "vishal_kidney/FA_small_rna_newcode")
 ```
 
 ```{r setup}
@@ -57,7 +57,7 @@ library(pheatmap)
 library(cluster)
 
 root_path = "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final"
-root_file = file.path(root_path, "files")
+root_file = file.path(root_path, "files_2016020")
 dir.create(root_file, showWarnings = FALSE)
 
 ```
@@ -92,7 +92,7 @@ mrna_design = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-0
 mrna_de = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/files/fa_model_simple.tsv"
 
 mirna_ma = as.matrix(read.table(mirna_results, header=T, row.names=1))
-mrna_ma = as.matrix(read.table(mrna_results, header=T, row.names=1))
+mrna_ma = as.matrix(read.csv(mrna_results, header=T, row.names=1))
 mrna_ma=mrna_ma[rowSums(mrna_ma)>0,]
 
 mirna_des = read.csv(mirna_design, row.names="sample_id")
@@ -103,8 +103,32 @@ mrna_sign = read.table(mrna_de, header = T, sep = "\t", row.names = 1)
 
 mirna_keep = row.names(mirna_sign)[mirna_sign$padj<0.05]
 write.table(data.frame(m=mirna_keep), "~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/files/mirna_diff.txt",row.names=F, col.names=F, quote=F)
-mrna_keep = row.names(mrna_sign)[mrna_sign$padj<0.05 & abs(mrna_sign$log2FoldChange)]
+mrna_keep = row.names(mrna_sign)[mrna_sign$padj<0.05 ]
 mrna_keep = intersect(mrna_keep, row.names(mrna_ma)) #' fix this
+
+mirna_clean = mirna_ma[,order(mirna_des$group)]
+gr = mirna_des$group[order(mirna_des$group)]
+mirna_clean = mirna_clean[,gr!="Day28"]
+mirna_g = factor( gsub("day0", "control", 
+                       sort(
+                           as.character(tolower(gr[gr!="Day28"]))
+                           ) ),
+                 levels=c("control", "day1", "day2", "day3", "day7", "day14"))
+
+mrna_clean = mrna_ma[,order(mrna_des$group)]
+gr = factor(mrna_des$group[order(mrna_des$group)], levels=levels(mirna_g))
+
+
+mi_rse = SummarizedExperiment(assays=SimpleList(norm=mirna_clean), colData= 
+                                  data.frame(row.names=colnames(mirna_clean),
+                                             group=mirna_g), 
+                              metadata=list(sign=mirna_keep))
+gene_rse = SummarizedExperiment(assays=SimpleList(norm=mrna_clean),colData= 
+                                  data.frame(row.names=colnames(mrna_clean),
+                                             group=gr),  
+                                metadata=list(sign=mrna_keep))
+
+
 
 if ( !file.exists(ma_rda) ){
     pairs=read.table("~/orch/scratch/vishal_mirna_kidney/FA_model/mirna_bio/final/files/matrix.tsv") %>% filter(V3< -.1)
@@ -130,24 +154,11 @@ library(org.Mm.eg.db)
 library(reshape)
 library(cluster)
 
-mirna_clean = mirna_ma[,order(mirna_des$group)]
-gr = mirna_des$group[order(mirna_des$group)]
-mirna_clean = mirna_clean[,gr!="Day28"]
-mirna_g = factor( gsub("day0", "control", 
-                       sort(
-                           as.character(tolower(gr[gr!="Day28"]))
-                           ) ),
-                 levels=c("control", "day1", "day2", "day3", "day7", "day14"))
 
-mrna_clean = mrna_ma[,order(mrna_des$group)]
-gr = mrna_des$group[order(mrna_des$group)]
-
-data = sync_terms_with_mirs(mirna_clean, mrna_clean, as.matrix(ma), 
-                     mrna_keep, mirna_keep, mirna_g, org.Mm.eg.db)
+data = isoNetwork(mi_rse, gene_rse, ma, org=org.Mm.eg.db)
 
 save_file(data$network, "go_terms_network.tsv", root_file)
 save_file(data$summary, "go_term_summary.tsv", root_file)
-#data$summary %>% dplyr::select(Description, Count, nmir)
 ```
 
 Tables with full information at : `go_terms_network.tsva` and `go_term_summary.tsv`.
@@ -163,14 +174,13 @@ Only miRNAs that appear more than 1 times are shown.
 * Top-right panel shows what miRNAs target what terms.
 
 ```{r annotation-calc}
-viz_info = viz_mirna_gene_enrichment(data, mirna_clean, mrna_clean, mirna_g, org.Mm.eg.db)
-save_file(viz_info$table, "interaction.tsv", root_file)
+save_file(data$analysis$table, "interaction.tsv", root_file)
 ```
 
 Table with summarized information for the figure at `interaction.tsv`.
 
 ```{r annotation-run, cache=FALSE, fig.width=15, fig.height=12}
-summary_targets(viz_info)
+isoPlotNet(data)
 # save_file(final_df,"mir_gene_cluster.tsv",root_file)
 ```
 

@@ -1,0 +1,155 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="Methylation data"
+labPI=""
+lablocation=""
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+
+```
+
+
+```{r knitrsetup, echo=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+library(myRfunctions)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, 
+                      warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+render_2_drop("chr10_comparison.Rmd", "shi_methylation_data")
+```
+
+---
+
+# Chr10 comparison
+
+RNA-seq analysis for`r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+# Setup
+
+## Libraries
+
+```{r functions}
+library(ggplot2)
+library(gplots)
+library(CHBUtils)
+library(readr)
+```
+
+```{r load}
+bismark = readr::read_tsv("~/orch/scratch/shi_wgbs/pilot_2/test_bisrmark_s11/chr10_bismark.cov",col_names = FALSE)
+bismap = readr::read_tsv("~/orch/scratch/shi_wgbs/pilot_2/test_bsmap_s11/methratio_chr10.txt")
+```
+
+number of rows in bsmap `r nrow(bismap)` and bsmark `r nrow(bismark)`
+
+
+BSMAP methylation correlation with CpG context
+
+```{r bismap-table}
+table(bismap$context,cut(bismap$ratio, breaks = c(-1,0.5,1.1)))
+```
+
+
+If we keep only CpG and only methylated:
+
+```{r}
+bismark_m = bismark[bismark[,4]>0,]
+# bismark_m_cov = bismark_m[rowSums(bismark_m[,5:6])>3,]
+bsmap_m = bismap[bismap[,"ratio"]>0,]
+bsmap_m_cp = bsmap_m[bsmap_m$context=="CG",]
+# bsmap_m_cp_cov = bsmap_m_cp[bsmap_m_cp$CT_count > 3,]
+nrow(bismark_m)
+nrow(bsmap_m_cp)
+```
+
+common positions:
+
+```{r}
+common = length(intersect(unlist(bismark_m[,2]),(bsmap_m_cp$pos)))
+common/nrow(bismark_m)
+common/nrow(bsmap_m_cp)
+```
+
+
+Summary for bismark
+
+```{r}
+common= intersect(unlist(bismark[,2]),bismap$pos)
+# only_bsmap= setdiff((bsmap_m_cp$pos),unlist(bismark_m[,2]))
+# bismark %>% filter(X2 %in% only_bismark, X5>5)
+
+bismark$overlap = FALSE
+bismark[bismark$X2 %in% common,"overlap"] = TRUE
+bismark$reads = cut(rowSums(bismark[,5:6]), breaks = c(-1,3,10,1000000))
+bismark$ratio_cat = cut(bismark[,4], breaks = c(-1,50,100.1))
+
+ggplot(bismark, aes(x=reads,fill=ratio_cat)) +
+    geom_bar() +
+    facet_wrap(~overlap)
+```
+
+Summary for bsmap
+
+```{r}
+common= intersect(bismap$pos,unlist(bismark[,2]))
+# only_bsmap= setdiff((bsmap_m_cp$pos),unlist(bismark_m[,2]))
+# bismark %>% filter(X2 %in% only_bismark, X5>5)
+
+bismap$overlap = FALSE
+bismap[bismap$pos %in% common,"overlap"] = TRUE
+bismap$reads = cut(rowSums(bismap[,c(8,10)]), breaks = c(-1,3,10,1000000))
+bismap$ratio_cat = cut(bismap$ratio, breaks = c(-1,0.5,1.1))
+
+ggplot(bismap, aes(x=reads,fill=ratio_cat)) +
+    geom_bar() +
+    facet_wrap(~overlap)
+
+
+ggplot(bismap %>% filter(context=="CG"), aes(x=reads,fill=ratio_cat)) +
+    geom_bar() +
+    facet_wrap(~overlap)
+
+
+table(bismap$context,bismap$overlap)
+
+```
+
+
+```{r compress, echo=F}
+name_res = compress_results(res_files)
+```
+
+#R Session Info
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+

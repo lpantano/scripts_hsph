@@ -20,7 +20,6 @@ dir.create(path_results, showWarnings = FALSE)
 
 
 ```{r knitrsetup, echo=FALSE}
-library(knitrBootstrap)
 library(rmarkdown)
 library(myRfunctions)
 

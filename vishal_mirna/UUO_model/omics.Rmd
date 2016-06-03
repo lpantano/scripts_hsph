@@ -1,0 +1,190 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+    toc_float: true
+    theme: readable
+    highlight: zenburn
+---
+
+Report last updated `r date()`.
+
+
+```{r knitrsetup, echo=FALSE}
+library(myRfunctions)
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+# render_2_drop("omics.Rmd", "vishal_kidney/UUO_omics")
+```
+
+```{r libraries}
+library(ggplot2)
+library(reshape)
+library(limma)
+library(CHBUtils)
+library(biomaRt)
+library(dplyr)
+library(cluster)
+library(gridExtra)
+source("~/repos/isomiRs/R/targets.R")
+source("~/repos/DEGreport/R/clustering.R")
+order_group=c("normal", "day3", "day7", "day14")
+result_files = "~/orch/scratch/vishal_mirna_kidney/UUO-model/omics/files"
+root_path = "~/orch/scratch/vishal_mirna_kidney/UUO-model"
+dir.create(result_files, showWarnings = F, recursive = T)
+basicConfig(level='INFO')
+```
+
+# Protein analysis {.tabset}
+
+FC > 2 and FDR < 1%
+
+```{r protein-de, results='asis'}
+protein_file = file.path(root_path, "protein", "files")
+dir.create(protein_file, recursive = T, showWarnings = F)
+counts = read.csv(file.path(root_path, "UUO_Proteomics.csv"))
+row.names(counts) = counts$Uniprot.ID
+clean_counts = counts[,8:17]
+
+mapping = data.frame(id=rownames(clean_counts))
+mapping = annotate_df(mapping, "id", 'mmusculus_gene_ensembl', "uniprot_genename", "ensembl_gene_id")  %>% distinct(ensembl_gene_id)
+
+mapping2 = data.frame(id=unique(counts$Gene.Symbol)[!is.na(unique(counts$Gene.Symbol))])
+mapping2 = annotate_df(mapping2, "id", 'mmusculus_gene_ensembl', "wikigene_name", "ensembl_gene_id")  %>% distinct(ensembl_gene_id)
+
+counts[as.character(mapping$id), "ensembl"] = mapping$ensembl_gene_id 
+idx = match(mapping2$id,counts$Gene.Symbol)
+counts[idx, "ensembl"] = mapping2$ensembl_gene_id
+counts$symbol = convertIDs(as.character(counts$ensembl), "ENSEMBL", "SYMBOL", org.Mm.eg.db)
+save_file(counts, "counts_annotated.csv", protein_file)
+
+clean_counts = clean_counts[mapping$id,]
+rownames(clean_counts) = mapping$ensembl_gene_id
+cat("## Expression density of 'raw' data\n\n")
+ggplot(melt(clean_counts), aes(x=value, colour=variable)) + geom_density()
+
+MA <- normalizeBetweenArrays(as.matrix(clean_counts), method="quantile")
+
+cat("## Expression density of normalize data\n\n")
+ggplot(melt(as.data.frame(MA)), aes(x=value, colour=variable)) + geom_density()
+
+coldata = data.frame(row.names=colnames(clean_counts), samples=colnames(clean_counts)) %>% tidyr::separate(samples,into = c("group"), extra = "drop")
+
+cat("## MDS plot\n\n")
+mds(MA, condition = coldata$group)
+save_file(MA, "uuo_model_log2_counts.tsv", protein_file)
+design <- model.matrix(~ 0 + coldata$group)
+colnames(design) = c("day14", "day3", "day7", "normal")
+fit <- lmFit(MA, design)
+contrast.matrix <- makeContrasts(day3-normal, day7-day3, day14-day7, day14-normal, day14-day3, day7-normal, levels=design)
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2)
+res = topTable(fit2, adjust="BH", n="Inf")
+save_file(res, "uuo_model.tsv", protein_file)
+absMaxFC = rowMeans(abs(res[,1:4]))
+sign = row.names(res[absMaxFC>2 & res$adj.P.Val<0.01,])
+# protein_sign = row.names(res[absMaxFC>2 & res$adj.P.Val<0.01,])
+cat("## MDS plot of DE proteins\n\n")
+mds(MA[sign,], condition = coldata$group)
+
+coldata$group = factor(coldata$group, levels=order_group)
+cat("## Clustering analysis\n\n")
+clusters = degPatterns(MA[sign,], coldata, minc = 15, summarize = "group", time="group", col = NULL)
+.df=clusters$df
+save_file(.df, "clusters_genes_cluster.tsv", protein_file)
+name_res = compress_results(protein_file, prefix = "uoo_model_prot", zip = TRUE)
+
+```
+
+# 3D interaction analysis
+
+```{r load, results='asis'}
+
+root_path = "~/orch/scratch/vishal_mirna_kidney/UUO-model"
+mrna_path = "mrna/final/2016-02-03_mrna/files"
+mrna_matrix = read.csv(file.path(root_path, mrna_path, "uuo_model_log2_counts.tsv"), row.names = 1)
+mrna_clusters = read.csv(file.path(root_path, mrna_path, "clusters_genes.tsv"), row.names = 1)
+mrna_col = data.frame(row.names=colnames(mrna_matrix), samples=colnames(mrna_matrix)) %>% tidyr::separate(samples,into = c("group"), extra = "drop") %>% mutate(group=factor(group, levels=order_group))
+rownames(mrna_col) = colnames(mrna_matrix)
+    
+prot_path = "protein/files"
+prot_matrix = read.csv(file.path(root_path, prot_path, "uuo_model_log2_counts.tsv"), row.names = 1)
+prot_clusters = read.csv(file.path(root_path, prot_path, "clusters_genes_cluster.tsv"), row.names = 1)
+prot_col = data.frame(row.names=colnames(prot_matrix), samples=colnames(prot_matrix)) %>% tidyr::separate(samples,into = c("group"), extra = "drop") %>% mutate(group=factor(group, levels=order_group))
+rownames(prot_col) = colnames(prot_matrix)
+
+mirna_path = "mirna_bcbio/final/files"
+mirna_matrix = read.csv(file.path(root_path, mirna_path, "uuo_model_mirna_log2_counts.tsv"), row.names = 1)
+load(file.path(root_path, mirna_path, "ma.rda"))
+mirna_clusters = read.csv(file.path(root_path, mirna_path, "go_terms_network.tsv"))
+mirna_col = data.frame(row.names=colnames(mirna_matrix), samples=colnames(mirna_matrix)) %>% tidyr::separate(samples,into = c("group"), extra = "drop") %>% mutate(group=factor(group, levels=order_group))
+rownames(mirna_col) = colnames(mirna_matrix)
+# length(intersect(rownames(prot_matrix), rownames(mrna_matrix)))
+```
+
+```{r plot, results='asis'}
+
+#mrna_cluster = annotate_df(mrna_clusters, "genes", 'mmusculus_gene_ensembl', "ensembl_gene_id", "gene_biotype")
+mrna_keep = as.character(mrna_clusters$genes)
+prot_keep = unique(c(intersect(mrna_keep, rownames(prot_matrix)), as.character(prot_clusters$genes)))
+keep = intersect(mrna_keep, rownames(prot_matrix))
+
+df = degMerge(list(mrna=mrna_matrix[keep,], prot=prot_matrix[keep,]), 
+                   list(mrna=mrna_clusters), 
+                   list(mrna=mrna_col, prot=prot_col), 
+                   summarize="group", 
+                   time="group", col=NULL, 
+                   scale=TRUE)
+prot_merged = do.call(rbind, df)
+prot_merged$name = convertIDs(as.character(prot_merged$gene), "ENSEMBL", "SYMBOL", org.Mm.eg.db)
+names(prot_merged) = paste0("prot_", names(prot_merged))
+
+cor_tar = find_targets(mirna_matrix, mrna_matrix[mrna_keep,order(mrna_col$group)], ma, mirna_col$group)
+mapping = melt(cor_tar) %>% filter(value<0)
+keep = intersect(mrna_keep, unique(mapping[,1]))
+mirna_keep = as.character(unique(mapping[,2]))
+df = degMerge(list(mrna=mrna_matrix[keep,],
+                   mirna=mirna_matrix[mirna_keep,]), 
+              list(mrna=mrna_clusters), 
+              list(mrna=mrna_col, mirna=mirna_col), 
+              summarize="group", 
+              time="group", col=NULL, 
+              scale=TRUE, mapping=list(mirna=mapping))
+mirna_merged = do.call(rbind, df)
+mirna_merged$name = convertIDs(as.character(mirna_merged$pair), "ENSEMBL", "SYMBOL", org.Mm.eg.db)
+names(mirna_merged) = paste0("mirna_", names(mirna_merged))
+
+merged = merge(mirna_merged[mirna_merged$mirna_cor < -.6,c(6,7,1:5)], prot_merged[prot_merged$prot_cor > .6,c(5,7,1:4)], by=1, all=TRUE)
+merged_all = merge(mirna_merged, prot_merged, by=1, all=TRUE)
+
+save_file(merged, "omics_filtered.csv", result_files)
+save_file(merged_all, "omics.csv", result_files)
+save_file(prot_merged, "prot_omics.csv", result_files)
+save_file(mirna_merged, "mirna_omics.csv", result_files)
+```
+
+# R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+name_res = compress_results(result_files, prefix = "uuo_model_omic", zip = TRUE)
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+

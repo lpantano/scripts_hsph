@@ -1,0 +1,393 @@
+---
+title: "RNA-seq analysis."
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    code_folding: hide
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project=" human macrophages  - RNAseq "
+labPI="Jeffrey"
+lablocation="Longwood"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+```
+
+RNA-seq analysis for `r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",echo=FALSE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r project-options, echo=FALSE}
+library(myRfunctions)
+path_results = "~/orch/scratch/jeffreys_rnaseq/hg_macro/final/files"
+dir.create(path_results, showWarnings = FALSE)
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+#render_2_drop("mrna-summary.Rmd", "jeffrey/hgmacro_model")
+```
+
+# Overview
+
+```{r qc-setup, results='asis'}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(DESeq2)
+library(tximport)
+library(logging)
+library(gridExtra)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(cluster)
+library(dplyr)
+source("~/repos/DEGreport/R/clustering.R")
+# library(DT)
+
+basicConfig()
+root_path = "~/orch/scratch/jeffreys_rnaseq/hg_macro/final/2016-05-23_hg_macro"
+project_summary = file.path(root_path, "project-summary.csv")
+counts_file = file.path(root_path, "combined.counts")
+tx2genes_file = file.path(root_path, "tx2gene.csv")
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+
+summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
+summarydata$Name = rownames(summarydata)
+summarydata = summarydata[order(summarydata$Name),]
+
+if (file.exists(tx2genes_file)) {
+  loginfo("Using gene counts calculated from the Sailfish transcript counts.")
+  sf_files = file.path(root_path, "..",
+                       rownames(summarydata), "sailfish",
+                       "quant", "quant.sf")
+  names(sf_files) = summarydata$Name
+  tx2gene = read.table(tx2genes_file, sep=",")
+  txi.salmon = tximport(sf_files, type="salmon", tx2gene = tx2gene,
+                        reader=readr::read_tsv,
+                        countsFromAbundance="lengthScaledTPM")
+  counts = txi.salmon$counts
+} else {
+  loginfo("Using gene counts calculated from featureCounts.")
+  counts = read.table(counts_file, header=TRUE, row.names="id", check.names=FALSE)
+}
+
+# this is a list of all non user-supplied metadata columns that could appear
+known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.quality",
+    "rRNA_rate", "Fragment.Length.Mean", "Intronic.Rate", "Intergenic.Rate",
+    "Mapping.Rate", "Quality.format", "Duplication.Rate.of.Mapped", "Mapped",
+    "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
+    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "complexity", "X5.3.bias", "Duplicates.pct", "Duplicates", "Mapped.reads",
+    "Average.insert.size", "Mapped.reads.pct", "Total.reads",
+    "avg_coverage_per_region", "Mapped.Reads", "description", "name2")
+metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
+rownames(metadata) = summarydata$Name
+
+knitr::kable(metadata)
+
+```
+
+```{r heatmap-function}
+get_heatmap_fn = function(summarydata) {
+    # return the pheatmap function with or without metadata
+    if(ncol(metadata) == 0) {
+       return(pheatmap)
+    }
+    else {
+    # rownames(metadata) = summarydata$Name
+    heatmap_fn = function(data, ...) {
+        pheatmap(data, annotation=metadata, clustering_method = "ward.D2", clustering_distance_cols = "correlation", ...)
+    }
+    return(heatmap_fn)
+}}
+heatmap_fn = get_heatmap_fn(summarydata)
+```
+
+# Quality control metrics
+
+## Mapped reads
+```{r mapped-plot, eval="Mapped" %in% colnames(summarydata)}
+ggplot(summarydata, aes(x=Name, y=Mapped)) +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    geom_bar(stat="identity") +
+    ylab("mapped reads") + xlab("") 
+```
+
+## Genomic mapping rate
+```{r mapping-rate-plot, eval="Mapping.Rate" %in% colnames(summarydata)}
+ggplot(summarydata, aes(x=Name, y=Mapping.Rate)) +
+    geom_bar(stat="identity") +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+```{r mapping-rate-plot-noqualimap, eval="Mapped.reads.pct" %in% colnames(summarydata)}
+ggplot(summarydata, aes(x=Name, y=Mapped.reads.pct)) +
+    geom_bar(stat="identity") +
+    ylab("mapping rate") + xlab("") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90))
+```
+
+## Number of genes detected
+```{r genes-detected-plot, eval="Genes.Detected" %in% colnames(summarydata)}
+dd = data.frame(Name=colnames(counts), Genes.Detected = colSums(counts > 0))
+ggplot(dd, aes(x=Name, y=Genes.Detected)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("genes detected") + xlab("")
+```
+
+## Gene detection saturation
+```{r saturation-plot, eval="Genes.Detected" %in% colnames(summarydata)}
+dd = data.frame(Mapped=summarydata$Mapped, Genes.Detected = colSums(counts > 0))
+ggplot(dd, aes(x=Mapped, y=Genes.Detected)) +
+    geom_point() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("genes detected") + xlab("reads mapped")
+```
+
+## Exonic mapping rate
+```{r exonic-mapping-plot, eval="Exonic.Rate" %in% colnames(summarydata)}
+ggplot(summarydata, aes(x=Name, y=Exonic.Rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("exonic mapping rate") + xlab("")
+```
+
+## rRNA|mitRNA mapping rate
+```{r check-rRNA-eval}
+eval_rRNA = "rRNA_rate" %in% colnames(summarydata) & !sum(is.na(summarydata$rRNA_rate)) == nrow(summarydata)
+```
+```{r rRNA-rate-plot, eval=eval_rRNA}
+ggplot(summarydata, aes(x=Name, y=rRNA_rate)) +
+    geom_bar(stat="identity") +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) +
+    ylab("rRNA rate") + xlab("")
+```
+
+## Boxplot of log10 counts per gene
+```{r boxplot-raw}
+melted = melt(as.data.frame(counts))
+colnames(melted) = c("sample", "count")
+melted$sample = factor(melted$sample)
+melted = melted[order(melted$sample),]
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Boxplot of log10 TMM-normalized counts per gene
+Trimmed mean of M-values (TMM) normalization is described
+[here](http://genomebiology.com/2010/11/3/R25)
+
+Robinson, M. D., & Oshlack, A. (2010). A scaling normalization method for differential expression analysis of RNA-seq data. Genome Biology, 11(3). doi:10.1186/gb-2010-11-3-r25
+
+```{r boxplot-normalized}
+y = DGEList(counts=counts)
+y = calcNormFactors(y)
+normalized_counts = cpm(y, normalized.lib.sizes=TRUE)
+melted = melt(normalized_counts)
+colnames(melted) = c("gene", "sample", "count")
+melted$sample = factor(melted$sample)
+melted = melted[order(melted$sample),]
+melted$count = log(melted$count)
+ggplot(melted, aes(x=sample, y=count)) + geom_boxplot() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Density of log10 TMM-normalized counts
+```{r density-normalized}
+ggplot(melted, aes(x=count, group=sample)) +
+    geom_density() +
+    theme_bw(base_size=10) +
+    theme(panel.grid.major = element_line(size = .5, color = "grey"),
+          axis.text.x = element_text(angle=90)) + xlab("")
+```
+
+## Correlation (Spearman) heatmap of TMM-normalized counts
+```{r spearman-heatmap-normalized, eval=ncol(counts) > 1}
+heatmap_fn(cor(normalized_counts, method="spearman"), clustering_distance_rows="correlation")
+```
+
+## MDS plot
+```{r pca, eval=ncol(counts) > 1}
+dds = DESeqDataSetFromTximport(txi.salmon, colData=metadata, design=~1)
+vst = varianceStabilizingTransformation(dds)
+# plotPCA(vst, intgroup=c("group")) + geom_text(aes(label=summarydata$Name),hjust = 0, nudge_x = 0.3)
+mds(assay(vst), condition = metadata$group)
+```
+
+## Heatmap by concordance correlation coefficient
+http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1004075
+
+```{r propcor-heatmap, eval=ncol(counts) > 1}
+propcor = function(x, y) {
+    x = log(x + 0.1)
+    y = log(y + 0.1)
+    num = 2 * cov(x, y)
+    denom = var(x) + var(y)
+return(num/denom)}
+
+do_propcor = function(x) {
+     mat = list()
+     for(i in seq_len(ncol(x))) {
+         for(j in seq_len(ncol(x))) {
+        x2 = x[, i]
+        y2 = x[, j]
+        mat = c(mat, propcor(x2, y2)) } }
+    mat = unlist(mat)
+    mat = matrix(mat, ncol(x), ncol(x))
+    colnames(mat) = colnames(x)
+    rownames(mat) = colnames(x)
+    return(mat)}
+
+heatmap_fn(do_propcor(normalized_counts))
+```
+
+
+```{r de-setup}
+library(DESeq2)
+library(DEGreport)
+library(vsn)
+design = ~ group
+condition = "group"
+```
+
+# Differential expression
+
+```{r deseq2-expression-analysis, results='asis'}
+metadata$comp = paste0(metadata$group, "_", metadata$treatment)
+dds = DESeqDataSetFromTximport(txi.salmon,
+    colData=metadata, design = ~ donor + comp)
+dds2 = DESeq(dds, test="LRT", reduced = ~ 1)
+rlogMat = assay(rlog(dds2))
+```
+
+
+## Dispersion estimates
+
+```{r dispersion-estimate}
+plotDispEsts(dds2)
+```
+
+```{r deseq2-handler}
+handle_deseq2 = function(dds, summarydata, column, all_combs=NULL) {
+  if (is.null(all_combs)){
+    all_combs = combn(levels(summarydata[,column]), 2, simplify=FALSE)
+  }
+  all_results = list()
+  contrast_strings = list()
+  for(comb in all_combs) {
+    contrast_string = paste(comb, collapse="_vs_")
+    contrast = c(column, comb)
+    res = results(dds, contrast=contrast)
+    res = res[order(res$padj),]
+    all_results = c(all_results, res)
+    contrast_strings = c(contrast_strings, contrast_string)
+  }
+  names(all_results) = contrast_strings
+  return(all_results)
+}
+```
+
+```{r get-groups}
+get_groups <- function(d, comp, condition)
+{
+  g <- unlist(strsplit(comp,"_"))
+  g1 <- d$Name[d[, (names(d)==condition)]==g[1]]
+  g2 <- d$Name[d[, (names(d)==condition)]==g[3]]
+  list(g1,g2)
+}
+```
+
+```{r DESeq-output, results='asis'}
+combs = list(c("control_none","KOsp140_none"), c("control_LPS","KOsp140_LPS"),
+             c("control_none","control_LPS"), c("KOsp140_none","KOsp140_LPS"))
+dds = DESeq(dds)
+all_results = handle_deseq2(dds, colData(dds), "comp", combs)
+deg_res = list()
+for (name in names(all_results)){
+    res = all_results[[name]]
+    deg_res[[name]] = degResults(res=res, dds, rlogMat=rlogMat, name, 
+                    FDR=0.05, FC=0.05, group="treatment", xs="group",
+                    org=org.Hs.eg.db, 
+                    path_results = path_results)
+}
+
+```
+
+```{r fpkm}
+fpkm = read.table(file.path(root_path,"combined.gene.sf.tpm"), header=T, row.names=1)
+fpkm = cbind(id=rownames(fpkm), fpkm)
+fpkm = annotate_df(fpkm ,"id", 'hsapiens_gene_ensembl', "ensembl_gene_id", "external_gene_name")
+save_file(fpkm, "combined.tpm", path_results)
+rownames(fpkm) = fpkm$id
+```
+
+```{r overlap-peaks}
+peak0h = read.csv(file.path(root_path, "chipseq_peaks_0h.csv"), header = F)
+peak4h = read.csv(file.path(root_path, "chipseq_peaks_4h.csv"), header = F)
+peak0h_ens = convertIDs(as.character(peak0h$V1[peak0h$V1!="NONE"]), "SYMBOL", "ENSEMBL", org.Hs.eg.db)
+peak4h_ens = convertIDs(as.character(peak4h$V1[peak4h$V1!="NONE"]), "SYMBOL", "ENSEMBL", org.Hs.eg.db)
+
+save_file(fpkm[peak0h_ens[!is.na(peak0h_ens)],], "combined_peaks_0h_tpm.csv", path_results)
+save_file(fpkm[peak4h_ens[!is.na(peak4h_ens)],], "combined_peaks_4h_tpm.csv", path_results)
+```
+
+
+#R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+name_res = compress_results(path_results, prefix = "hgmacro_results")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```

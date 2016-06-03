@@ -1,0 +1,198 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+    toc_float: true
+    theme: readable
+    highlight: zenburn
+---
+
+Report last updated `r date()`.
+
+
+```{r knitrsetup, echo=FALSE}
+library(myRfunctions)
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+# render_2_drop("omics_ournorm.Rmd", "vishal_kidney/FA_omics_ournorm")
+```
+
+```{r libraries}
+library(ggplot2)
+library(reshape)
+library(limma)
+library(CHBUtils)
+library(biomaRt)
+library(dplyr)
+library(cluster)
+library(gridExtra)
+library(logging)
+library(org.Mm.eg.db)
+library(dplyr)
+source("~/repos/isomiRs/R/targets.R")
+source("~/repos/DEGreport/R/clustering.R")
+order_group=c("normal", "day1", "day2", "day3", "day7", "day14")
+result_files = "~/orch/scratch/vishal_mirna_kidney/FA-model/omics/files_ournorm"
+root_path = "~/orch/scratch/vishal_mirna_kidney/FA-model"
+dir.create(result_files, showWarnings = F, recursive = T)
+basicConfig(level='INFO')
+```
+
+# Protein analysis {.tabset}
+
+FC > 4 and FDR < 1%
+
+```{r protein-de, results='asis'}
+protein_file = file.path(root_path, "protein", "files_ournorm")
+dir.create(protein_file, recursive = T, showWarnings = F)
+counts = read.csv(file.path(root_path, "FA_Proteomics_RawData.csv"),skip = 1) %>% tidyr::separate(Protein.Id, c("sp", "Uniprot.ID", "type"),sep = "[::|::]", extra = "merge")
+row.names(counts) = counts$Uniprot.ID
+
+mapping = data.frame(id=rownames(counts))
+mapping = annotate_df(mapping, "id", 'mmusculus_gene_ensembl', "uniprot_genename", "ensembl_gene_id")  %>% distinct(ensembl_gene_id)
+
+mapping2 = data.frame(id=unique(counts$Gene.Symbol)[!is.na(unique(counts$Gene.Symbol))])
+mapping2 = annotate_df(mapping2, "id", 'mmusculus_gene_ensembl', "wikigene_name", "ensembl_gene_id")  %>% distinct(ensembl_gene_id)
+
+counts[as.character(mapping$id), "ensembl"] = mapping$ensembl_gene_id 
+idx = match(as.character(mapping2$id),as.character(counts$Gene.Symbol))
+counts[idx, "ensembl"] = mapping2$ensembl_gene_id
+counts$symbol = convertIDs(as.character(counts$ensembl), "ENSEMBL", "SYMBOL", org.Mm.eg.db)
+save_file(counts, "counts_annotated.csv", protein_file)
+
+counts = counts %>% distinct(ensembl) %>% filter(!is.na(ensembl))
+clean_counts = counts[,9:18]
+rownames(clean_counts) = counts$ensembl
+names(clean_counts) = sapply(names(clean_counts), tolower)
+
+cat("## Expression density of 'raw' data\n\n")
+ggplot(melt(clean_counts), aes(x=log2(value), colour=variable)) + geom_density()
+
+dge = edgeR::DGEList(clean_counts)
+dge = edgeR::calcNormFactors(dge, method="TMM")
+
+coldata = data.frame(row.names=colnames(clean_counts), samples=colnames(clean_counts)) %>% tidyr::separate(samples,into = c("group"), extra = "drop")
+coldata$group = sapply(coldata$group, tolower)
+norm_counts = edgeR::cpm(dge, log=T)
+
+MA <- normalizeBetweenArrays(as.matrix(norm_counts), method="none")
+
+cat("## Expression density of normalize data\n\n")
+ggplot(melt(as.data.frame(MA)), aes(x=value, colour=variable)) + geom_density()
+
+cat("## MDS plot\n\n")
+mds(MA, condition = coldata$group)
+save_file(MA, "uuo_model_log2_counts.tsv", protein_file)
+design <- model.matrix(~ 0 + coldata$group)
+colnames(design) = c("day14", "day3", "day7", "normal")
+fit <- lmFit(MA, design)
+contrast.matrix <- makeContrasts(day3-normal, day7-day3, day14-day7, day14-normal, day14-day3, day7-normal, levels=design)
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2)
+res = topTable(fit2, adjust="BH", n="Inf")
+save_file(res, "uuo_model.tsv", protein_file)
+absMaxFC = rowMax(as.matrix(abs(res[,1:6])))
+sign = row.names(res[absMaxFC>4 & res$adj.P.Val<0.01,])
+
+cat("## MDS plot of DE proteins\n\n")
+mds(MA[sign,], condition = coldata$group)
+
+coldata$group = factor(coldata$group, levels=order_group)
+cat("## Clustering analysis\n\n")
+clusters = degPatterns(MA[sign,], coldata, minc = 15, summarize = "group", time="group", col = NULL)
+.df=clusters$df
+save_file(.df, "clusters_genes_cluster.tsv", protein_file)
+name_res = compress_results(protein_file, prefix = "uuo_model_prot_ournorm", zip = TRUE)
+
+```
+
+# 3D interaction analysis
+
+```{r load, results='asis'}
+
+root_path = "~/orch/scratch/vishal_mirna_kidney/FA_model"
+mrna_path = "rna_bio/final/2016-02-05_mrna_bio/files"
+mrna_matrix = read.csv(file.path(root_path, mrna_path, "fa_model_log2_counts.tsv"), row.names = 1)
+mrna_clusters = read.csv(file.path(root_path, mrna_path, "clusters_genes.tsv"), row.names = 1)
+mrna_col = data.frame(row.names=colnames(mrna_matrix), samples=colnames(mrna_matrix)) %>% tidyr::separate(samples,into = c("group"), extra = "drop") %>% mutate(group=factor(group, levels=order_group))
+rownames(mrna_col) = colnames(mrna_matrix)
+    
+prot_path = "protein/files_ournorm"
+prot_matrix = read.csv(file.path(root_path, prot_path, "fa_model_log2_counts.tsv"), row.names = 1)
+prot_clusters = read.csv(file.path(root_path, prot_path, "clusters_genes_cluster.tsv"), row.names = 1)
+prot_col = data.frame(row.names=colnames(prot_matrix), samples=colnames(prot_matrix)) %>% tidyr::separate(samples,into = c("group"), extra = "drop") %>% mutate(group=factor(group, levels=order_group))
+rownames(prot_col) = colnames(prot_matrix)
+
+mirna_path = "mirna_bcbio/final/files_dev"
+mirna_matrix = read.csv(file.path(root_path, mirna_path, "mirna_log_matrix.txt"), row.names = 1)
+load(file.path(root_path, mirna_path, "ma.rda"))
+# mirna_clusters = read.csv(file.path(root_path, mirna_path, "go_terms_network.tsv"))
+mirna_col = data.frame(row.names=colnames(mirna_matrix), samples=colnames(mirna_matrix)) %>% tidyr::separate(samples,into = c("group"), extra = "drop") %>% mutate(group=factor(group, levels=order_group))
+rownames(mirna_col) = colnames(mirna_matrix)
+```
+
+```{r plot, results='asis'}
+#mrna_cluster = annotate_df(mrna_clusters, "genes", 'mmusculus_gene_ensembl', "ensembl_gene_id", "gene_biotype")
+mrna_keep = as.character(mrna_clusters$genes)
+prot_keep = unique(c(intersect(mrna_keep, rownames(prot_matrix)), as.character(prot_clusters$genes)))
+keep = intersect(mrna_keep, rownames(prot_matrix))
+
+df = degMerge(list(mrna=mrna_matrix[keep,], prot=prot_matrix[keep,]), 
+                   list(mrna=mrna_clusters), 
+                   list(mrna=mrna_col, prot=prot_col), 
+                   summarize="group", 
+                   time="group", col=NULL, 
+                   scale=TRUE)
+prot_merged = do.call(rbind, df)
+prot_merged$name = convertIDs(as.character(prot_merged$gene), "ENSEMBL", "SYMBOL", org.Mm.eg.db)
+names(prot_merged) = paste0("prot_", names(prot_merged))
+
+cor_tar = find_targets(mirna_matrix, mrna_matrix[mrna_keep,order(mrna_col$group)], ma, mirna_col$group)
+mapping = melt(cor_tar) %>% filter(value<0)
+keep = intersect(mrna_keep, unique(mapping[,1]))
+mirna_keep = as.character(unique(mapping[,2]))
+df = degMerge(list(mrna=mrna_matrix[keep,],
+                   mirna=mirna_matrix[mirna_keep,]), 
+              list(mrna=mrna_clusters), 
+              list(mrna=mrna_col, mirna=mirna_col), 
+              summarize="group", 
+              time="group", col=NULL, 
+              scale=TRUE, mapping=list(mirna=mapping))
+mirna_merged = do.call(rbind, df)
+mirna_merged$name = convertIDs(as.character(mirna_merged$pair), "ENSEMBL", "SYMBOL", org.Mm.eg.db)
+names(mirna_merged) = paste0("mirna_", names(mirna_merged))
+
+merged = merge(mirna_merged[mirna_merged$mirna_cor < -.6,c(6,7,1:5)], prot_merged[prot_merged$prot_cor > .6,c(5,7,1:4)], by=1, all=TRUE)
+merged_all = merge(mirna_merged[c(6,7,1:5)], prot_merged[c(5,7,1:4)], by=1, all=TRUE)
+
+save_file(merged, "omics_filtered.csv", result_files)
+save_file(merged_all, "omics.csv", result_files)
+save_file(prot_merged, "prot_omics.csv", result_files)
+save_file(mirna_merged, "mirna_omics.csv", result_files)
+```
+
+# R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+name_res = compress_results(result_files, prefix = "uuo_model_omic_ournorm", zip = TRUE)
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+

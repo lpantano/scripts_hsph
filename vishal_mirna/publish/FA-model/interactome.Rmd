@@ -1,0 +1,185 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: readable
+    highlight: zenburn
+---
+
+Report last updated `r date()`.
+
+## Overview
+
+The goal of this analysis is trying to put together GO terms,
+expression progiles, miRNA expression, 
+and gene expression from the same data. Several files are generated
+to dig into Go enrichment analysis, genes and miRNAs are 
+all together. The final figure intends to show the most populated
+GO terms and the most used miRNAs classified in different gene
+expression profiles.
+
+It was used data from [RNAseq report](https://dl.dropboxusercontent.com/u/20050186/hsph/vishal_kidney/FA_mrna/mrna-summary.html#differential-expression)
+and [miRNA report](https://dl.dropboxusercontent.com/u/20050186/hsph/vishal_kidney/FA_small_rna/srna-summary.html#Differential_expression)
+
+```{r knitrsetup, echo=FALSE, cache=FALSE}
+library(rmarkdown)
+library(knitr)
+library(myRfunctions)
+
+knitr::opts_chunk$set(dev="png",echo=FALSE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r setup}
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(genefilter)
+library(CHBUtils)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(tidyr)
+library(isomiRs)
+library(pheatmap)
+library(cluster)
+
+# root_path = "~/orch/scratch/vishal_mirna_kidney/publish/FA-model"
+root_file = file.path(root_path, "srnaseq/final", "files_publish")
+dir.create(root_file, showWarnings = FALSE)
+
+```
+
+### Methods
+
+Only considered genes and miRNAs with FDR < 5%. Targets from targetscan
+were filtered using total context score value of -0.1 or lower. 
+This value correlates with the effect on the gene expression. 
+In this case will be at leas 1% of effect. As well aggregate Pct should be 
+higher of 0.1 that is the probability to be a real miRNA binding site
+for the gene.
+
+I will cluster in common expression profiles with diana.
+
+I will do GO enrichment analysis using only the genes that are de-regulated
+and are targeted by any miRNA (as well de-regulated) using targetscan database.
+
+The universe for the analysis is all genes expressed in these samples. So,
+results from GO enrichment will mean that these genes are over represented compared to
+the expression profile of these samples.
+
+
+```{r load-files}
+ma_rda = file.path(root_path, "srnaseq/final/files_publish/ma.rda")
+mirna_results = file.path(root_path, "srnaseq/final/files_publish/fa_model_mirna_log2_counts.tsv")
+mirna_design = file.path(root_path, "srnaseq/final/2016-02-08_mirna_bio/report/summary_re.csv")
+mirna_de = file.path(root_path, "srnaseq/final/files_publish/fa_model_mirna.tsv")
+
+mrna_results = file.path(root_path, "rnaseq/final/2016-02-05_mrna_bio/files_publish/rlog_counts.tsv")
+mrna_design = file.path(root_path, "rnaseq/final/2016-02-05_mrna_bio/project-summary.csv")
+mrna_de = file.path(root_path, "rnaseq/final/2016-02-05_mrna_bio/files_publish/fa_model.tsv")
+
+mirna_ma = as.matrix(read.csv(mirna_results, row.names = 1))
+mrna_ma = as.matrix(read.csv(mrna_results, row.names = 1))
+mrna_ma=mrna_ma[rowSums(mrna_ma)>0,]
+
+mirna_des = read.csv(mirna_design, row.names="sample_id")
+mrna_des = read.csv(mrna_design, row.names="descritiption")
+
+mirna_sign = read.csv(mirna_de, row.names = 1)
+mrna_sign = read.csv(mrna_de, row.names = 1)
+
+mirna_keep = row.names(mirna_sign)[mirna_sign$padj<0.05]
+mrna_keep = row.names(mrna_sign)[mrna_sign$padj<0.05 ]
+mrna_keep = intersect(mrna_keep, row.names(mrna_ma)) #' fix this
+
+mirna_clean = mirna_ma[,order(mirna_des$group)]
+gr = mirna_des$group[order(mirna_des$group)]
+mirna_clean = mirna_clean[,gr!="Day28"]
+mirna_g = factor( gsub("day0", "control", 
+                       sort(
+                           as.character(tolower(gr[gr!="Day28"]))
+                           ) ),
+                 levels=c("control", "day1", "day2", "day3", "day7", "day14"))
+
+mrna_clean = mrna_ma[,order(mrna_des$group)]
+gr = factor(mrna_des$group[order(mrna_des$group)], levels=levels(mirna_g))
+
+
+mi_rse = SummarizedExperiment(assays=SimpleList(norm=mirna_clean), colData= 
+                                  data.frame(row.names=colnames(mirna_clean),
+                                             group=mirna_g), 
+                              metadata=list(sign=mirna_keep))
+gene_rse = SummarizedExperiment(assays=SimpleList(norm=mrna_clean),colData= 
+                                  data.frame(row.names=colnames(mrna_clean),
+                                             group=gr),  
+                                metadata=list(sign=mrna_keep))
+
+
+
+if ( !file.exists(ma_rda) ){
+    pairs=read.table(file.path(root_file, "pairs/matrix.tsv")) %>% filter(V3< -.1)
+    map = data.frame(tx=unique(pairs$V1))
+    map_gene = annotate_df(map, "tx", 'mmusculus_gene_ensembl', "ensembl_transcript_id", "ensembl_gene_id")
+    idx = match(pairs$V1, map_gene$tx)
+    pairs$gene = map_gene[idx,2]
+    pairs$value = 1
+    ma = pairs %>% dplyr::select(gene,V2,value) %>%
+        dplyr::distinct() %>% spread(V2,value, fill=0) %>% filter(!is.na(gene))
+    row.names(ma) = ma$gene
+    save(ma, file=ma_rda)
+}else{
+    load(ma_rda)    
+}
+
+```
+
+```{r annotation-preparation}
+library(clusterProfiler)
+library(KEGG.db)
+library(org.Mm.eg.db)
+library(reshape)
+library(cluster)
+
+data = isoNetwork(mi_rse, gene_rse, ma, org=org.Mm.eg.db)
+
+save_file(data$network, "go_terms_network.tsv", root_file)
+save_file(data$summary, "go_term_summary.tsv", root_file)
+```
+
+Tables with full information at : `go_terms_network.tsva` and `go_term_summary.tsv`.
+
+### Summary of the GO enrichment classify by expression profiles.
+
+Only terms with profiles with more than 4 genes are shown. 
+
+Only miRNAs that appear more than 1 times are shown.
+
+* Top-left panel shows the terms and the number of genes in that term with a specific expression profile(x axis). Bigger points mean more genes (number indicate number of genes). 
+* Bottom panel shows the different expression profiles detected. Profiles are in the same order than the top-left x axis labels.
+* Top-right panel shows what miRNAs target what terms.
+
+```{r annotation-calc}
+isoPlotNet(data)
+save_file(data$analysis$table, "interaction.tsv", root_file)
+```
+
+Table with summarized information for the figure at `interaction.tsv`.
+
+# R Session Info
+
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+

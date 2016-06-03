@@ -1,0 +1,372 @@
+---
+title: "early late data together"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+    theme: readable
+    highlight: zenburn
+---
+    
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project=" Fibrosis mice model - RNAseq "
+labPI="Jagesh Shah"
+lablocation="Longwood"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+```
+
+RNA-seq analysis for `r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r project-options, echo=FALSE}
+library(myRfunctions)
+source("~/repos/DEGreport/R/clustering.R")
+path_results = "~/orch/scratch/jshah_fibrosis_rnaseq/early_late/files"
+dir.create(path_results, showWarnings = FALSE, recursive = TRUE)
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+# render_2_drop("meta.Rmd", "shah_fibrosis/early_late_bytime")
+```
+
+# Overview
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(DESeq2)
+library(tximport)
+library(logging)
+library(gridExtra)
+library(clusterProfiler)
+library(AnnotationDbi)
+library(Rgraphviz)
+library(org.Mm.eg.db)
+library(cluster)
+library(dplyr)
+
+# library(DT)
+
+basicConfig()
+late_path = "~/orch/scratch/shah-rnaseq2/late/final/2016-04-11_late/files"
+early_path = "~/orch/scratch/jshah_fibrosis_rnaseq/time_course_1/final/2016-03-28_time_course_1/de_early/"
+
+late_df = read.table(file.path(late_path, "mice_model_late_fold_changes_attime.tsv"), sep=",", header=T, row.names=1)
+early_df = read.table(file.path(early_path, "mice_model_early_fold_changes_attime.tsv"), sep=",", header=T, row.names=1)
+
+late_fc_cols = grepl("vs",names(late_df))
+early_fc_cols = names(early_df)[grepl("vs",names(early_df))]
+early_fc_cols = early_fc_cols[c(4,1:3)]
+
+late_keep = row.names(late_df[ late_df$padj<0.05 & !is.na(late_df$padj) & rowMax(abs(as.matrix(late_df[,late_fc_cols]))) > 0.1 , ])
+early_keep = row.names(early_df[ early_df$padj<0.1 & !is.na(early_df$padj) & rowMax(abs(as.matrix(early_df[,early_fc_cols]))) > 0 , ])
+keep = unique(late_keep,early_keep)
+
+meta_early = data.frame(row.names=early_fc_cols, 
+                     time = c("P5", "P10", "P15", "P20"))
+
+meta_late = data.frame(row.names=colnames(late_df)[late_fc_cols], 
+                     time = c("P26", "P35", "P44", "P50", "P64"))
+
+df = cbind(early_df[keep, early_fc_cols], late_df[keep, late_fc_cols])
+df = df[rowSums(is.na(df))==0,]
+save_file(df, "metatable_fold_change.tsv", path_results)
+meta = rbind(meta_early, meta_late)
+meta$time = factor(meta$time, levels=meta$time)
+```
+
+```{r load-extra}
+root_path = "~/orch/scratch/vishal_mirna_kidney/UUO-model"
+mrna_path = "mrna/final/2016-02-03_mrna/files_publish"
+uuo_matrix = read.csv(file.path(root_path, mrna_path, "uuo_model.tsv"), row.names = 1)
+uuo_de = rownames(uuo_matrix[uuo_matrix$padj<0.01 & uuo_matrix$absMaxLog2FC > 2, ])
+
+root_path = "~/orch/scratch/vishal_mirna_kidney/FA_model/mrna_bio/final/2016-02-05_mrna_bio/files_publish"
+fa_matrix = read.csv(file.path(root_path, "fa_model.tsv"), row.names = 1)
+fa_de = rownames(fa_matrix[fa_matrix$padj<0.01 & fa_matrix$absMaxLog2FC > 2, ])
+
+ir_matrix = read.csv("~/orch/scratch/jshah_fibrosis_rnaseq/ir_model.csv")
+ir_matrix = annotate_df(ir_matrix, "Gene.symbol", 'mmusculus_gene_ensembl', "mgi_symbol", "ensembl_gene_id")
+ir_de = as.character(ir_matrix$ensembl_gene_id[ir_matrix$adj.P.Val<0.05 & abs(ir_matrix$logFC) > 1])
+```
+
+
+## MDS
+
+Strong batch effect, difficult to put all together based on expresison
+
+```{r mds}
+late_exp = read.table(file.path(late_path, "mice_model_late_log2_counts.tsv"), sep=",", header=T, row.names=1)
+early_exp = read.table(file.path(early_path, "mice_model_log2_counts.tsv"), sep=",", header=T, row.names=1)
+ma = cbind(late_exp, early_exp)
+mds(ma)
+mapping=data.frame(id=rownames(ma))
+mapping = annotate_df(mapping, "id", 'mmusculus_gene_ensembl', "ensembl_gene_id", "chromosome_name")
+keep=as.character(mapping$id[mapping$chromosome_name!="X" & mapping$chromosome_name!="Y"])
+mds(ma[keep,]) + ggtitle("Removing XY chromosomes")
+```
+
+## Gene clustering
+
+I chose genes according to log2FoldChange and FDR:
+
+* early data: FDR < 0.1 and abs(log2FC) > 0
+* late data: FDR < 0.05 and abs(log2FC) > 0.1
+
+In the late data you have more genes, so it is good to keep the ones with stronger signal,
+since it will help the clustering to separate better.
+
+## Clustering in common patterns
+
+We used __diana__ function inside __cluster__ R package to separate genes
+using the expression correlation with time. 
+Clusters with more than 3
+genes are shown. Significant genes were those with log2FC bigger than 0.1 and FDR < 5%.
+The file with the information of this analysis is `clusters_genes.tsv`.
+
+### Using fold change
+
+using raw foldchanges
+
+```{r clustering-fig-fc, fig.width=12, fig.height=12}
+clusters_fc = degPatterns(as.matrix(df), meta, col = NULL, minc=15, scale = FALSE)
+.df = clusters_fc$df
+.df$symbol = convertIDs(rownames(.df), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
+save_file(.df, "clusters_genes_foldchange_attime.tsv", path_results)
+```
+
+we can normalize the FC to be 0 the minimum and 1 the maximum.
+
+```{r clustering-fig-fc-scale, fig.width=12, fig.height=12}
+clusters_fc = degPatterns(as.matrix(df), meta, col = NULL, minc=15)
+.df = clusters_fc$df
+.df$symbol = convertIDs(rownames(.df), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
+save_file(.df, "clusters_genes_foldchange_scaled_attime.tsv", path_results)
+```
+
+### Intersection with UUO FA and IR
+
+Number of DE genes in UUO `r length(uuo_de)`, number of genes in FA `r length(fa_de)`, 
+and number of genes in IR `r length(ir_de)`.
+
+
+```{r enrichmentincluster, results='asis'}
+library(UpSetR)
+all_genes=unique(c(uuo_de, fa_de, ir_de))
+
+.hyper=function(de, other_de, other_de_total, de_total){
+    n=length(de) # DE in this cluster
+    k=sum(other_de==1)-1 # uuo DE genes in cluster
+    M=length(intersect(other_de_total, de_total)) #uuo DE genes in total
+    N=length(setdiff(de_total, other_de_total)) #only DE genes in total
+    phyper(k,M,N-M,n)
+}
+
+.t=lapply(unique(.df$cluster), function(nc){
+    cat("\n\ncluster:", nc, "\n\n")
+    .this=as.character(.df$genes[.df$cluster==nc])
+    common_genes = unique(c(all_genes,.this))
+    all_set = data.frame(row.names=common_genes, id=common_genes, uuo=0, fa=0, ir=0,cluster=0)
+    uuo_de_c=intersect(uuo_de, common_genes);fa_de_c=intersect(fa_de, common_genes);ir_de_c=intersect(ir_de, common_genes)
+    all_set[uuo_de_c,"uuo"] = 1;all_set[fa_de_c,"fa"] = 1;all_set[ir_de_c,"ir"] = 1;all_set[.this,"cluster"] = 1;
+    set_names=c("uuo","fa","ir","cluster")
+    if (length(.this)<10)
+        return(all_set)
+    if (sum(colSums(all_set[,2:5])>0)==1){
+        cat("\n**No shared genes**\n")
+        return(all_set)
+    }
+    
+    upset(all_set, sets=set_names[colSums(all_set[,2:5])>0])
+    #.hyper(.this, all_set$uuo, uuo_de, .df$genes)
+    #.hyper(.this, all_set$fa, fa_de, .df$genes)
+    #.hyper(.this, all_set$ir, ir_de, .df$genes)
+    res =  runGO(.this, org.Mm.eg.db, from="ENSEMBL", universe=rownames(df))
+    cat("\n\nGo enrichement:\n\n")
+    if(!is.null(res$table))
+        print(res$table)
+    cat("\n\n")
+    if(!is.null(res$table))
+        print(res$plot)
+    return(all_set)
+})
+
+meta_set = do.call(rbind, .t)
+
+```
+
+### Intersection with FA
+
+number of genes in FA `r length(fa_de)`
+
+
+```{r enrichmentincluster-fa, results='asis'}
+library(UpSetR)
+all_genes=unique(c(fa_de))
+
+.t=lapply(unique(.df$cluster), function(nc){
+    cat("\n\ncluster:", nc, "\n\n")
+    .this=as.character(.df$genes[.df$cluster==nc])
+    common_genes = unique(c(all_genes,.this))
+    all_set = data.frame(row.names=common_genes, id=common_genes, fa=0,cluster=0)
+    fa_de_c=intersect(fa_de, common_genes)
+    all_set[fa_de_c,"fa"] = 1;all_set[.this,"cluster"] = 1;
+    set_names=c("fa", "cluster")
+    if (length(.this)<10)
+        return(all_set)
+    if (sum(colSums(all_set[,2:3])>0)==1){
+        cat("\n**No shared genes**\n")
+        return(all_set)
+    }
+    upset(all_set, sets=set_names[colSums(all_set[,2:3])>0])
+    #.hyper(.this, all_set$uuo, uuo_de, .df$genes)
+    #.hyper(.this, all_set$fa, fa_de, .df$genes)
+    #.hyper(.this, all_set$ir, ir_de, .df$genes)
+    res =  runGO(.this, org.Mm.eg.db, from="ENSEMBL", universe=rownames(df))
+    cat("\n\nGo enrichement:\n\n")
+    if(!is.null(res$table))
+        print(res$table)
+    cat("\n\n")
+    if(!is.null(res$table))
+        print(res$plot)
+    return(all_set)
+})
+
+meta_set_fa = do.call(rbind, .t)
+
+```
+
+### Merge cluster 1-3-8
+```{r cluster1-3-8, results='asis'}
+.keep = as.character(.df$genes[.df$cluster %in% c(1, 3, 8)])
+clusters_fc_138 = degPatterns(as.matrix(df)[.keep,], meta, col = NULL, minc=15)
+.df = clusters_fc_138$df
+.df$symbol = convertIDs(rownames(.df), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
+save_file(.df, "clusters138_genes_foldchange_scaled_attime.tsv", path_results)
+
+.t=lapply(unique(.df$cluster), function(nc){
+    cat("\n\ncluster:", nc, "\n\n")
+    .this=as.character(.df$genes[.df$cluster==nc])
+    common_genes = unique(c(all_genes,.this))
+    all_set = data.frame(row.names=common_genes, id=common_genes, fa=0,cluster=0)
+    fa_de_c=intersect(fa_de, common_genes)
+    all_set[fa_de_c,"fa"] = 1;all_set[.this,"cluster"] = 1;
+    set_names=c("fa", "cluster")
+    if (length(.this)<10)
+        return(all_set)
+    if (sum(colSums(all_set[,2:3])>0)==1){
+        cat("\n**No shared genes**\n")
+        return(all_set)
+    }
+    upset(all_set, sets=set_names[colSums(all_set[,2:3])>0])
+    #.hyper(.this, all_set$uuo, uuo_de, .df$genes)
+    #.hyper(.this, all_set$fa, fa_de, .df$genes)
+    #.hyper(.this, all_set$ir, ir_de, .df$genes)
+    res =  runGO(.this, org.Mm.eg.db, from="ENSEMBL", universe=rownames(df))
+    cat("\n\nGo enrichement:\n\n")
+    if(!is.null(res$table))
+        print(res$table)
+    cat("\n\n")
+    if(!is.null(res$table))
+        print(res$plot)
+    return(all_set)
+})
+
+meta_set_138 = do.call(rbind, .t)
+save_file(meta_set_138, "clusters138_overlap_fa_attime.tsv", path_results)
+
+```
+
+## tables
+
+I created a table with all the information together. Columns description are:
+
+* ID: ensembl id
+* symbol: gene name
+* log2FC columns for each time point
+* FDR for late time points. This FDR comes from the DE analysis where condition and
+time was taking into account. It shows the FDR if the genes is DE at any time between
+the two groups.
+* `late_sign` means how the gene is classified: **none** (no significant),
+**time** (significant over time), **condition** (significant when ignoring time, 
+so difference in the condition mean expression.)
+* FDR for early time points, same than before for late time points.
+* `early_sign`, same as late_sign
+
+Significant genes are called according to the cutoff used for clustering in the above section.
+
+The following table only shows gene significant over time. Full table at `meta-table.tsv`.
+
+```{r meta-table, cache=FALSE}
+late_df_cond = read.table(file.path(late_path, "mice_model_jck_wt.tsv"), sep=",", header=T, row.names=1)
+late_clus_cond = read.table(file.path(late_path, "clusters_genes_foldchange_attime.tsv"), sep=",", header=T, row.names=1)
+late_cond_keep = row.names(late_df_cond[ late_df_cond$padj<0.05 & !is.na(late_df_cond$padj) & abs(late_df_cond$log2FoldChange) > 0.1 , ])
+
+early_df_cond = read.table(file.path(early_path, "mice_model_jck_wt.tsv"), sep=",", header=T, row.names=1)
+early_clus_cond = read.table(file.path(early_path, "clusters_genes_foldchange_attime.tsv"), sep=",", header=T, row.names=1)
+early_cond_keep = row.names(early_df_cond[ early_df_cond$padj<0.1 & !is.na(early_df_cond$padj) & abs(early_df_cond$log2FoldChange)  > 0 , ])
+
+all_genes = unique(c(rownames(late_df), rownames(early_df), rownames(late_df_cond), rownames(early_df_cond)))
+
+main = data.frame(row.names=all_genes, id=all_genes, symbol = convertIDs(all_genes, "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst"))
+
+main = cbind(main, early_df[all_genes, early_fc_cols], late_df[all_genes, late_fc_cols])
+
+main$late_padj = late_df[all_genes, "padj"]
+main$late_sign = "none"
+main[late_cond_keep, "late_sign"] =  "condition"
+main[late_keep, "late_sign"] =  "time"
+
+main$early_padj = early_df[all_genes, "padj"]
+main$early_sign = "none"
+main[early_cond_keep, "early_sign"] =  "condition"
+main[early_keep, "early_sign"] =  "time"
+
+main[as.character(clusters_fc$df$genes), "cluster"] = clusters_fc$df$cluster
+main[as.character(late_clus_cond$genes), "cluster_early"] = late_clus_cond$cluster
+main[as.character(early_clus_cond$genes), "cluster_late"] = early_clus_cond$cluster
+
+main = merge(main, meta_set[,1:4], by="id", all.x=TRUE)
+
+save_file(main, "meta-table.csv", path_results)
+
+DT::datatable(main %>% filter(late_sign=="time" | early_sign=="time"))
+```
+
+
+#R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+name_res = compress_results(path_results,prefix = "early_late")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```

@@ -1,0 +1,159 @@
+---
+title: "RNA-seq analysis."
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="LDR - RNAseq "
+labPI="Greenberg"
+lablocation="Longwood"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+```
+
+RNA-seq analysis for `r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",echo=TRUE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r project-options, echo=FALSE}
+library(myRfunctions)
+path_results = "~/orch/scratch/greenberg_rnaseq/ldr_model/final/files"
+dir.create(path_results, showWarnings = FALSE)
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+render_2_drop("mrna-goenrichment.Rmd", "greenberg_ldr/ldr-go_enrichment")
+```
+
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(CHBUtils)
+library(DESeq2)
+library(logging)
+library(gridExtra)
+library(clusterProfiler)
+library(DOSE)
+library(org.Mm.eg.db)
+library(cluster)
+library(dplyr)
+
+# library(DT)
+
+basicConfig()
+
+comp_keep = c("Ctrl_E18_vs_P04.tsv", "Ctrl_P04_vs_P10.tsv", "Ctrl_P10_vs_P16.tsv", "Ctrl_P16_vs_P20.tsv", "Ctrl_P20_vs_P27.tsv", "Ctrl_P27_vs_P32.tsv")
+comp = list()
+for (name in comp_keep){
+    comp[[name]] = readr::read_tsv(file.path(path_results, name))
+}
+
+goterms =  readr::read_tsv(file.path(path_results, "..", "immune-terms.txt"), 
+                           col_names = FALSE) %>%
+    tidyr::separate(X1, into=c("id", "term"), sep="  ")    
+goterms2 =  readr::read_tsv(file.path(path_results, "..", "microglia-terms.txt"), 
+                            col_names = FALSE) %>%
+    tidyr::separate(X1, into=c("id", "term"), sep="  ")    
+goterms3 =  rbind(goterms, goterms2)    
+
+# https://www.biostars.org/p/52101/#68158
+library(biomaRt)
+ensembl = useMart("ensembl",dataset="mmusculus_gene_ensembl") #uses human ensembl annotations
+#gets gene symbol, transcript_id and go_id for all genes annotated with GO:0007507
+gene.goterms <- getBM(attributes=c('ensembl_gene_id', 'go_id'),
+                   filters = 'go_id', values = goterms$id, mart = ensembl)
+gene.goterms2 <- getBM(attributes=c('ensembl_gene_id', 'go_id'),
+                   filters = 'go_id', values = goterms2$id, mart = ensembl)
+gene.goterms3 <- data.frame(ensembl_gene_id=unique(c(gene.goterms$ensembl_gene_id, gene.goterms2$ensembl_gene_id)))
+
+```
+
+## GO enrichment using DE genes
+
+We considered DE genes as genes with FDR < 10%.
+
+Using following GO terms as one:
+
+```{r ,results='asis'}
+kable(rbind(goterms, goterms2))
+```
+
+
+```{r clusterprofile, results='asis'}
+for (i in 1:length(comp)){
+    cat("### Go enrichment for:", names(comp)[i], "\n\n")
+    keep = comp[[i]]$padj<0.1 & !is.na(comp[[i]]$padj)
+
+    go_fake = rbind(
+              data.frame(go="GO_immune",
+                               genes=as.character(unique(gene.goterms$ensembl_gene_id))),
+              data.frame(go="GO_microglia",
+                         genes=as.character(unique(gene.goterms2$ensembl_gene_id))),
+              data.frame(go="GO_both",
+                         genes=as.character(unique(gene.goterms3$ensembl_gene_id)))
+              )
+    
+    go_fake = rbind(go_fake, data.frame(go="GO_control", genes=comp[[i]]$id))
+    
+    # go_fake = data.frame(go="GO_immune", genes=comp[[1]]$id[keep])
+    # go_fake = rbind(go_fake, go_fake)
+    go_name = data.frame(go=c("GO_immune", "GO_microglia", "GO_both", "GO_everything.else"), 
+                         name=c("custom", "custom", "custom", "control"))
+    
+    if (sum(keep) == 0){
+        cat("\n\nNo DE genes in this comparison\n\n");next}
+    
+    cp = enricher( comp[[i]]$id[keep], universe = comp[[i]]$id, 
+                   pvalueCutoff = 1, qvalueCutoff = 1,
+                   TERM2GENE = go_fake, maxGSSize = 2000,
+                   TERM2NAME = go_name, minGSSize = 2)
+    cat("\n")
+    if (!("result" %in% slotNames(cp))){
+        cat("\n\nNo Genes in any terms in this comparison\n\n");next}
+        
+    print(kable(cp@result[,1:6]))
+    cat("\n\ngenes in GO term\n\n")
+    print(paste(convertIDs(unique(unlist(strsplit(cp@result$geneID,"/"))),
+                           "ENSEMBL", "SYMBOL", 
+                           org.Mm.eg.db, "useFirst"), collapse = " "))
+    cat("\n\n")
+}
+```
+
+
+#R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+#name_res = compress_results(path_results,prefix = "ldr_results")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```

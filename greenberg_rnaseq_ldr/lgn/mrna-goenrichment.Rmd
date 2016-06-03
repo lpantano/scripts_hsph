@@ -1,0 +1,179 @@
+---
+title: "RNA-seq analysis."
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="LGN - RNAseq "
+labPI="Greenberg"
+lablocation="Longwood"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+```
+
+RNA-seq analysis for `r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",echo=TRUE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r project-options, echo=FALSE}
+library(myRfunctions)
+path_results = "~/orch/scratch/greenberg_rnaseq/lgn2/final/2016-05-06_lgn2/files"
+dir.create(path_results, showWarnings = FALSE)
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+render_2_drop("mrna-goenrichment.Rmd", "greenberg/lgn-go_enrichment")
+```
+
+
+```{r set-up}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(CHBUtils)
+library(DESeq2)
+library(logging)
+library(gridExtra)
+library(clusterProfiler)
+library(DOSE)
+library(org.Mm.eg.db)
+library(cluster)
+library(dplyr)
+basicConfig()
+
+comp_keep = c("0_vs_1.tsv", "0_vs_3.tsv", "0_vs_8.tsv", 
+              "1_vs_3.tsv", "1_vs_8.tsv", "3_vs_8.tsv")
+comp = list()
+for (name in comp_keep){
+    comp[[name]] = readr::read_csv(file.path(path_results, name))
+}
+
+
+# counts = read.csv(file.path(path_results, "log2_counts.csv"), row.names=1)
+# tpm = read.table(file.path(path_results, "..","combined.gene.sf.tpm"), row.names=1, header=T)
+# 
+# sig = comp[["0_vs_8.tsv"]][comp[["0_vs_8.tsv"]]$padj<0.05 & abs(comp[["0_vs_8.tsv"]]$log2FoldChange)>0.3,"id"]
+# h0 = rowMeans(tpm[,1:3])
+# h8 = rowMeans(tpm[,10:12])
+# col = rep("grey",length(h0))
+# col[match(sig$id,rownames(tpm))] = "red"
+#plot(log2(h0+1),log2(h8+1),pch=20, col = "grey")
+#points(log2(h0[match(sig$id,rownames(tpm))]+1),log2(h8[match(sig$id,rownames(tpm))]+1),pch=20, col = "red")
+```
+
+
+```{r load-go-setup}
+# https://www.biostars.org/p/52101/#68158
+library(biomaRt)
+ensembl = useMart("ensembl",dataset="mmusculus_gene_ensembl") #uses 
+
+asd_files = list.files("~/orch/scratch/greenberg_rnaseq/lgn2/final/", pattern = "txt", full.names = T)
+
+asd_terms = do.call(rbind, lapply(asd_files, function(fn){
+    
+    if (!grepl("term", fn)){
+        goterms =  readr::read_tsv(fn, col_names = F) %>% mutate(gene=X1)
+        gene.goterms <- getBM(attributes=c('external_gene_name', 'ensembl_gene_id'),
+                              filters = 'external_gene_name', 
+                              values = goterms$gene, 
+                              mart = ensembl)
+        return(data.frame(go=basename(fn), genes=as.character(gene.goterms$ensembl_gene_id)))
+    }else{
+        goterms =  readr::read_tsv(fn, 
+                           col_names = FALSE) %>%
+        tidyr::separate(X1, into=c("id", "term"), sep="  ")    
+        gene.goterms <- getBM(attributes=c('ensembl_gene_id', 'go_id'),
+                   filters = 'go_id', values = goterms$id, mart = ensembl)
+
+        return(data.frame(go=basename(fn), genes=unique(as.character(gene.goterms$ensembl_gene_id))))
+    }
+}))
+
+
+trasnmembrane_domain = getBM(attributes=c("ensembl_gene_id", "mgi_symbol",
+                                "transmembrane_domain"), mart=ensembl)
+
+asd_terms = rbind(asd_terms, data.frame(go="transmembrane",
+                                        genes=unique(as.character(trasnmembrane_domain$ensembl_gene_id[trasnmembrane_domain$transmembrane_domain!=""]))))
+
+write.csv(asd_terms, "~/orch/scratch/greenberg_rnaseq/lgn2/final/all-terms.csv")
+```
+
+## GO enrichment using DE genes
+
+We considered DE genes as genes with FDR < 10%.
+
+
+```{r clusterprofile, results='asis'}
+go_res = data.frame()
+for (i in 1:length(comp)){
+    cat("### Go enrichment for:", names(comp)[i], "\n\n")
+    keep = comp[[i]]$padj<0.1 & !is.na(comp[[i]]$padj)
+    cat("Working with ", sum(keep), " genes\n\n")
+    go_fake = rbind(asd_terms, data.frame(go="GO_control", genes=comp[[i]]$id))
+    
+    go_name = data.frame(go=c(as.character(unique(asd_terms$go)),
+                              "GO_everything.else"), 
+                         name=c(as.character(unique(asd_terms$go)), "control"))
+    
+    if (sum(keep) == 0){
+        cat("\n\nNo DE genes in this comparison\n\n");next}
+    
+    cp = enricher( as.character(comp[[i]]$id[keep]), universe = as.character(comp[[i]]$id), 
+                   pvalueCutoff = 1, qvalueCutoff = 1, 
+                   TERM2GENE = go_fake, maxGSSize = 8000,
+                   TERM2NAME = go_name, minGSSize = 2)
+    cat("\n")
+    if (!("result" %in% slotNames(cp))){
+        cat("\n\nNo Genes in any terms in this comparison\n\n");next}
+        
+    print(kable(cp@result[,1:6]))
+    # cat("\n\ngenes in GO term\n\n")
+    # print(paste(
+    symbol = paste(convertIDs(unique(unlist(strsplit(cp@result$geneID,"/"))),
+                          "ENSEMBL", "SYMBOL", 
+                          org.Mm.eg.db, "useFirst"), collapse = " ")
+    cat("\n\n")
+    dt = cp@result
+    dt$symbol = symbol
+    dt$comparision = names(comp)[i]
+    go_res = rbind(go_res, dt)
+}
+write.csv(go_res, "~/orch/scratch/greenberg_rnaseq/lgn2/final/go-res.csv")
+```
+
+
+#R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+#name_res = compress_results(path_results,prefix = "ldr_results")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```

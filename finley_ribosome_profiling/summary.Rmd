@@ -1,0 +1,153 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="Ribosome profiling"
+labPI="Finley's"
+lablocation=""
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+
+```
+
+
+```{r knitrsetup, echo=FALSE}
+library(knitrBootstrap)
+library(rmarkdown)
+library(myRfunctions)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, 
+                      warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 9,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+render_2_drop("summary.Rmd", "finley_ribosomal_profiling")
+```
+
+---
+
+# Ribosome Profiling Report
+
+RNA-seq analysis for`r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+# Setup
+
+## Libraries
+
+```{r functions}
+library(ggplot2)
+library(gplots)
+library(CHBUtils)
+library(edgeR)
+library(org.Mm.eg.db)
+library(DT)
+path_results = "~/orch/scratch/finley_ribosome_profiling/files"
+dir.create(path_results, showWarnings = FALSE)
+
+```
+
+## Load data
+```{r load}
+counts_raw = read.table("~/orch/scratch/finley_ribosome_profiling/counts.txt", header=T, row.names = 1)
+counts = counts_raw[rowSums(counts_raw[,6:9]>5)>1,6:9]
+```
+
+# Normalization
+
+I used the two samples to find the normalization factor to be use to get the normalized count data. This is done to keep the enrichment we see for reads longer than 31 nts. Values will be RPKM.
+
+
+```{r norm}
+dge_raw = calcNormFactors(edgeR::DGEList(counts[,3:4]))
+dge = DGEList(counts)
+dge$samples$norm.factors = rep(dge_raw$samples$norm.factors,2)
+dge$samples$lib.size = rep(dge_raw$samples$lib.size,2)
+
+norm_counts = cpm(dge, normalized.lib.sizes = T, gene.length=counts_raw$Length)
+symbol = convertIDs(row.names(norm_counts),"ENSEMBL", "SYMBOL", org.Mm.eg.db)
+```
+
+# Ratios
+
+Only showing proteing coding genes with a normalized counts > 5 in any samples.
+Full table at `ratio_split_read_size.tsv`.
+
+```{r ratio-table, cache=FALSE}
+colnames(norm_counts) = c("WT_31", "Hem9_31", "WT", "Hem9")
+pseudo = min(norm_counts[norm_counts>0])
+ratio = cbind(id=rownames(norm_counts), as.data.frame(norm_counts), symbol) %>% mutate(ratio_31 = Hem9_31/(WT_31+pseudo), ratio = Hem9/(WT+pseudo))
+ratio = annotate_df(ratio, "id", 'mmusculus_gene_ensembl', "ensembl_gene_id", "gene_biotype")
+save_file(ratio, "ratio_split_read_size.tsv", path_results)
+datatable(ratio[rowSums(ratio[,2:5]>5)>0,] %>% filter(gene_biotype=="protein_coding"))
+```
+
+## Distribution of ratio values 
+
+```{r ratio-figures}
+ratio_long = melt(ratio %>% filter(gene_biotype=="protein_coding") %>% dplyr::select(id, ratio_31, ratio))
+
+ggplot(ratio_long, aes(x=variable, y=value, fill=variable)) +
+    geom_violin() +
+    scale_y_log10()
+```
+
+# Uniquely mapped reads
+
+In the previous analysis I allowed all reads to be used for gene quantification,
+but the ideal is to use only uniquely mapped reads. Sometimes, genes don't appear
+in this case, mainly genes that have multiple copies. So I added this as well,
+in case it matches better with you previous analysis. Table in this file:
+`ratio_split_read_size_uniquely_mapped_reads.tsv`.
+
+```{r uniquely-mapped, cache=FALSE}
+counts_raw = read.table("~/orch/scratch/finley_ribosome_profiling/counts_unique.txt", header=T, row.names = 1)
+counts = counts_raw[rowSums(counts_raw[,6:9]>5)>1,6:9]
+dge_raw = calcNormFactors(edgeR::DGEList(counts[,3:4]))
+dge = DGEList(counts)
+dge$samples$norm.factors = rep(dge_raw$samples$norm.factors,2)
+dge$samples$lib.size = rep(dge_raw$samples$lib.size,2)
+
+norm_counts = cpm(dge, normalized.lib.sizes = T, gene.length=counts_raw$Length)
+symbol = convertIDs(row.names(norm_counts),"ENSEMBL", "SYMBOL", org.Mm.eg.db)
+
+colnames(norm_counts) = c("WT_31", "Hem9_31", "WT", "Hem9")
+pseudo = min(norm_counts[norm_counts>0])
+ratio = cbind(id=rownames(norm_counts), as.data.frame(norm_counts), symbol) %>% mutate(ratio_31 = Hem9_31/(WT_31+pseudo), ratio = Hem9/(WT+pseudo))
+ratio = annotate_df(ratio, "id", 'mmusculus_gene_ensembl', "ensembl_gene_id", "gene_biotype")
+save_file(ratio, "ratio_split_read_size_uniquely_mapped_reads.tsv", path_results)
+datatable(ratio[rowSums(ratio[,2:5]>5)>0,] %>% filter(gene_biotype=="protein_coding"))
+```
+
+
+```{r compress, echo=F}
+name_res = compress_results(path_results)
+```
+
+#R Session Info
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+

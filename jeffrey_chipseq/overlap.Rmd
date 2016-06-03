@@ -131,7 +131,14 @@ if (!file.exists(peak_rda)){
     load(peak_rda)
     load(his_rda)
 }
+
+idx = histAnnoList$k27me3@detailGenomicAnnotation$Promoter==TRUE
+save_file(as.data.frame(histAnnoList$k27me3@anno[idx,]), "H3K27me3_tss.txt", baseDir)
+idx = histAnnoList$k4me3@detailGenomicAnnotation$Promoter==TRUE
+save_file(as.data.frame(histAnnoList$k4me3@anno[idx,]), "H3K4me3_tss.txt", baseDir)
+
 ```
+
 
 ### Overlap with all histone marks
 

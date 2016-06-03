@@ -1,12 +1,10 @@
 ---
 output:
-  knitrBootstrap::bootstrap_document:
-    theme: readable
-    highlight: zenburn
-    theme.chooser: TRUE
-    highlight.chooser: TRUE
   html_document:
     toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: readable
     highlight: zenburn
 ---
 
