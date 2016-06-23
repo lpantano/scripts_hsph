@@ -1,0 +1,804 @@
+details:
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB818-pfc-1b1
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB818-pfc-1b1/UMB818-pfc-1b1_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB818-pfc-1b1/UMB818-pfc-1b1_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 27
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 818
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: Caucasian
+    PostMortemInterval: 10
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB914-pfc-1b12
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB914-pfc-1b12/UMB914-pfc-1b12_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB914-pfc-1b12/UMB914-pfc-1b12_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 20
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 914
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: Caucasian
+    PostMortemInterval: 18
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB1024-pfc-1b12
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1024-pfc-1b12/UMB1024-pfc-1b12_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1024-pfc-1b12/UMB1024-pfc-1b12_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 14
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 1024
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: Caucasian
+    PostMortemInterval: 16
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB1474-pfc-1b123
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1474-pfc-1b123/UMB1474-pfc-1b123_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1474-pfc-1b123/UMB1474-pfc-1b123_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 50
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 1474
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: African American
+    PostMortemInterval: 8
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB1499-pfc-1b1
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1499-pfc-1b1/UMB1499-pfc-1b1_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1499-pfc-1b1/UMB1499-pfc-1b1_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 4
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 1499
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: Asian
+    PostMortemInterval: 21
+    SequencingCompany: Macrogen
+    Sex: F
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB1712-pfc-1b12
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1712-pfc-1b12/UMB1712-pfc-1b12_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1712-pfc-1b12/UMB1712-pfc-1b12_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 20
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 1712
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: Caucasian
+    PostMortemInterval: 8
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB4548-pfc-1b1
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB4548-pfc-1b1/UMB4548-pfc-1b1_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB4548-pfc-1b1/UMB4548-pfc-1b1_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 20
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 4548
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: African American
+    PostMortemInterval: 5
+    SequencingCompany: Macrogen
+    Sex: F
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB4672-pfc-1b12
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB4672-pfc-1b12/UMB4672-pfc-1b12_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB4672-pfc-1b12/UMB4672-pfc-1b12_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 22
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 4672
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: African American
+    PostMortemInterval: 14
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB4842-pfc-1b1
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB4842-pfc-1b1/UMB4842-pfc-1b1_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB4842-pfc-1b1/UMB4842-pfc-1b1_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 47
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 4842
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: Caucasian
+    PostMortemInterval: 12
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB5161-pfc-1b1
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB5161-pfc-1b1/UMB5161-pfc-1b1_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB5161-pfc-1b1/UMB5161-pfc-1b1_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 10
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 5161
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: African American
+    PostMortemInterval: 22
+    SequencingCompany: Macrogen
+    Sex: F
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB5238-pfc-1b123
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB5238-pfc-1b123/UMB5238-pfc-1b123_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB5238-pfc-1b123/UMB5238-pfc-1b123_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 32
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 5238
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: Caucasian
+    PostMortemInterval: 7
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB5391-pfc-1b12
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB5391-pfc-1b12/UMB5391-pfc-1b12_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB5391-pfc-1b12/UMB5391-pfc-1b12_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 8
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 5391
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Control
+    Ethnicity: Caucasian
+    PostMortemInterval: 12
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: M3663M-pfc-1b12
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/M3663M-pfc-1b12/M3663M-pfc-1b12_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/M3663M-pfc-1b12/M3663M-pfc-1b12_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 27
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: M3663M
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Hispanic
+    PostMortemInterval: 22
+    SequencingCompany: Macrogen
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UK28768-pfc-1b2123
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UK28768-pfc-1b2123/UK28768-pfc-1b2123_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UK28768-pfc-1b2123/UK28768-pfc-1b2123_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: M
+    BrainBank: Autism BrainNet
+    CaseNumber: Oxford
+    Coverage: Macrogen
+    Databack: 210x
+    Diagnosis: UK28768
+    Ethnicity: 48
+    PostMortemInterval: 22
+    SequencingCompany: English-White
+    Sex: Autism
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UK25363-pfc-1b1
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UK25363-pfc-1b1/UK25363-pfc-1b1_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UK25363-pfc-1b1/UK25363-pfc-1b1_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: M
+    BrainBank: Autism BrainNet
+    CaseNumber: Oxford
+    Coverage: Macrogen
+    Databack: 210x
+    Diagnosis: UK25363
+    Ethnicity: 96
+    PostMortemInterval: '-'
+    SequencingCompany: English-White
+    Sex: Autism
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UK20119-pfc-1b123
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UK20119-pfc-1b123/UK20119-pfc-1b123_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UK20119-pfc-1b123/UK20119-pfc-1b123_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: M
+    BrainBank: Autism BrainNet
+    CaseNumber: Oxford
+    Coverage: Macrogen
+    Databack: 210x
+    Diagnosis: UK20119
+    Ethnicity: 72
+    PostMortemInterval: 50
+    SequencingCompany: Unknown
+    Sex: Autism
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UK45353-pfc-1b2123-1
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UK45353-pfc-1b2123-1/UK45353-pfc-1b2123-1_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UK45353-pfc-1b2123-1/UK45353-pfc-1b2123-1_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: F
+    BrainBank: Autism BrainNet
+    CaseNumber: Oxford
+    Coverage: Macrogen
+    Databack: 210x
+    Diagnosis: UK45353
+    Ethnicity: 48
+    PostMortemInterval: 44
+    SequencingCompany: Unknown
+    Sex: Autism
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB1174-pfc-1b12
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1174-pfc-1b12/UMB1174-pfc-1b12_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1174-pfc-1b12/UMB1174-pfc-1b12_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 7
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 1174
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Caucasian
+    PostMortemInterval: 14
+    SequencingCompany: Macrogen
+    Sex: F
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB1182-pfc-1b12
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1182-pfc-1b12/UMB1182-pfc-1b12_R1.fastq.gz
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_bulk_200x_macrogen/UMB1182-pfc-1b12/UMB1182-pfc-1b12_R2.fastq.gz
+  genome_build: GRCh37
+  metadata:
+    Age: 9
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 1182
+    Coverage: 210x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: African American
+    PostMortemInterval: 24
+    SequencingCompany: Macrogen
+    Sex: F
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB797_20150323-pfc-1b1_20150326-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB797-20150323-pfc-1b1-20150326-WGS/analysis/UMB797-20150323-pfc-1b1-20150326-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 9
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 797
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Caucasian
+    PostMortemInterval: 13
+    SequencingCompany: NY Genome
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB4671_20150323-pfc-1b1_20150326-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB4671-20150323-pfc-1b1-20150326-WGS/analysis/UMB4671-20150323-pfc-1b1-20150326-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 4
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 4671
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: African American
+    PostMortemInterval: 13
+    SequencingCompany: NY Genome
+    Sex: F
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB1638_20150323-pfc-1b1_20150326-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB1638-20150323-pfc-1b1-20150326-WGS/analysis/UMB1638-20150323-pfc-1b1-20150326-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 20
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 1638
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Caucasian
+    PostMortemInterval: 50
+    SequencingCompany: NY Genome
+    Sex: F
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB5302_20150608-PFC-1b1_20150615-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB5302-20150608-PFC-1b1-20150615-WGS/analysis/UMB5302-20150608-PFC-1b1-20150615-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 16
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 5302
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Caucasian
+    PostMortemInterval: 20
+    SequencingCompany: NY Genome
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB5297_20150603-PFC-1b1_20150615-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB5297-20150603-PFC-1b1-20150615-WGS/analysis/UMB5297-20150603-PFC-1b1-20150615-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 33
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 5297
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Caucasian
+    PostMortemInterval: 50
+    SequencingCompany: NY Genome
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB5176_20150603-PFC-1b1_20150615-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB5176-20150603-PFC-1b1-20150615-WGS/analysis/UMB5176-20150603-PFC-1b1-20150615-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 22
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 5176
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: African American
+    PostMortemInterval: 18
+    SequencingCompany: NY Genome
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB5115_20150603-PFC-1b1_20150615-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB5115-20150603-PFC-1b1-20150615-WGS/analysis/UMB5115-20150603-PFC-1b1-20150615-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 46
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 5115
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Caucasian
+    PostMortemInterval: 29
+    SequencingCompany: NY Genome
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB5027_20150605-PFC-1b2_20150615-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB5027-20150605-PFC-1b2-20150615-WGS/analysis/UMB5027-20150605-PFC-1b2-20150615-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 37
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 5027
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: African American
+    PostMortemInterval: 26
+    SequencingCompany: NY Genome
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB4999_20150603-PFC-1b1_20150615-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB4999-20150603-PFC-1b1-20150615-WGS/analysis/UMB4999-20150603-PFC-1b1-20150615-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 20
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 4999
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Caucasian
+    PostMortemInterval: 14
+    SequencingCompany: NY Genome
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB4899_20150323-pfc-1b1_20150326-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB4899-20150323-pfc-1b1-20150326-WGS/analysis/UMB4899-20150323-pfc-1b1-20150326-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 14
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 4899
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Caucasian
+    PostMortemInterval: 9
+    SequencingCompany: NY Genome
+    Sex: M
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  description: UMB4334_20150505-PFC-1bnor_20150514-WGS
+  files:
+  - /n/data1/bch/genetics/walsh-park/rawSeqData/wgs_ASD/Sample_UMB4334-20150505-PFC-1bnor-20150514-WGS/analysis/UMB4334-20150505-PFC-1bnor-20150514-WGS.final.bam
+  genome_build: GRCh37
+  metadata:
+    Age: 11
+    BrainBank: NIH NeuroBioBank
+    CaseNumber: 4334
+    Coverage: 200x
+    Databack: 'Yes'
+    Diagnosis: Autism
+    Ethnicity: Hispanic
+    PostMortemInterval: 27
+    SequencingCompany: NY Genome
+    Sex: M
+fc_date: '2016-04-12'
+fc_name: batch1
+upload:
+  dir: ../final

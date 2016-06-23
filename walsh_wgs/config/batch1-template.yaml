@@ -1,0 +1,13 @@
+details:
+- algorithm:
+    aligner: bwa
+    indelcaller: false
+    mark_duplicates: false
+    min_allele_fraction: 3
+    realign: false
+    recalibrate: false
+    variant_regions: /home/lp113/scratch/walsh_asd/chr.bed
+    variantcaller:
+    - vardict-java
+  analysis: variant2
+  genome_build: GRCh37

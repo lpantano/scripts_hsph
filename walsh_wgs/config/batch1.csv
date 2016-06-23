@@ -1,0 +1,31 @@
+samplename,description,BrainBank,CaseNumber,Diagnosis,Sex,Age,PostMortemInterval,Ethnicity,SequencingCompany,Coverage,Databack
+UMB4334-20150505-PFC-1bnor-20150514-WGS,UMB4334_20150505-PFC-1bnor_20150514-WGS,NIH NeuroBioBank,4334,Autism,M,11,27,Hispanic,NY Genome,200x,Yes
+UMB4899-20150323-pfc-1b1-20150326-WGS,UMB4899_20150323-pfc-1b1_20150326-WGS,NIH NeuroBioBank,4899,Autism,M,14,9,Caucasian,NY Genome,200x,Yes
+UMB4999-20150603-PFC-1b1-20150615-WGS,UMB4999_20150603-PFC-1b1_20150615-WGS,NIH NeuroBioBank,4999,Autism,M,20,14,Caucasian,NY Genome,200x,Yes
+UMB5027-20150605-PFC-1b2-20150615-WGS,UMB5027_20150605-PFC-1b2_20150615-WGS,NIH NeuroBioBank,5027,Autism,M,37,26,African American,NY Genome,200x,Yes
+UMB5115-20150603-PFC-1b1-20150615-WGS,UMB5115_20150603-PFC-1b1_20150615-WGS,NIH NeuroBioBank,5115,Autism,M,46,29,Caucasian,NY Genome,200x,Yes
+UMB5176-20150603-PFC-1b1-20150615-WGS,UMB5176_20150603-PFC-1b1_20150615-WGS,NIH NeuroBioBank,5176,Autism,M,22,18,African American,NY Genome,200x,Yes
+UMB5297-20150603-PFC-1b1-20150615-WGS,UMB5297_20150603-PFC-1b1_20150615-WGS,NIH NeuroBioBank,5297,Autism,M,33,50,Caucasian,NY Genome,200x,Yes
+UMB5302-20150608-PFC-1b1-20150615-WGS,UMB5302_20150608-PFC-1b1_20150615-WGS,NIH NeuroBioBank,5302,Autism,M,16,20,Caucasian,NY Genome,200x,Yes
+UMB1638-20150323-pfc-1b1-20150326-WGS,UMB1638_20150323-pfc-1b1_20150326-WGS,NIH NeuroBioBank,1638,Autism,F,20,50,Caucasian,NY Genome,200x,Yes
+UMB4671-20150323-pfc-1b1-20150326-WGS,UMB4671_20150323-pfc-1b1_20150326-WGS,NIH NeuroBioBank,4671,Autism,F,4,13,African American,NY Genome,200x,Yes
+UMB797-20150323-pfc-1b1-20150326-WGS,UMB797_20150323-pfc-1b1_20150326-WGS,NIH NeuroBioBank,797,Autism,M,9,13,Caucasian,NY Genome,200x,Yes
+UMB1182-pfc-1b12,UMB1182-pfc-1b12,NIH NeuroBioBank,1182,Autism,F,9,24,African American,Macrogen,210x,Yes
+UMB1174-pfc-1b12,UMB1174-pfc-1b12,NIH NeuroBioBank,1174,Autism,F,7,14,Caucasian,Macrogen,210x,Yes
+UK45353-pfc-1b2123-1,UK45353-pfc-1b2123-1,Autism BrainNet, Oxford,UK45353,Autism,F,44,48,Unknown,Macrogen,210x,Yes
+UK20119-pfc-1b123,UK20119-pfc-1b123,Autism BrainNet, Oxford,UK20119,Autism,M,50,72,Unknown,Macrogen,210x,Yes
+UK25363-pfc-1b1,UK25363-pfc-1b1,Autism BrainNet, Oxford,UK25363,Autism,M,-,96,English-White,Macrogen,210x,Yes
+UK28768-pfc-1b2123,UK28768-pfc-1b2123,Autism BrainNet, Oxford,UK28768,Autism,M,22,48,English-White,Macrogen,210x,Yes
+M3663M-pfc-1b12,M3663M-pfc-1b12,NIH NeuroBioBank,M3663M ,Autism,M,27,22,Hispanic,Macrogen,210x,Yes
+UMB5391-pfc-1b12,UMB5391-pfc-1b12,NIH NeuroBioBank,5391,Control,M,8,12,Caucasian,Macrogen,210x,Yes
+UMB5238-pfc-1b123,UMB5238-pfc-1b123,NIH NeuroBioBank,5238,Control,M,32,7,Caucasian,Macrogen,210x,Yes
+UMB5161-pfc-1b1,UMB5161-pfc-1b1,NIH NeuroBioBank,5161,Control,F,10,22,African American,Macrogen,210x,Yes
+UMB4842-pfc-1b1,UMB4842-pfc-1b1,NIH NeuroBioBank,4842,Control,M,47,12,Caucasian,Macrogen,210x,Yes
+UMB4672-pfc-1b12,UMB4672-pfc-1b12,NIH NeuroBioBank,4672,Control,M,22,14,African American,Macrogen,210x,Yes
+UMB4548-pfc-1b1,UMB4548-pfc-1b1,NIH NeuroBioBank,4548,Control,F,20,5,African American,Macrogen,210x,Yes
+UMB1712-pfc-1b12,UMB1712-pfc-1b12,NIH NeuroBioBank,1712,Control,M,20,8,Caucasian,Macrogen,210x,Yes
+UMB1499-pfc-1b1,UMB1499-pfc-1b1,NIH NeuroBioBank,1499,Control,F,4,21,Asian,Macrogen,210x,Yes
+UMB1474-pfc-1b123,UMB1474-pfc-1b123,NIH NeuroBioBank,1474,Control,M,50,8,African American,Macrogen,210x,Yes
+UMB1024-pfc-1b12,UMB1024-pfc-1b12,NIH NeuroBioBank,1024,Control,M,14,16,Caucasian,Macrogen,210x,Yes
+UMB914-pfc-1b12,UMB914-pfc-1b12,NIH NeuroBioBank,914,Control,M,20,18,Caucasian,Macrogen,210x,Yes
+UMB818-pfc-1b1,UMB818-pfc-1b1,NIH NeuroBioBank,818,Control,M,27,10,Caucasian,Macrogen,210x,Yes
