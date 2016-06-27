@@ -46,7 +46,7 @@ dir.create(path_results, showWarnings = FALSE)
 ```
 
 ```{r create-report, echo=FALSE, eval=FALSE}
-#render_2_drop("mrna-summary.Rmd", "jeffrey/hgmacro_model")
+# Rscript -e 'library(rmarkdown);library(myRfunctions);render_2_drop("mrna-summary.Rmd", "jeffrey/hgmacro_model")'
 ```
 
 # Overview
@@ -66,8 +66,6 @@ library(clusterProfiler)
 library(org.Hs.eg.db)
 library(cluster)
 library(dplyr)
-source("~/repos/DEGreport/R/clustering.R")
-# library(DT)
 
 basicConfig()
 root_path = "~/orch/scratch/jeffreys_rnaseq/hg_macro/final/2016-05-23_hg_macro"
@@ -346,28 +344,39 @@ get_groups <- function(d, comp, condition)
 ```
 
 ```{r DESeq-output, results='asis'}
-combs = list(c("control_none","KOsp140_none"), c("control_LPS","KOsp140_LPS"),
-             c("control_none","control_LPS"), c("KOsp140_none","KOsp140_LPS"))
+combs = list(c("KOsp140_none", "control_none"), 
+             c("KOsp140_LPS", "control_LPS"),
+             c("control_none", "control_LPS"))
+             #, c("KOsp140_none", "KOsp140_LPS"))
 dds = DESeq(dds)
 all_results = handle_deseq2(dds, colData(dds), "comp", combs)
 deg_res = list()
 for (name in names(all_results)){
     res = all_results[[name]]
     deg_res[[name]] = degResults(res=res, dds, rlogMat=rlogMat, name, 
-                    FDR=0.05, FC=0.05, group="treatment", xs="group",
+                    FDR=0.05, FC=log2(1.5), group="treatment", xs="group",
                     org=org.Hs.eg.db, 
                     path_results = path_results)
 }
 
 ```
 
+```{r fpkm-2}
+fpkm = read.table(file.path(root_path,"combined.fpkm"), header=T, row.names=1)
+fpkm = cbind(id=rownames(fpkm), fpkm)
+fpkm = annotate_df(fpkm ,"id", 'hsapiens_gene_ensembl', "ensembl_gene_id", "external_gene_name")
+save_file(fpkm, "combined.fpkm", path_results)
+rownames(fpkm) = fpkm$id
+```
+
 ```{r fpkm}
-fpkm = read.table(file.path(root_path,"combined.gene.sf.tpm"), header=T, row.names=1)
+fpkm = read.csv(file.path(root_path,"combined.gene.sf.tpm"),row.names = 1)
 fpkm = cbind(id=rownames(fpkm), fpkm)
 fpkm = annotate_df(fpkm ,"id", 'hsapiens_gene_ensembl', "ensembl_gene_id", "external_gene_name")
 save_file(fpkm, "combined.tpm", path_results)
 rownames(fpkm) = fpkm$id
 ```
+
 
 ```{r overlap-peaks}
 peak0h = read.csv(file.path(root_path, "chipseq_peaks_0h.csv"), header = F)
@@ -375,8 +384,182 @@ peak4h = read.csv(file.path(root_path, "chipseq_peaks_4h.csv"), header = F)
 peak0h_ens = convertIDs(as.character(peak0h$V1[peak0h$V1!="NONE"]), "SYMBOL", "ENSEMBL", org.Hs.eg.db)
 peak4h_ens = convertIDs(as.character(peak4h$V1[peak4h$V1!="NONE"]), "SYMBOL", "ENSEMBL", org.Hs.eg.db)
 
-save_file(fpkm[peak0h_ens[!is.na(peak0h_ens)],], "combined_peaks_0h_tpm.csv", path_results)
-save_file(fpkm[peak4h_ens[!is.na(peak4h_ens)],], "combined_peaks_4h_tpm.csv", path_results)
+save_file(fpkm[peak0h_ens[!is.na(peak0h_ens)],], "combined_peaks_0h_fpkm.csv", path_results)
+save_file(fpkm[peak4h_ens[!is.na(peak4h_ens)],], "combined_peaks_4h_fpkm.csv", path_results)
+```
+
+
+# Custom figures
+
+```{r load-data}
+library(readr)
+fns = unlist(sapply(list.files(path_results, pattern = ".tsv", full.names = T),
+             function(x){
+                 if (!grepl("goenrich", x) & !grepl("counts",x)){
+                     return(x)
+                 }
+}))
+
+fns=fns[!is.null(fns)]
+
+res = list()
+for (fn in fns){
+    name = gsub(".tsv", "", basename(fn))
+    res[[name]] = read_csv(fn)    
+}
+
+rlogMat = as.matrix(read.csv(file.path(path_results,"KOsp140_none_vs_control_none_log2_counts.csv"), row.names = 1, check.names = F))
+
+```
+
+## Heatmaps of DE genes
+
+```{r heatmaps}
+library(RColorBrewer)
+my_palette <- rev(brewer.pal(11,"RdBu"))
+col_order = c(c(1,5,3,7), c(2,6,4,8))
+
+.get_text = function(data_text){
+    data_text = annotate_df(data_text ,"id", 'hsapiens_gene_ensembl', "ensembl_gene_id", "external_gene_name")
+    data_text[is.na(data_text$external_gene_name),"external_gene_name"] <- data_text[is.na(data_text$external_gene_name),"id"]
+    as.data.frame(data_text[,c(2,3,4)])
+}
+
+
+for (name in names(res)[2:3]){
+    df = as.data.frame(res[[name]])
+    row.names(df) = df$id
+    diff_genes_top = abs(df$log2FoldChange)>log2(1.5) & df$padj<0.05 & !is.na(df$padj)
+    diff_genes_top = df$id[diff_genes_top]
+    # diff_genes_top = diff_genes_top[1:10]
+    hr = hclust(as.dist(1-cor(t(rlogMat[diff_genes_top,col_order]))), method = "ward.D2")
+    pheatmap(rlogMat[hr$labels[hr$order],col_order],
+              annotation=metadata,
+              clustering_method = "ward.D2", 
+              clustering_distance_cols = "correlation",
+              scale='row', labels_row = "",
+              cluster_row=FALSE, cluster_cols=FALSE,
+              show_rownames=T, color=my_palette,main = name)
+    fn_out = file.path(paste0(name, "_order_heatmap.csv"))
+    out_sort = cbind(data.frame(ensembl=hr$labels[hr$order], 
+                          symbol=convertIDs(hr$labels[hr$order], "ENSEMBL", "SYMBOL", org.Hs.eg.db)), df[hr$labels[hr$order],])
+    save_file(out_sort, fn_out, path_results)
+    stats = as.data.frame(df[,c(3,7)])
+    text = read.csv(file.path(root_path, paste0(name, "_selected.csv")))
+    text = df[as.character(text$id),c(3,7,8)]
+    volcano_density_plot(stats, title=name, lfc.cutoff=log2(1.5), pval.cutoff = 0.05, plot_text = text)
+}
+
+```
+
+
+## Genes up-regulated at Control_LPS and DE at KO_LPS vs control_LPS
+```{r custom-de}
+name = "KOsp140_LPS_vs_control_LPS_filtered_by_LPS_induced"
+df = as.data.frame(res[[2]])
+row.names(df) = df$id
+diff_genes_top = abs(df$log2FoldChange)>log2(1.5) & df$padj<0.05 & !is.na(df$padj)
+diff_genes_top = df$id[diff_genes_top]
+
+lps = as.data.frame(res[[1]])
+row.names(lps) = lps$id
+diff_lps = lps$log2FoldChange< -log2(1.5) & lps$padj<0.05 & !is.na(lps$padj)
+diff_lps = lps$id[diff_lps]
+
+keep = intersect(diff_genes_top, diff_lps)
+hr = hclust(as.dist(1-cor(t(rlogMat[keep,col_order]))), method = "ward.D2")
+pheatmap(rlogMat[hr$labels[hr$order],col_order],
+         annotation=metadata,
+         clustering_method = "ward.D2", 
+         clustering_distance_cols = "correlation",
+         scale='row', labels_row = "",
+         cluster_row=FALSE, cluster_cols=FALSE,
+         show_rownames=T, color=my_palette,main = name)
+fn_out = file.path(paste0(name, "_order_heatmap.csv"))
+out_sort = cbind(data.frame(ensembl=hr$labels[hr$order], 
+                            symbol=convertIDs(hr$labels[hr$order], "ENSEMBL", "SYMBOL", org.Hs.eg.db),
+                            log2FC_LPS = -1 * lps[hr$labels[hr$order], "log2FoldChange"]), df[hr$labels[hr$order],])
+save_file(out_sort, fn_out, path_results)
+
+```
+
+
+## Heatmaps of SP140 peaks
+```{r heatmap-sp140}
+.make_heatmap = function(ma, name, row=F, scale="row"){
+    hr = hclust(as.dist(1-cor(t(ma))), method = "ward.D2")
+     pheatmap(ma[hr$labels[hr$order],],
+              clustering_method = "ward.D2", 
+              clustering_distance_cols = "correlation",
+              scale=scale, 
+              cluster_row=FALSE, cluster_cols=FALSE,
+              show_rownames=row, color=my_palette,main = name)
+    fn_out = file.path(path_results, paste0(name, "_order_heatmap.csv"))
+    out_sort = data.frame(symbol=hr$labels[hr$order])
+    write.table(out_sort, fn_out, row.names=F, sep="\t")
+
+}
+
+sp140_10pct = read.csv(file.path(root_path, "SP140.10pct.peaksTPM.csv")) %>% distinct()
+name = "SP140_10pct"
+sp140_10pct = sp140_10pct[rowSums(sp140_10pct[2:5])>0, ]
+rownames(sp140_10pct) = sp140_10pct[,1]
+.make_heatmap(sp140_10pct[,2:5], name)
+
+
+sp140_100 = read.csv(file.path(root_path, "SP140.100.peaksTPM.csv")) %>% distinct()
+name = "SP140_100"
+sp140_100 = sp140_100[rowSums(sp140_100[2:5])>0, ]
+rownames(sp140_100) = sp140_100[,1]
+.make_heatmap(sp140_100[,2:5], name)
+
+```
+
+## HOX genes
+```{r heatmap-hox}
+.summarize = function(ma, groups){
+    sapply(levels(groups), function(g){
+        rowMeans(ma[,g==groups])
+    })
+}
+groups = factor(gsub("^.[.]", "", colnames(fpkm)[2:9]), levels=c("Hi0h",
+                                                          "Hi4h",
+                                                          "Si0h",
+                                                          "Si4h"))
+
+hox = read.csv(file.path(root_path, "hox_genes.csv"), header=F) %>% distinct()
+idx = match(hox$V1, fpkm$external_gene_name)
+idx = idx[!is.na(idx)]
+ma = fpkm[idx,2:9]
+ma = ma[rowSums(ma>0)>1,]
+ma = .summarize(ma, groups)
+rownames(ma) = fpkm[rownames(ma),"external_gene_name"]
+
+.make_heatmap(ma[,c(1,3,2,4)], "HOX", row=T)
+
+.make_heatmap(ma[,c(1,3,2,4)], "HOX", row=T, scale="none")
+```
+
+## HOX genes - list 2
+```{r heatmap-hox-1-13}
+hox = read.csv(file.path(root_path, "hox_genes_list2.csv"), header=F) %>% distinct()
+idx = match(hox$V1, fpkm$external_gene_name)
+idx = idx[!is.na(idx)]
+ma = fpkm[idx,2:9]
+ma = ma[rowSums(ma>0)>0,]
+ma = .summarize(ma, groups)
+rownames(ma) = fpkm[rownames(ma),"external_gene_name"]
+.make_heatmap(ma[,c(1,3,2,4)], "HOX", row=T)
+
+.make_heatmap(ma[,c(1,3,2,4)], "HOX", row=T, scale="none")
+```
+
+```{r fpkm-iso, echo=F, eval=F}
+fpkm = read.table(file.path(root_path,"combined.isoform.sf.tpm"),row.names = 1,header=T)
+fpkm = cbind(id=rownames(fpkm), fpkm)
+fpkm = annotate_df(fpkm ,"id", 'hsapiens_gene_ensembl', "ensembl_transcript_id", "external_gene_name")
+save_file(fpkm, "combined.tpm", path_results)
+rownames(fpkm) = fpkm$id
 ```
 
 
