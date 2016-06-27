@@ -273,11 +273,56 @@ vst = varianceStabilizingTransformation(dds)
 mds(assay(vst), condition = metadata$group,k=2)
 ```
 
+```{r shiny}
+library(DEGreport)
+degObj(assay(vst), metadata[,"group", FALSE], file.path(path_results, "deg.rda"))
+```
+
+# Comparison
+
+```{r comp, results='asis'}
+bcv <- 0.4
+keep <- colnames(counts)[1:3]
+y <- DGEList(counts=counts[rowSums(counts>3)>1, keep], group=metadata[keep, "group"])
+y <- calcNormFactors(y, method = "TMM")
+et <- exactTest(y, dispersion=bcv^2)
+et$table$padj <- p.adjust(et$table$PValue, method = "BH")
+sign = rownames(et)[et$table$padj<0.05]
+et$table$symbol = convertIDs(rownames(et$table), from = "ENSEMBL", "SYMBOL", org.Hs.eg.db)
+save_file(et$table, "de_table.csv", path_results)
+
+t = et$table[et$table$logCPM>3,]
+t = cbind(t, assay(vst)[rownames(t),])
+kable(head(t[order(t$logFC),], 10))
+
+```
+
+## MA-plot
+
+In red significant genes with FDR < 1%
+
+```{r MAplot}
+edgeR::plotSmear(et, de.tags = sign)
+```
+
+
+## Go-enrichment
+
+```{r go-enrichment, results='asis'}
+library(clusterProfiler)
+library(org.Hs.eg.db)
+sign = rownames(et)[et$table$padj<0.05]
+ego = enrichGO(sign, org.Hs.eg.db, keytype = "ENSEMBL", universe = rownames(et$table))
+
+kable(ego@result[,1:7])
+
+```
+
 
 #R Session Info
 
 ```{r compress, eval="FALSE", echo=FALSE, cache=FALSE}
-name_res = compress_results(path_results,prefix = "XXX_results")
+name_res = compress_results(path_results, prefix = "XXX_results")
 ```
 
 (useful if replicating these results)

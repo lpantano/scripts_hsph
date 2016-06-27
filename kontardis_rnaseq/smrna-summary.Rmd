@@ -14,7 +14,7 @@ The most recent update of this html document occurred: `r date()`
 
 ```{r setup}
 library(knitr)
-
+library(myRfunctions)
 library(ggplot2)
 library(reshape)
 library(DESeq2)
@@ -145,15 +145,14 @@ ggplot((melt(cs,id.vars = "pos")))+
 counts = counts(obj)
 dds = DESeqDataSetFromMatrix(counts[rowSums(counts>0)>3,], colData=design, design=~1)
 vst = rlog(dds)
-
-pheatmap(assay(vst), annotation_col = design, show_rownames = F, 
+pheatmap(assay(vst), annotation_col = metadata, show_rownames = F, 
          clustering_distance_cols = "correlation",
          clustering_method = "ward.D")
 ```
 
 ### MDS plot
 ```{r pca, eval=ncol(counts) > 1, eval=ismirbase}
-mds(assay(vst), condition = design[,condition], k=2)
+mds(assay(vst), condition = metadata[,"group"], k=3)
 ```
 
 ### complexity
