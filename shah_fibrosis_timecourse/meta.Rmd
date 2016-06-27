@@ -254,7 +254,7 @@ all_genes=unique(c(fa_de))
     cat("\n\n")
     if(!is.null(res$table))
         print(res$plot)
-    return(all_set)
+    return(all_set[all_set$cluster==1,])
 })
 
 meta_set_fa = do.call(rbind, .t)
@@ -294,12 +294,14 @@ save_file(.df, "clusters138_genes_foldchange_scaled_attime.tsv", path_results)
     cat("\n\n")
     if(!is.null(res$table))
         print(res$plot)
-    return(all_set)
+    return(all_set[all_set$cluster==1,])
 })
 
 meta_set_138 = do.call(rbind, .t)
+names(meta_set_138) = c("id", "in_fa", "in_cluster")
 save_file(meta_set_138, "clusters138_overlap_fa_attime.tsv", path_results)
-
+meta_138 = merge(.df, meta_set_138, by=1, all=1)
+save_file(meta_138, "meta_clusters138_overlap_fa_attime.tsv", path_results)
 ```
 
 ## tables
