@@ -71,9 +71,20 @@ for (name in comp_keep){
     comp[[name]] = readr::read_csv(file.path(path_results, name))
 }
 
+tpm = read.table(file.path(path_results, "..","combined.gene.sf.tpm"), row.names=1, header=T)
+tpm$symbol = convertIDs(row.names(tpm), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
 
+for (name in comp_keep){
+    .df = as.data.frame(comp[[name]])
+    rownames(.df) = .df$id
+    names(.df) = paste0(names(.df), "_", gsub(".tsv", "", name), sep="")
+    
+    tpm = cbind(tpm, .df[row.names(tpm), c(3,7)])
+}
+
+# tpm = tpm[!is.na(tpm[,1]),]
+save_file(tpm,"counts_tpm_with_fc.csv", path_results)
 # counts = read.csv(file.path(path_results, "log2_counts.csv"), row.names=1)
-# tpm = read.table(file.path(path_results, "..","combined.gene.sf.tpm"), row.names=1, header=T)
 # 
 # sig = comp[["0_vs_8.tsv"]][comp[["0_vs_8.tsv"]]$padj<0.05 & abs(comp[["0_vs_8.tsv"]]$log2FoldChange)>0.3,"id"]
 # h0 = rowMeans(tpm[,1:3])
@@ -112,7 +123,6 @@ asd_terms = do.call(rbind, lapply(asd_files, function(fn){
     }
 }))
 
-
 trasnmembrane_domain = getBM(attributes=c("ensembl_gene_id", "mgi_symbol",
                                 "transmembrane_domain"), mart=ensembl)
 
@@ -124,14 +134,13 @@ write.csv(asd_terms, "~/orch/scratch/greenberg_rnaseq/lgn2/final/all-terms.csv")
 
 ## GO enrichment using DE genes
 
-We considered DE genes as genes with FDR < 10%.
-
+We considered DE genes as genes with FDR < 5%.
 
 ```{r clusterprofile, results='asis'}
 go_res = data.frame()
 for (i in 1:length(comp)){
     cat("### Go enrichment for:", names(comp)[i], "\n\n")
-    keep = comp[[i]]$padj<0.1 & !is.na(comp[[i]]$padj)
+    keep = comp[[i]]$padj<0.05 & !is.na(comp[[i]]$padj)
     cat("Working with ", sum(keep), " genes\n\n")
     go_fake = rbind(asd_terms, data.frame(go="GO_control", genes=comp[[i]]$id))
     
@@ -162,6 +171,7 @@ for (i in 1:length(comp)){
     dt$comparision = names(comp)[i]
     go_res = rbind(go_res, dt)
 }
+
 write.csv(go_res, "~/orch/scratch/greenberg_rnaseq/lgn2/final/go-res.csv")
 ```
 
