@@ -41,7 +41,6 @@ options(bitmapType = 'cairo')
 
 ```{r project-options, echo=FALSE}
 library(myRfunctions)
-source("~/repos/DEGreport/R/clustering.R")
 path_results = "~/orch/scratch/jshah_fibrosis_rnaseq/early_late/files"
 dir.create(path_results, showWarnings = FALSE, recursive = TRUE)
 ```
@@ -69,7 +68,7 @@ library(Rgraphviz)
 library(org.Mm.eg.db)
 library(cluster)
 library(dplyr)
-
+library(DEGreport)
 # library(DT)
 
 basicConfig()
@@ -121,8 +120,8 @@ ir_de = as.character(ir_matrix$ensembl_gene_id[ir_matrix$adj.P.Val<0.05 & abs(ir
 Strong batch effect, difficult to put all together based on expresison
 
 ```{r mds}
-late_exp = read.table(file.path(late_path, "mice_model_late_log2_counts.tsv"), sep=",", header=T, row.names=1)
-early_exp = read.table(file.path(early_path, "mice_model_log2_counts.tsv"), sep=",", header=T, row.names=1)
+late_exp = read.table(file.path(late_path, "mice_model_late_log2_counts.csv"), sep=",", header=T, row.names=1)
+early_exp = read.table(file.path(early_path, "mice_model_log2_counts.csv"), sep=",", header=T, row.names=1)
 ma = cbind(late_exp, early_exp)
 mds(ma)
 mapping=data.frame(id=rownames(ma))
@@ -178,7 +177,7 @@ and number of genes in IR `r length(ir_de)`.
 ```{r enrichmentincluster, results='asis'}
 library(UpSetR)
 all_genes=unique(c(uuo_de, fa_de, ir_de))
-
+all_genes = all_genes[!is.na(all_genes)]
 .hyper=function(de, other_de, other_de_total, de_total){
     n=length(de) # DE in this cluster
     k=sum(other_de==1)-1 # uuo DE genes in cluster
@@ -325,11 +324,14 @@ Significant genes are called according to the cutoff used for clustering in the 
 The following table only shows gene significant over time. Full table at `meta-table.tsv`.
 
 ```{r meta-table, cache=FALSE}
-late_df_cond = read.table(file.path(late_path, "mice_model_jck_wt.tsv"), sep=",", header=T, row.names=1)
+library(CHBUtils)
+library(org.Mm.eg.db)
+library(dplyr)
+late_df_cond = read.table(file.path(late_path, "mice_model_jck_wt_de.csv"), sep=",", header=T, row.names=1)
 late_clus_cond = read.table(file.path(late_path, "clusters_genes_foldchange_attime.tsv"), sep=",", header=T, row.names=1)
 late_cond_keep = row.names(late_df_cond[ late_df_cond$padj<0.05 & !is.na(late_df_cond$padj) & abs(late_df_cond$log2FoldChange) > 0.1 , ])
 
-early_df_cond = read.table(file.path(early_path, "mice_model_jck_wt.tsv"), sep=",", header=T, row.names=1)
+early_df_cond = read.table(file.path(early_path, "mice_model_jck_wt_de.csv"), sep=",", header=T, row.names=1)
 early_clus_cond = read.table(file.path(early_path, "clusters_genes_foldchange_attime.tsv"), sep=",", header=T, row.names=1)
 early_cond_keep = row.names(early_df_cond[ early_df_cond$padj<0.1 & !is.na(early_df_cond$padj) & abs(early_df_cond$log2FoldChange)  > 0 , ])
 
@@ -350,14 +352,19 @@ main[early_cond_keep, "early_sign"] =  "condition"
 main[early_keep, "early_sign"] =  "time"
 
 main[as.character(clusters_fc$df$genes), "cluster"] = clusters_fc$df$cluster
-main[as.character(late_clus_cond$genes), "cluster_early"] = late_clus_cond$cluster
-main[as.character(early_clus_cond$genes), "cluster_late"] = early_clus_cond$cluster
+main[as.character(late_clus_cond$genes), "cluster_late"] = late_clus_cond$cluster
+main[as.character(early_clus_cond$genes), "cluster_early"] = early_clus_cond$cluster
 
 main = merge(main, meta_set[,1:4], by="id", all.x=TRUE)
-
+main = distinct(main)
+fa_merge = fa_matrix[as.character(main$id),c(6,9:14)]
+names(fa_merge) <- paste0("fa_", names(fa_merge))
+main = cbind(main, fa_merge)
+row.names(main) = 1:nrow(main)
 save_file(main, "meta-table.csv", path_results)
 
 DT::datatable(main %>% filter(late_sign=="time" | early_sign=="time"))
+
 ```
 
 

@@ -138,7 +138,8 @@ do_de <- function(counts, coldata, design, contrast, prefix, path){
 ```{r load-extra}
 root_path_fa = "~/orch/scratch/vishal_mirna_kidney/publish/FA-model/protein/files_publish"
 fa_matrix = read.csv(file.path(root_path_fa, "fa_model.tsv"), row.names = 1)
-fa_de = rownames(fa_matrix[fa_matrix$adj.P.Val<0.01 & rowMax(abs(as.matrix(fa_matrix[,1:11]))) > 2, ])
+fa_de = rownames(fa_matrix[fa_matrix$adj.P.Val<0.05 & rowMax(abs(as.matrix(fa_matrix[,1:11]))) > 1, ])
+save_file(fa_de, "prot_fa_selected.csv", path_results)
 ```
 
 In this study there are no replicates. I use log2(ratio) to filter genes
@@ -276,25 +277,50 @@ mds(cbind(early_res[keep,], late_res[keep,]), condition = col)
 
 
 ## Clustering analysis
+```{r ann-cluster}
+ann_meta = function(prot_meta, fa_de, absMaxFC, prot_early_clusters, prot_late_clusters, fn){
+    prot_meta_fa = intersect_fa(.df, fa_de, rownames(prot_meta))
+    prot_meta$absMaxFC = apply(abs(prot_meta), 1, max, na.rm=T)
+    prot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
+    add_fa = intersect(as.character(prot_meta_fa$id), rownames(prot_meta))
+    prot_meta[add_fa, "fa"] <- prot_meta_fa[add_fa, "fa"]
+    prot_meta$symbol = convertIDs(rownames(prot_meta), "UNIPROT", "SYMBOL", org.Mm.eg.db)
+    prot_meta$uniprot = convertIDs(rownames(prot_meta), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
+    prot_meta[rownames(prot_early_clusters$df), "early_cluster"] = prot_early_clusters$df$cluster
+    prot_meta[rownames(prot_late_clusters$df), "late_cluster"] = prot_late_clusters$df$cluster
+    save_file(prot_meta, fn, result_files)
+    prot_meta
+}
+create_meta_table = function(early, late, fs=NULL){
+    keep = intersect(rownames(late), rownames(early))
+    meta = as.data.frame(cbind(early[keep,], late[keep,]))
+    only_early = setdiff(rownames(early), keep)
+    only_late = setdiff(rownames(late), keep)
+    early_fake = data.frame(row.names=only_early, 
+                            matrix(nrow=length(only_early), ncol=ncol(late)))
+    colnames(early_fake) = colnames(late)
+    late_fake = data.frame(row.names=only_late, 
+                            matrix(nrow=length(only_late), ncol=ncol(early)))
+    colnames(late_fake) = colnames(early)
+
+    meta = rbind(meta, cbind(early[only_early,],early_fake),
+                 cbind(late[only_late,],late_fake))
+}
+```
+
 
 ```{r cluster-merge, results='asis'}
 keep = intersect(rownames(late), rownames(early))
-prot_meta = as.data.frame(cbind(early[keep,], late[keep,]))
+prot_meta = create_meta_table(early,late)
 prot_meta_col = rbind(early_col, late_col)
-absMaxFC = rowMax(abs(as.matrix(prot_meta)))
-names(absMaxFC) = rownames(prot_meta)
-sign = row.names(prot_meta)[absMaxFC>1]
+absMaxFC = rowMax(abs(as.matrix(prot_meta[keep,])))
+names(absMaxFC) = rownames(prot_meta[keep,])
+sign = keep[absMaxFC>1]
 prot_clusters = degPatterns(as.matrix(prot_meta[sign,]), prot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
 .df=prot_clusters$df[prot_clusters$df$cluster %in% prot_clusters$pass,]
 save_file(.df, "prot_clusters_genes_cluster.tsv", result_files)
 
-prot_meta_fa = intersect_fa(.df, fa_de, rownames(prot_meta))
-prot_meta$absMaxFC = absMaxFC
-prot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
-prot_meta[as.character(prot_meta_fa$id), "fa"] <- prot_meta_fa$fa
-prot_meta$symbol = convertIDs(rownames(prot_meta), "UNIPROT", "SYMBOL", org.Mm.eg.db)
-prot_meta$uniprot = convertIDs(rownames(prot_meta), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
-save_file(prot_meta, "prot_meta.tsv", result_files)
+prot_meta = ann_meta(prot_meta, fa_de, absMaxFC, prot_early_clusters, prot_late_clusters, "prot_meta.tsv")
 ```
 
 
@@ -304,21 +330,18 @@ save_file(prot_meta, "prot_meta.tsv", result_files)
 keep = intersect(rownames(late), rownames(early))
 absMaxFC = rowMax(as.matrix(data.frame(early=rowMax(abs(as.matrix(early[keep,]))), late=rowMax(abs(as.matrix(late[keep,]))))))
 fs = early[keep, "P26_1"] / late[keep, "P26_2"]
-prot_meta = as.data.frame(cbind(early[keep,], late[keep,] * fs))
+# prot_meta = as.data.frame(cbind(early[keep,], late[keep,] * fs))
+late_shift = late
+late_shift[keep,] = late[keep,] * fs 
+prot_meta = create_meta_table(early,late_shift)
 prot_meta_col = rbind(early_col, late_col)
-names(absMaxFC) = rownames(prot_meta)
-sign = row.names(prot_meta)[absMaxFC>1]
+names(absMaxFC) = rownames(prot_meta[keep,])
+sign = keep[absMaxFC>1]
 prot_clusters = degPatterns(as.matrix(prot_meta[sign,]), prot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
 .df=prot_clusters$df[prot_clusters$df$cluster %in% prot_clusters$pass,]
 save_file(.df, "prot_norm_clusters_genes_cluster.tsv", result_files)
 
-prot_meta_fa = intersect_fa(.df, fa_de, rownames(prot_meta))
-prot_meta$absMaxFC = absMaxFC
-prot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
-prot_meta[as.character(prot_meta_fa$id), "fa"] <- prot_meta_fa$fa
-prot_meta$symbol = convertIDs(rownames(prot_meta), "UNIPROT", "SYMBOL", org.Mm.eg.db)
-prot_meta$uniprot = convertIDs(rownames(prot_meta), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
-save_file(prot_meta, "prot_norm_meta.tsv", result_files)
+prot_meta = ann_meta(prot_meta, fa_de, absMaxFC, prot_early_clusters, prot_late_clusters, "prot_norm_meta.tsv")
 ```
 
 
@@ -446,6 +469,18 @@ mds(cbind(early_res[keep,], late_res[keep,]), condition = col)
 ```
 
 ## Clustering analysis
+```{r ann-phospho-cluster}
+ann_meta = function(pprot_meta, absMaxFC, pprot_early_clusters, pprot_late_clusters, fn){
+    pprot_meta$absMaxFC = absMaxFC
+    pprot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
+    pprot_meta$symbol = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "SYMBOL", org.Mm.eg.db)
+    pprot_meta$uniprot = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
+    pprot_meta$early_cluster = pprot_early_clusters$df[row.names(pprot_meta),2]
+    pprot_meta$late_cluster = pprot_late_clusters$df[row.names(pprot_meta),2]
+    save_file(pprot_meta, fn, result_files)
+    pprot_meta
+}
+```
 
 ```{r phospho-cluster-merge, results='asis'}
 keep = intersect(rownames(late), rownames(early))
@@ -458,11 +493,7 @@ pprot_clusters = degPatterns(as.matrix(pprot_meta[sign,]), prot_meta_col, minc =
 .df=pprot_clusters$df[pprot_clusters$df$cluster %in% pprot_clusters$pass,]
 save_file(.df, "phospho-prot_clusters_genes_cluster.tsv", result_files)
 
-pprot_meta$absMaxFC = absMaxFC
-pprot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
-pprot_meta$symbol = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "SYMBOL", org.Mm.eg.db)
-pprot_meta$uniprot = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
-save_file(pprot_meta, "phospho-prot_meta.tsv", result_files)
+pprot_meta = ann_meta(pprot_meta, absMaxFC, pprot_early_clusters, pprot_late_clusters, "phospho-prot_meta.tsv")
 ```
 
 ## Clustering analysis with batch normalization
@@ -479,13 +510,7 @@ pprot_clusters = degPatterns(as.matrix(pprot_meta[sign,]), prot_meta_col, minc =
 .df=pprot_clusters$df[pprot_clusters$df$cluster %in% pprot_clusters$pass,]
 save_file(.df, "phospho-prot_norm_clusters_genes_cluster.tsv", result_files)
 
-# pprot_meta_fa = intersect_fa(.df, fa_de, rownames(pprot_meta))
-pprot_meta$absMaxFC = absMaxFC
-pprot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
-# pprot_meta[as.character(pprot_meta_fa$id), "fa"] <- pprot_meta_fa$fa
-pprot_meta$symbol = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "SYMBOL", org.Mm.eg.db)
-pprot_meta$uniprot = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
-save_file(pprot_meta, "phospho-prot_norm_meta.tsv", result_files)
+pprot_meta = ann_meta(pprot_meta, absMaxFC, pprot_early_clusters, pprot_late_clusters, "phospho-prot_norm_meta.tsv")
 ```
 
 

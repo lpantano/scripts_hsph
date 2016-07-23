@@ -40,7 +40,6 @@ options(bitmapType = 'cairo')
 
 ```{r project-options, echo=FALSE}
 library(myRfunctions)
-source("~/repos/DEGreport/R/clustering.R")
 path_results = "~/orch/scratch/jshah_fibrosis_rnaseq/time_course_1/final/2016-03-28_time_course_1/de_early"
 dir.create(path_results, showWarnings = FALSE)
 ```
@@ -66,6 +65,7 @@ library(clusterProfiler)
 library(org.Mm.eg.db)
 library(cluster)
 library(dplyr)
+library(DEGreport)
 
 # library(DT)
 
@@ -218,7 +218,7 @@ dds_condition = DESeqDataSetFromTximport(txi.salmon,
 dds_condition = DESeq(dds_condition)
 
 res_pairs =  results(dds_condition, contrast = c("condition", "JCK", "WT"))
-de_res_pairs = show_deseq2_results(res_pairs, dds, rlogMat, "mice_model_jck_wt", 
+de_res_pairs = degResults(res_pairs, dds, rlogMat, "mice_model_jck_wt", 
                              FDR=0.1, FC=0, do_go=FALSE, path_results = path_results)
 ```
 
@@ -229,10 +229,25 @@ are always UP or DOWN.
 
 ```{r DESeq-output, results='asis'}
 res =  results(dds)
-de_res = show_deseq2_results(res, dds, rlogMat, "mice_model", FDR=0.1, FC=0, path_results = path_results)
+de_res = degResults(res, dds, rlogMat, "mice_model", FDR=0.1, FC=0, path_results = path_results, org=org.Mm.eg.db)
 ```
 
 This will detect genes that change differently over time in the two conditions.
+```{r load-custom-fn}
+.table_w_fc <- function(dds, contrast){
+    if (!contrast[[1]][1] %in% names(colData(dds))){
+        stop("column not in dds object:", contrast[[1]][1])
+    }
+    fc_df <- do.call(rbind, lapply(contrast, function(cntr){
+        tb <- results(dds, contrast=c(cntr[1], cntr[2], cntr[3]), tidy="TRUE")
+        # print(head(tb))
+        tb  %>% dplyr::select(row, log2FoldChange) %>% mutate(comp=paste0(cntr[2], "vs", cntr[3]))
+    }))
+    fc_df <- fc_df %>% tidyr::spread(comp, log2FoldChange)
+    rownames(fc_df) = fc_df$row
+    fc_df[,2:ncol(fc_df)]
+}
+```
 
 ```{r contrast_time}
 out_df = de_res$table
@@ -264,7 +279,7 @@ fc_df <- .table_w_fc(dds_pairs, contrast)
 cols_names <- names(fc_df)
 out_df <- cbind(out_df, fc_df[rownames(out_df),])
 meta_fc_time = data.frame(row.names=colnames(fc_df), 
-                     time = gs)
+                     time = factor(gs, levels=gs))
 fc_df_time=fc_df
 save_file(out_df[,-8], "mice_model_early_fold_changes_attime.tsv", path_results)
 ```

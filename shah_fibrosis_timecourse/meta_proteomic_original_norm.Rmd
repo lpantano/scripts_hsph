@@ -146,15 +146,12 @@ fa_matrix = read.csv(file.path(root_path_fa, "fa_model.tsv"), row.names = 1)
 fa_de = rownames(fa_matrix[fa_matrix$adj.P.Val<0.01 & rowMax(abs(as.matrix(fa_matrix[,1:11]))) > 2, ])
 ```
 
-In this study there are no replicates. I use log2(ratio) to filter genes
+In this study there are no replicates. I use the values at they are
 for clustering step. The ratio is between JCK vs KO, and 
 there is one for each time point. I am using a cutoff of 1 and refering to them
 like **DE proteins**.
 
-
-I use TMM normalization from edgeR package assuming the majority of genes
-are not de-regulated, so the ratio between the genes for each sample should be 
-the factor size to use to bring all library to the same scale.
+In this report, we didn't do any normalization. We used the values as they were in the input.
 
 # Proteomic
 
@@ -299,6 +296,8 @@ prot_meta[as.character(.df$genes), "cluster"] <- .df$cluster
 prot_meta[as.character(prot_meta_fa$id), "fa"] <- prot_meta_fa$fa
 prot_meta$symbol = convertIDs(rownames(prot_meta), "UNIPROT", "SYMBOL", org.Mm.eg.db)
 prot_meta$uniprot = convertIDs(rownames(prot_meta), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
+prot_meta$early_cluster = prot_early_clusters$df[row.names(prot_meta),2]
+prot_meta$late_cluster = prot_late_clusters$df[row.names(prot_meta),2]
 save_file(prot_meta, "prot_meta.tsv", result_files)
 ```
 
@@ -323,6 +322,8 @@ prot_meta[as.character(.df$genes), "cluster"] <- .df$cluster
 prot_meta[as.character(prot_meta_fa$id), "fa"] <- prot_meta_fa$fa
 prot_meta$symbol = convertIDs(rownames(prot_meta), "UNIPROT", "SYMBOL", org.Mm.eg.db)
 prot_meta$uniprot = convertIDs(rownames(prot_meta), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
+prot_meta$early_cluster = prot_early_clusters$df[row.names(prot_meta),2]
+prot_meta$late_cluster = prot_late_clusters$df[row.names(prot_meta),2]
 save_file(prot_meta, "prot_norm_meta.tsv", result_files)
 ```
 
@@ -469,6 +470,8 @@ pprot_meta[as.character(.df$genes), "cluster"] <- .df$cluster
 # pprot_meta[as.character(pprot_meta_fa$id), "fa"] <- pprot_meta_fa$fa
 pprot_meta$symbol = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "SYMBOL", org.Mm.eg.db)
 pprot_meta$uniprot = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
+pprot_meta$early_cluster = pprot_early_clusters$df[row.names(pprot_meta),2]
+pprot_meta$late_cluster = pprot_late_clusters$df[row.names(pprot_meta),2]
 save_file(pprot_meta, "phospho-prot_meta.tsv", result_files)
 ```
 
@@ -492,6 +495,8 @@ pprot_meta[as.character(.df$genes), "cluster"] <- .df$cluster
 # pprot_meta[as.character(pprot_meta_fa$id), "fa"] <- pprot_meta_fa$fa
 pprot_meta$symbol = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "SYMBOL", org.Mm.eg.db)
 pprot_meta$uniprot = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
+pprot_meta$early_cluster = pprot_early_clusters$df[row.names(pprot_meta),2]
+pprot_meta$late_cluster = pprot_late_clusters$df[row.names(pprot_meta),2]
 save_file(pprot_meta, "phospho-prot_norm_meta.tsv", result_files)
 ```
 
