@@ -357,9 +357,9 @@ main[as.character(early_clus_cond$genes), "cluster_early"] = early_clus_cond$clu
 
 main = merge(main, meta_set[,1:4], by="id", all.x=TRUE)
 main = distinct(main)
-fa_merge = fa_matrix[as.character(main$id),c(6,9:14)]
-names(fa_merge) <- paste0("fa_", names(fa_merge))
-main = cbind(main, fa_merge)
+# fa_merge = fa_matrix[as.character(main$id),c(6,9:14)]
+# names(fa_merge) <- paste0("fa_", names(fa_merge))
+# main = cbind(main, fa_merge)
 row.names(main) = 1:nrow(main)
 save_file(main, "meta-table.csv", path_results)
 

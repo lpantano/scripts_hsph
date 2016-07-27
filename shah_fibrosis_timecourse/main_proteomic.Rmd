@@ -1,0 +1,677 @@
+
+```{r knitrsetup, echo=FALSE}
+library(myRfunctions)
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=FALSE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+# ORIGINAL = FALSE
+# library(rmarkdown);library(knitr);render("meta_proteomic.Rmd")
+# render_2_drop("meta_proteomic.Rmd", "shah_fibrosis/proteomics")
+```
+
+```{r libraries}
+library(ggplot2)
+library(reshape)
+library(limma)
+library(CHBUtils)
+library(biomaRt)
+library(dplyr)
+library(cluster)
+library(gridExtra)
+library(logging)
+library(org.Mm.eg.db)
+library(DEGreport)
+library(UpSetR)
+library(dplyr)
+
+if (ORIGINAL){
+    result_files = "~/orch/scratch/jshah_fibrosis_rnaseq/protein/files_original"
+}else{
+    result_files = "~/orch/scratch/jshah_fibrosis_rnaseq/protein/files"
+}
+root_path = "~/orch/scratch/jshah_fibrosis_rnaseq/protein"
+dir.create(result_files, showWarnings = F, recursive = T)
+
+basicConfig(level='INFO')
+```
+
+```{r fn}
+
+intersect_fa <- function(.df, fa_de, universe){
+    all_genes=convertIDs(unique(c(fa_de)), "ENSEMBL", "UNIPROT", org.Mm.eg.db, ifMultiple = 'useFirst')
+    all_genes = all_genes[!is.na(all_genes)]
+    .t=lapply(unique(.df$cluster), function(nc){
+        cat("\n\ncluster:", nc, "\n\n")
+        .this=as.character(.df$genes[which(.df$cluster==nc)])
+        common_genes = unique(c(all_genes,.this))
+        fa_de_c = intersect(all_genes, common_genes)
+        all_set = data.frame(row.names=common_genes, id=common_genes, fa=0, cluster=0)
+        all_set[fa_de_c,"fa"] = 1;all_set[.this,"cluster"] = 1;
+        set_names=c("fa", "cluster")
+        if (length(.this)<10)
+            return(all_set)
+        if (sum(colSums(all_set[,2:3])>0)==1){
+            cat("\n**No shared genes**\n")
+            return(all_set)
+        }
+        upset(all_set, sets=set_names[colSums(all_set[,2:3])>0])
+        .this_only = setdiff(.this, fa_de)
+        cat("\n**Number of unique genes", length(.this_only), "**\n")
+        # res =  runGO(.this_only, org.Mm.eg.db, from="ENSEMBL", universe = universe)
+        # cat("\n\nGo enrichment:\n\n")
+        # if(!is.null(res$table))
+        #     print(res$table)
+        # cat("\n\n")
+        # if(!is.null(res$table))
+        #     print(res$plot)
+        return(all_set[all_set$cluster==1,])
+    })
+    
+    do.call(rbind, .t)
+}
+
+if (ORIGINAL){
+    do_de <- function(counts, coldata, design, contrast, prefix, path){
+    counts$ensembl = convertIDs(as.character(counts$Uniprot.Id), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
+    save_file(counts, paste0(prefix, "_counts_annotated.csv"), path)
+    
+    clean_counts = counts[,row.names(coldata)]
+    names(clean_counts) = sapply(names(clean_counts), tolower)
+    
+    cat("## Expression density of 'raw' data\n\n")
+    print(ggplot(melt(clean_counts), aes(x=log2(value), colour=variable)) + geom_density())
+    
+    ref = which.max(colSums(clean_counts))
+    ratio = colSums(clean_counts) / ref
+    norm_counts = sweep(clean_counts,2,ratio,"/")
+    norm_counts = sweep(norm_counts,1,rowSums(norm_counts),"/") * 100
+    norm_counts[is.na(norm_counts)] = 0.5
+    norm_counts[norm_counts==0] = 0.5
+    
+    cat("\n\n## Mean vs SD")
+    plot(rowMeans(norm_counts),apply(norm_counts, 1, sd), 
+         pch=20, ylab="SD counts", xlab="average counts")
+    
+    MA <- normalizeBetweenArrays(as.matrix(norm_counts), method="none")
+    
+    cat("\n\n## Expression density of normalize data\n\n")
+    print(ggplot(melt(as.data.frame(MA)), aes(x=value, colour=variable)) + geom_density())
+    
+    cat("\n\n## MDS plot\n\n")
+    print(mds(MA, condition = coldata$condition))
+    save_file(MA, paste0(prefix, "_model_log2_counts.tsv"), path)
+    MA
+    }
+    get_fc <- function(one, two){
+        log2(one/two)
+    }
+}else{
+    do_de <- function(counts, coldata, design, contrast, prefix, path){
+    counts$ensembl = convertIDs(as.character(counts$Uniprot.Id), "UNIPROT", "ENSEMBL", org.Mm.eg.db)
+    save_file(counts, paste0(prefix, "_counts_annotated.csv"), path)
+    
+    clean_counts = counts[,row.names(coldata)]
+    names(clean_counts) = sapply(names(clean_counts), tolower)
+    
+    cat("## Expression density of 'raw' data\n\n")
+    print(ggplot(melt(clean_counts), aes(x=log2(value), colour=variable)) + geom_density())
+    
+    dge = edgeR::DGEList(clean_counts)
+    dge = edgeR::calcNormFactors(dge, method="TMM")
+    
+    norm_counts = edgeR::cpm(dge, log=T)
+    
+    cat("\n\n## Mean vs SD")
+    plot(rowMeans(norm_counts),log10(apply(norm_counts, 1, sd)), 
+         pch=20, ylab="SD counts", xlab="average counts")
+    
+    MA <- normalizeBetweenArrays(as.matrix(norm_counts), method="none")
+    
+    cat("\n\n## Expression density of normalize data\n\n")
+    print(ggplot(melt(as.data.frame(MA)), aes(x=value, colour=variable)) + geom_density())
+    
+    cat("\n\n## MDS plot\n\n")
+    print(mds(MA, condition = coldata$condition))
+    save_file(MA, paste0(prefix, "_model_log2_counts.tsv"), path)
+    MA
+    }
+    get_fc <- function(one, two){
+        one - two
+    }
+
+
+}
+FC=1
+FDR=0.05
+```
+
+Loading FA data with logFC cutoff of `r FC` and FDR cutoff `r FDR`.
+
+```{r load-extra}
+root_path_fa = "~/orch/scratch/vishal_mirna_kidney/publish/FA-model/protein/files_publish"
+fa_matrix = read.csv(file.path(root_path_fa, "fa_model.tsv"), row.names = 1)
+fa_matrix$uniprot = convertIDs(rownames(fa_matrix), "ENSEMBL", "UNIPROT", org.Mm.eg.db, ifMultiple = 'useFirst')
+fa_de = rownames(fa_matrix[fa_matrix$adj.P.Val<FDR & rowMax(abs(as.matrix(fa_matrix[,1:11]))) >FC , ])
+save_file(fa_matrix, "prot_fa.csv", result_files)
+```
+
+In this study there are no replicates. I use log2(ratio) to filter genes
+for clustering step. The ratio is between JCK vs KO, and 
+there is one for each time point. I am using a cutoff of 1 and refering to them
+like **DE proteins**.
+
+```{asis explain-tmm, eval=!ORIGINAL, echo=FALSE}
+I used TMM normalization from edgeR package assuming the majority of genes
+are not de-regulated, so the ratio between the genes for each sample should be 
+the factor size to use to bring all library to the same scale.
+```
+
+```{asis explain-no, eval=ORIGINAL, echo=FALSE}
+In this report, we didn't do any normalization. We used the values as they were in the input.
+```
+
+
+# Proteomic
+
+## Early
+
+```{r protein-early, results='asis'}
+counts = read.csv(file.path(root_path, "early_prot_P5-P26ProtQuant 2016.csv"),skip = 0) %>% tidyr::separate(Uniprot.protein.Id, c("sp", "Uniprot.Id", "type"),sep = "[::|::]", extra = "merge")
+row.names(counts) = counts$Uniprot.Id
+
+names(counts)[7:16] = c("JCK_P5","JCK_P10","JCK_P15","WT_P26","JCK_P26" ,"WT_P5","WT_P10","WT_P15","WT_P20","JCK_P20")
+
+coldata = data.frame(row.names=colnames(counts)[7:16], group=colnames(counts)[7:16]) %>% tidyr::separate(group,into = c("condition","time"), extra = "drop",remove = F)
+coldata$group = sapply(coldata$group, tolower)
+
+design <- model.matrix(~ 0 + coldata$group)
+colnames(design) = gsub("coldata[$]group", "",colnames(design))
+contrast.matrix <- makeContrasts(jck_p5-wt_p5,jck_p10-wt_p10,jck_p15-wt_p15,jck_p20-wt_p20, levels=design)
+
+res = do_de(counts, coldata, design, contrast, "prot_early", result_files)
+comp = list(c("jck_p5", "wt_p5"), c("jck_p10", "wt_p10"),
+            c("jck_p15", "wt_p15"), c("jck_p20", "wt_p20"),
+            c("jck_p26", "wt_p26"))
+fc = lapply(comp, function(c){
+    get_fc(res[,c[1]], res[,c[2]])
+})
+fc_tab = do.call(cbind, fc)
+colnames(fc_tab) = c("P5", "P10", "P15", "P20", "P26_1")
+
+#save_file(res, "prot_early_model.tsv", result_files)
+absMaxFC = rowMax(abs(fc_tab))
+sign = row.names(res)[absMaxFC>1]
+
+cat("\n\n## MDS plot of DE proteins\n\n")
+mds(res[sign,], condition = coldata$condition)
+
+order_group = c("P5", "P10", "P15", "P20", "P26_1")
+coldata_fc = data.frame(row.names=colnames(fc_tab), group = factor(colnames(fc_tab), levels=order_group))
+early = fc_tab
+early_col = coldata_fc
+early_res = res
+```
+
+## Clustering early
+
+```{r protein-early-clus}
+absMaxFC = rowMax(abs(as.matrix(early)))
+sign = row.names(early)[absMaxFC>1]
+prot_early_clusters = degPatterns(as.matrix(early[sign,]), early_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2), cutoff = 0.1)
+.df=prot_early_clusters$df[prot_early_clusters$df$cluster %in% prot_early_clusters$pass,]
+early_fa = intersect_fa(.df, fa_de, rownames(early))
+prot_early_clusters[["ann"]] = counts[,c("Quantified.spectral.counts"), drop=F]
+save_file(.df, "prot_early_clusters_genes_cluster.tsv", result_files)
+```
+
+## Late
+
+```{r protein-late, results='asis'}
+counts = read.csv(file.path(root_path, "late_prot_150715_ProQuant_tc-d161.csv"),skip = 0) %>% tidyr::separate(Protein.Id, c("sp", "Uniprot.Id", "type"),sep = "[::|::]", extra = "merge")
+row.names(counts) = counts$Uniprot.Id
+names(counts)[7:16] = c("JCK_P26","JCK_P35","JCK_P44","JCK_P50", "JCK_P64",
+                        "WT_P26","WT_P35","WT_P44","WT_P50","WT_P64")
+
+coldata = data.frame(row.names=colnames(counts)[7:16], group=colnames(counts)[7:16]) %>% tidyr::separate(group,into = c("condition","time"), extra = "drop",remove = F)
+coldata$group = sapply(coldata$group, tolower)
+
+design <- model.matrix(~ 0 + coldata$group)
+colnames(design) = gsub("coldata[$]group", "",colnames(design))
+
+res = do_de(counts, coldata, design, contrast, "prot_late", result_files)
+comp = list(c("jck_p26", "wt_p26"), c("jck_p35", "wt_p35"),
+            c("jck_p44", "wt_p44"), c("jck_p50", "wt_p50"),
+            c("jck_p64", "wt_p64"))
+fc = lapply(comp, function(c){
+    get_fc(res[,c[1]], res[,c[2]])
+})
+fc_tab = do.call(cbind, fc)
+colnames(fc_tab) = c("P26_2", "P35", "P44", "P50", "P64")
+
+#save_file(res, "prot_late_model.tsv", result_files)
+absMaxFC = rowMax(abs(fc_tab))
+sign = row.names(res)[absMaxFC>1]
+
+cat("\n\n## MDS plot of DE proteins\n\n")
+mds(res[sign,], condition = coldata$condition)
+
+order_group = c("P26_2", "P35", "P44", "P50", "P64")
+coldata_fc = data.frame(row.names=colnames(fc_tab), group = factor(colnames(fc_tab), levels=order_group))
+late = fc_tab
+late_col = coldata_fc
+late_res = res
+```
+
+## Clustering late
+
+```{r protein-late-clus}
+absMaxFC = rowMax(abs(as.matrix(late)))
+sign = row.names(late)[absMaxFC>1]
+prot_late_clusters = degPatterns(as.matrix(late[sign,]), late_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2), cutoff = 0.1)
+.df=prot_late_clusters$df[prot_late_clusters$df$cluster %in% prot_late_clusters$pass,]
+late_fa = intersect_fa(.df, fa_de, rownames(late))
+prot_late_clusters[["ann"]] = counts[,c("Quantified.Spectral.Count"), drop=F]
+save_file(.df, "prot_late_clusters_genes_cluster.tsv", result_files)
+```
+
+## P26 replicate QC
+
+```{r p26-comp}
+keep = intersect(rownames(late), rownames(early))
+plot(early_res[keep,"jck_p26"], late_res[keep, "jck_p26"], pch=20, main="early vs late JCK26")
+plot(early_res[keep,"wt_p26"], late_res[keep, "wt_p26"], pch=20,  main="early vs late WT26")
+plot(early_res[,"jck_p26"], early_res[, "wt_p26"], pch=20,  main="early JCK26 vs WTP16")
+plot(late_res[,"jck_p26"], late_res[, "wt_p26"], pch=20, 
+     main="late JCK26 vs WTP16")
+plot(early[keep,"P26_1"], late[keep, "P26_2"], pch=20, main="FC correlation")
+abline(h=1, col="red")
+abline(h=-1, col="red")
+abline(v=1, col="red")
+abline(v=-1, col="red")
+
+```
+
+## MDS batch effect
+```{r prot-batch}
+col = grepl("wt", c(colnames(early_res), colnames(late_res)))
+mds(cbind(early_res[keep,], late_res[keep,]), condition = col)
+```
+
+
+## Clustering analysis
+```{r ann-cluster}
+ann_meta = function(prot_meta, clus, fa_de, prot_early_clusters, prot_late_clusters, fn){
+    fa_prot_de=convertIDs(unique(c(fa_de)), "ENSEMBL", "UNIPROT", org.Mm.eg.db, ifMultiple = 'useFirst')
+    prot_meta_fa = intersect_fa(clus, fa_de, rownames(prot_meta))
+    prot_meta$absMaxFC = apply(abs(prot_meta), 1, max, na.rm=T)
+    prot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
+    # add_fa = intersect(as.character(prot_meta_fa$id), rownames(prot_meta))
+    prot_meta[fa_prot_de, "is_de_fa"] <- 1
+    prot_meta$comb_is_de_fa <- sapply(!is.na(prot_meta$is_de_fa) & !is.na(prot_meta$cluster), sum)
+    prot_meta$symbol = convertIDs(rownames(prot_meta), "UNIPROT", "SYMBOL", org.Mm.eg.db, ifMultiple="useFirst")
+    prot_meta$uniprot = convertIDs(rownames(prot_meta), "UNIPROT", "ENSEMBL", org.Mm.eg.db, ifMultiple="useFirst")
+    
+    prot_meta[rownames(prot_early_clusters$df), "early_cluster"] = prot_early_clusters$df$cluster
+    prot_meta[rownames(prot_early_clusters$ann), "early_qsp"] = prot_early_clusters$ann[,1]
+    prot_meta$early_is_de_fa <- sapply(!is.na(prot_meta$is_de_fa) & !is.na(prot_meta$early_cluster), sum)
+
+    prot_meta[rownames(prot_late_clusters$df), "late_cluster"] = prot_late_clusters$df$cluster
+    prot_meta[rownames(prot_late_clusters$ann), "late_qsp"] = prot_late_clusters$ann[,1]
+    prot_meta$late_is_de_fa <- sapply(!is.na(prot_meta$is_de_fa) & !is.na(prot_meta$late_cluster), sum)
+    save_file(prot_meta, fn, result_files)
+    prot_meta
+}
+create_meta_table = function(early, late, fs=NULL){
+    keep = intersect(rownames(late), rownames(early))
+    meta = as.data.frame(cbind(early[keep,], late[keep,]))
+    only_early = setdiff(rownames(early), keep)
+    only_late = setdiff(rownames(late), keep)
+    early_fake = data.frame(row.names=only_early, 
+                            matrix(nrow=length(only_early), ncol=ncol(late)))
+    colnames(early_fake) = colnames(late)
+    late_fake = data.frame(row.names=only_late, 
+                            matrix(nrow=length(only_late), ncol=ncol(early)))
+    colnames(late_fake) = colnames(early)
+
+    meta = rbind(meta, cbind(early[only_early,],early_fake),
+                 cbind(late[only_late,],late_fake))
+}
+```
+
+```{r cluster-merge, results='asis'}
+keep = intersect(rownames(late), rownames(early))
+prot_meta = create_meta_table(early,late)
+prot_meta_col = rbind(early_col, late_col)
+absMaxFC = rowMax(abs(as.matrix(prot_meta[keep,])))
+names(absMaxFC) = rownames(prot_meta[keep,])
+sign = keep[absMaxFC>1]
+prot_clusters = degPatterns(as.matrix(prot_meta[sign,]), prot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
+.df=prot_clusters$df[prot_clusters$df$cluster %in% prot_clusters$pass,]
+save_file(.df, "prot_clusters_genes_cluster.tsv", result_files)
+
+prot_meta = ann_meta(prot_meta, .df, fa_de, prot_early_clusters, prot_late_clusters, "prot_meta.tsv")
+```
+
+## Clustering analysis with batch normalization
+```{r cluster-merge-2, results='asis'}
+keep = intersect(rownames(late), rownames(early))
+absMaxFC = rowMax(as.matrix(data.frame(early=rowMax(abs(as.matrix(early[keep,]))), late=rowMax(abs(as.matrix(late[keep,]))))))
+fs = early[keep, "P26_1"] / late[keep, "P26_2"]
+# prot_meta = as.data.frame(cbind(early[keep,], late[keep,] * fs))
+late_shift = late
+late_shift[keep,] = late[keep,] * fs 
+prot_meta = create_meta_table(early,late_shift)
+prot_meta_col = rbind(early_col, late_col)
+names(absMaxFC) = rownames(prot_meta[keep,])
+sign = keep[absMaxFC>1]
+prot_clusters = degPatterns(as.matrix(prot_meta[sign,]), prot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
+.df=prot_clusters$df[prot_clusters$df$cluster %in% prot_clusters$pass,]
+save_file(.df, "prot_norm_clusters_genes_cluster.tsv", result_files)
+
+prot_meta = ann_meta(prot_meta, .df, fa_de, prot_early_clusters, prot_late_clusters, "prot_norm_meta.tsv")
+```
+
+# Phospho-proteomic
+
+##  Early
+
+```{r phospho-protein-early, results='asis'}
+counts = read.csv(file.path(root_path, "early_phospo_P5-P26PhosphoSiteQuant2016.csv")) %>% tidyr::separate(Protein.Id, c("sp", "Uniprot.Id", "type"),sep = "[::|::]", extra = "merge")
+row.names(counts) = paste0(counts$Uniprot.Id, ":", counts$Site.Position)
+names(counts)[4] = "Gene.symbol"
+
+names(counts)[10:19] = c("JCK_P5","JCK_P10","JCK_P15","WT_P26","JCK_P26" ,"WT_P5","WT_P10","WT_P15","WT_P20","JCK_P20")
+
+coldata = data.frame(row.names=colnames(counts)[10:19], group=colnames(counts)[10:19]) %>% tidyr::separate(group,into = c("condition","time"), extra = "drop",remove = F)
+coldata$group = sapply(coldata$group, tolower)
+
+design <- model.matrix(~ 0 + coldata$group)
+colnames(design) = gsub("coldata[$]group", "",colnames(design))
+contrast.matrix <- makeContrasts(jck_p5-wt_p5,jck_p10-wt_p10,jck_p15-wt_p15,jck_p20-wt_p20, levels=design)
+
+res = do_de(counts, coldata, design, contrast, "phospho-prot_early", result_files)
+comp = list(c("jck_p5", "wt_p5"), c("jck_p10", "wt_p10"),
+            c("jck_p15", "wt_p15"), c("jck_p20", "wt_p20"),
+            c("jck_p26", "wt_p26"))
+fc = lapply(comp, function(c){
+    get_fc(res[,c[1]], res[,c[2]])
+})
+fc_tab = do.call(cbind, fc)
+colnames(fc_tab) = c("P5", "P10", "P15", "P20", "P26_1")
+
+#save_file(res, "early_phos-prot_model.tsv", result_files)
+absMaxFC = rowMax(abs(fc_tab))
+sign = row.names(res)[absMaxFC>1]
+
+cat("\n\n## MDS plot of DE proteins\n\n")
+mds(res[sign,], condition = coldata$condition)
+
+order_group = c("P5", "P10", "P15", "P20", "P26_1")
+coldata_fc = data.frame(row.names=colnames(fc_tab), group = factor(colnames(fc_tab), levels=order_group))
+early = fc_tab
+early_col = coldata_fc
+early_res = res
+```
+
+## Clustering early
+
+```{r pprotein-early-clus}
+absMaxFC = rowMax(abs(as.matrix(early)))
+sign = row.names(early)[absMaxFC>1.5]
+pprot_early_clusters = degPatterns(as.matrix(early[sign,]), early_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2), cutoff = 0.1)
+.df=pprot_early_clusters$df[pprot_early_clusters$df$cluster %in% pprot_early_clusters$pass,]
+early_fa = intersect_fa(.df, fa_de, rownames(early))
+pprot_early_clusters[['ann']] = counts[,c("Site.Position","Localization.score","Quantified.peptide")]
+save_file(.df, "phospho-prot_early_clusters_genes_cluster.tsv", result_files)
+```
+
+## Late 
+
+```{r phospho-protein-late, results='asis'}
+counts = read.csv(file.path(root_path, "late_phospo_150715_PhosSiteQuant_tc-d161p_Ti-TMT.csv")) %>% tidyr::separate(Protein.Id, c("sp", "Uniprot.Id", "type"),sep = "[::|::]", extra = "merge")
+row.names(counts) = paste0(counts$Uniprot.Id, ":", counts$Site.Position)
+names(counts)[4] = "Gene.symbol"
+names(counts)[10:19] = c("JCK_P26","JCK_P35","JCK_P44","JCK_P50", "JCK_P64",
+                        "WT_P26","WT_P35","WT_P44","WT_P50","WT_P64")
+
+coldata = data.frame(row.names=colnames(counts)[10:19], group=colnames(counts)[10:19]) %>% tidyr::separate(group,into = c("condition","time"), extra = "drop",remove = F)
+coldata$group = sapply(coldata$group, tolower)
+
+design <- model.matrix(~ 0 + coldata$group)
+colnames(design) = gsub("coldata[$]group", "",colnames(design))
+
+res = do_de(counts, coldata, design, contrast, "phospho-prot_late", result_files)
+comp = list(c("jck_p26", "wt_p26"), c("jck_p35", "wt_p35"),
+            c("jck_p44", "wt_p44"), c("jck_p50", "wt_p50"),
+            c("jck_p64", "wt_p64"))
+fc = lapply(comp, function(c){
+    get_fc(res[,c[1]], res[,c[2]])
+})
+fc_tab = do.call(cbind, fc)
+colnames(fc_tab) = c("P26_2", "P35", "P44", "P50", "P64")
+
+#save_file(res, "late_phos-prot_model.tsv", result_files)
+absMaxFC = rowMax(abs(fc_tab))
+sign = row.names(res)[absMaxFC>1]
+
+cat("\n\n## MDS plot of DE proteins\n\n")
+mds(res[sign,], condition = coldata$condition)
+
+order_group = c("P26_2", "P35", "P44", "P50", "P64")
+coldata_fc = data.frame(row.names=colnames(fc_tab), group = factor(colnames(fc_tab), levels=order_group))
+late = fc_tab
+late_col = coldata_fc
+late_res = res
+```
+
+## Clustering late
+
+```{r pprotein-late-clus}
+absMaxFC = rowMax(abs(as.matrix(late)))
+sign = row.names(late)[absMaxFC>1.5]
+pprot_late_clusters = degPatterns(as.matrix(late[sign,]), late_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2), cutoff = 0.1)
+.df=pprot_late_clusters$df[pprot_late_clusters$df$cluster %in% pprot_late_clusters$pass,]
+late_fa = intersect_fa(.df, fa_de, rownames(late))
+pprot_late_clusters[['ann']] = counts[,c("Site.Position","Localization.score","Quantified.Spectral.Counts")]
+save_file(.df, "phospho-prot_late_clusters_genes_cluster.tsv", result_files)
+```
+
+## P26 replicate QC
+
+```{r p26-pp-comp}
+keep = intersect(rownames(late), rownames(early))
+plot(early_res[keep,"jck_p26"], late_res[keep, "jck_p26"], pch=20)
+plot(early_res[keep,"wt_p26"], late_res[keep, "wt_p26"], pch=20)
+plot(early[keep,"P26_1"], late[keep, "P26_2"], pch=20, main="FC correlation")
+# low=sapply(c(early_res[keep,"wt_p26"],late_res[keep, "wt_p26"]),mean)<4
+# points((early[keep,"P26"])[low], (late[keep, "P26"])[low], pch=20, col="red")
+abline(h=1, col="red")
+abline(h=-1, col="red")
+abline(v=1, col="red")
+abline(v=-1, col="red")
+
+```
+
+## MDS batch effect
+
+```{r pprot-batch}
+col = grepl("wt", c(colnames(early_res), colnames(late_res)))
+mds(cbind(early_res[keep,], late_res[keep,]), condition = col)
+```
+
+## Clustering analysis
+```{r ann-phospho-cluster}
+ann_meta = function(pprot_meta, pprot_early_clusters, pprot_late_clusters, fn){
+    pprot_meta$absMaxFC = apply(abs(pprot_meta), 1, max, na.rm=T)
+    pprot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
+    pprot_meta$symbol = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "SYMBOL", org.Mm.eg.db, ifMultiple="useFirst")
+    pprot_meta$uniprot = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "ENSEMBL", org.Mm.eg.db, ifMultiple="useFirst")
+    
+    pprot_meta[rownames(pprot_early_clusters$df), "early_cluster"] = pprot_early_clusters$df$cluster
+    pprot_meta[rownames(pprot_early_clusters$ann), "early_SP"] = pprot_early_clusters$ann[,1]
+    pprot_meta[rownames(pprot_early_clusters$ann), "early_LS"] = pprot_early_clusters$ann[,2]
+    pprot_meta[rownames(pprot_early_clusters$ann), "early_QP"] = pprot_early_clusters$ann[,3]
+    
+    pprot_meta[rownames(pprot_late_clusters$df), "late_cluster"] = pprot_late_clusters$df$cluster
+    pprot_meta[rownames(pprot_late_clusters$ann), "late_SP"] = pprot_late_clusters$ann[,1]
+    pprot_meta[rownames(pprot_late_clusters$ann), "late_LS"] = pprot_late_clusters$ann[,2]
+    pprot_meta[rownames(pprot_late_clusters$ann), "late_QP"] = pprot_late_clusters$ann[,3]
+
+    save_file(pprot_meta, fn, result_files)
+    pprot_meta
+}
+
+create_meta_table = function(early, late, fs=NULL){
+    keep = intersect(rownames(late), rownames(early))
+    meta = as.data.frame(cbind(early[keep,], late[keep,]))
+    only_early = setdiff(rownames(early), keep)
+    only_late = setdiff(rownames(late), keep)
+    early_fake = data.frame(row.names=only_early, 
+                            matrix(nrow=length(only_early), ncol=ncol(late)))
+    colnames(early_fake) = colnames(late)
+    late_fake = data.frame(row.names=only_late, 
+                            matrix(nrow=length(only_late), ncol=ncol(early)))
+    colnames(late_fake) = colnames(early)
+
+    meta = rbind(meta, cbind(early[only_early,],early_fake),
+                 cbind(late[only_late,],late_fake))
+}
+```
+
+```{r phospho-cluster-merge, results='asis'}
+keep = intersect(rownames(late), rownames(early))
+pprot_meta = create_meta_table(early,late)
+pprot_meta_col = rbind(early_col, late_col)
+absMaxFC = rowMax(abs(as.matrix(pprot_meta[keep,])))
+names(absMaxFC) = rownames(pprot_meta[keep,])
+sign = keep[absMaxFC>1.5]
+pprot_clusters = degPatterns(as.matrix(pprot_meta[sign,]), prot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
+.df=pprot_clusters$df[pprot_clusters$df$cluster %in% pprot_clusters$pass,]
+save_file(.df, "phospho-prot_clusters_genes_cluster.tsv", result_files)
+
+pprot_meta = ann_meta(pprot_meta, pprot_early_clusters, pprot_late_clusters, "phospho-prot_meta.tsv")
+```
+
+## Clustering analysis with batch normalization
+
+```{r phospho-cluster-merge-2, results='asis'}
+keep = intersect(rownames(late), rownames(early))
+absMaxFC = rowMax(as.matrix(data.frame(early=rowMax(abs(as.matrix(early[keep,]))), late=rowMax(abs(as.matrix(late[keep,]))))))
+fs = early[keep, "P26_1"] / late[keep, "P26_2"]
+late_shift = late
+late_shift[keep,] = late[keep,] * fs 
+pprot_meta = create_meta_table(early,late_shift)
+pprot_meta_col = rbind(early_col, late_col)
+absMaxFC = rowMax(abs(as.matrix(pprot_meta[keep,])))
+names(absMaxFC) = rownames(pprot_meta[keep,])
+sign = keep[absMaxFC>1.5]
+pprot_clusters = degPatterns(as.matrix(pprot_meta[sign,]), prot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
+.df=pprot_clusters$df[pprot_clusters$df$cluster %in% pprot_clusters$pass,]
+save_file(.df, "phospho-prot_norm_clusters_genes_cluster.tsv", result_files)
+
+pprot_meta = ann_meta(pprot_meta, pprot_early_clusters, pprot_late_clusters, "phospho-prot_norm_meta.tsv")
+```
+
+
+# Join both data
+
+I take the clusters in both data set and calculate the correlation value using the 
+median values of the genes in each cluster in each data. I transform the correlation 
+in distance because it is easy to plot heatmaps. The distance is **1-cor**
+
+Then, I take only the cluster pairs with distance < 0.3 (cor > 0.7). For those pairs, I show
+the common number of genes and the GO enrichment using all the genes in both 
+clusters. This may help to focus on some of them first. 
+
+```{r merge, results='asis'}
+prot_clus = unique(prot_meta$cluster)[!is.na(unique(prot_meta$cluster))]
+pprot_clus = unique(pprot_meta$cluster)[!is.na(unique(pprot_meta$cluster))]
+cor = lapply(prot_clus, function(nc1){
+    sapply(pprot_clus, function(nc2){
+        g1 = apply(prot_meta[prot_meta$cluster==nc1 & !is.na(prot_meta$cluster),1:9], 2, median)
+        g2 = apply(pprot_meta[pprot_meta$cluster==nc2 & !is.na(pprot_meta$cluster),1:9], 2, median)
+        1-cor.test(g1, g2)$estimate
+    })
+})
+cor <- do.call(rbind, cor)
+colnames(cor) <- paste0("pProt-", pprot_clus)
+rownames(cor) <- paste0("Prot-", prot_clus)
+pheatmap::pheatmap(cor, breaks = c(0,0.1,0.2,0.3,2), color = c("blue4","steelblue","lightblue","white"), display_numbers = T, main="correlation")
+
+universe = unique(c(rownames(prot_meta), 
+                    gsub(":.*", "", rownames(pprot_meta))))
+.void = apply(melt(cor<0.3) %>% filter(value==TRUE), 1, function(x){
+    cat("\n\n### Clusters", paste(x[1], x[2]), "\n\n")
+    nc1 = gsub("Prot-", "", x[1])
+    nc2 = gsub("pProt-", "", x[2])
+    g1 = rownames(prot_meta[prot_meta$cluster==nc1 & !is.na(prot_meta$cluster),])
+    g1c = apply(prot_meta[g1, 1:9], 2, median)
+    g2 = rownames(pprot_meta[pprot_meta$cluster==nc2 & !is.na(pprot_meta$cluster),])
+    g2c = apply(pprot_meta[g2, 1:9], 2, median)
+    g2 = gsub(":.*$", "", g2)
+    common = length(intersect(g1,g2))
+    cat("\n\ncommon genes:", common, "\n\n")
+    df = rbind(
+        data.frame(log2FC=g1c, x=names(g1c), molecule="protein"), 
+        data.frame(log2FC=g2c, x=names(g2c), molecule="phospho-protein"))
+    df$x = factor(df$x, levels=names(g1c))
+    p <- ggplot(df,aes(x=x, y=log2FC, color=molecule, group=molecule)) +
+        geom_point() + geom_line()
+    print(p)
+    res =  runGO(unique(c(g1,g2)), org.Mm.eg.db, from="UNIPROT", universe = universe)
+    # .this = unique(c(g1,g2))
+    # .this_prot = convertIDs(.this, "ENSEMBL", "UNIPROT", org.Mm.eg.db)
+    # res_kegg = enrichKEGG(.this_prot, organism="mmu", keyType = "uniprot")
+    # print(res_kegg)
+    cat("\n\nGo enrichment:\n\n")
+    if(!is.null(res$table))
+        print(res$table)
+    cat("\n\n")
+    if(!is.null(res$table))
+        print(res$plot)
+    NULL
+})
+```
+
+```{r-test, eval=FALSE, echo=FALSE}
+intersect(rownames(pprot_meta[!is.na(pprot_meta$cluster),]),
+rownames(prot_meta[!is.na(prot_meta$cluster),]))
+
+g = unique(c((pprot_meta[!is.na(pprot_meta$cluster),"uniprot"]),
+(prot_meta[!is.na(prot_meta$cluster),"uniprot"])))
+g = g[!is.na(g)]
+
+kegg = enrichKEGG(g,organism = "mmu", keyType = "uniprot", qvalueCutoff  = 1,pvalueCutoff = 1)
+
+p = "04150"
+library(pathview)
+g_c = c(pprot_meta[match(g, pprot_meta$uniprot), "cluster"],
+        prot_meta[match(g, prot_meta$uniprot), "cluster"])
+names(g_c) = c(g,g)
+g_c = g_c[!is.na(g_c)]
+g_c_s = g_c[unlist(strsplit(split="/",kegg@result$geneID[3]))]
+pathview(g_c_s, pathway.id = p, species = "mmu", kegg.native = T,gene.idtype="UNIPROT",discrete=list(gene=TRUE, cpd=TRUE),limit=list(gene=8, cpd=2),bins=list(gene=8,cpd=2),both.dirs=list(gene=FALSE, cpd=FALSE))
+```
+
+# R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE}
+#name_res = compress_results(result_files, prefix = "model_omic_ournorm", zip = TRUE)
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+
