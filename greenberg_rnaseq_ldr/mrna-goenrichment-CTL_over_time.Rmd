@@ -10,7 +10,7 @@ output:
 ---
 
 ```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
-project="LGN - RNAseq "
+project="LDR - RNAseq "
 labPI="Greenberg"
 lablocation="Longwood"
 analystname="Lorena Pantano"
@@ -40,15 +40,15 @@ options(bitmapType = 'cairo')
 
 ```{r project-options, echo=FALSE}
 library(myRfunctions)
-path_results = "~/orch/scratch/greenberg_rnaseq/lgn2/final/2016-05-06_lgn2/files"
+path_results = "~/orch/scratch/greenberg_rnaseq/ldr_model/final/files"
 dir.create(path_results, showWarnings = FALSE)
 ```
 
 ```{r create-report, echo=FALSE, eval=FALSE}
-render_2_drop("mrna-goenrichment.Rmd", "greenberg/lgn-go_enrichment")
+render_2_drop("mrna-goenrichment-CTL_over_time.Rmd", "greenberg_ldr/ldr-go_enrichment-CTL_over_time")
 ```
 
-```{r set-up}
+```{r qc-setup}
 library(ggplot2)
 library(reshape)
 library(gplots)
@@ -61,20 +61,32 @@ library(DOSE)
 library(org.Mm.eg.db)
 library(cluster)
 library(dplyr)
+
+# library(DT)
+
 basicConfig()
 
-comp_keep = c("0_vs_1.tsv", "0_vs_3.tsv", "0_vs_8.tsv", 
-              "1_vs_3.tsv", "1_vs_8.tsv", "3_vs_8.tsv")
+comp_keep = c("ctl_over_time.tsv", "Ctrl_E18_vs_P04.tsv", "Ctrl_P04_vs_P10.tsv", "Ctrl_P10_vs_P16.tsv")
 comp = list()
 for (name in comp_keep){
-    comp[[name]] = readr::read_csv(file.path(path_results, name))
+    comp[[name]] = readr::read_tsv(file.path(path_results, name))
+}
+```
+
+```{r create-tpm}
+comp_keep = list.files(path_results, "vs")
+comp_tpm = list()
+for (name in comp_keep){
+    if (!grepl("go", name))
+        comp_tpm[[name]] = readr::read_delim(file.path(path_results, name), delim = "\t")
 }
 
-tpm = read.table(file.path(path_results, "..","combined.gene.sf.tpm"), row.names=1, header=T)
+tpm = read.table(file.path(path_results, "..", "2016-02-29_ldr_model","combined.gene.sf.tpm"),
+                 row.names=1, header=T)
 tpm$symbol = convertIDs(row.names(tpm), "ENSEMBL", "SYMBOL", org.Mm.eg.db, "useFirst")
 
-for (name in comp_keep){
-    .df = as.data.frame(comp[[name]])
+for (name in names(comp_tpm)){
+    .df = as.data.frame(comp_tpm[[name]])
     rownames(.df) = .df$id
     names(.df) = paste0(names(.df), "_", gsub(".tsv", "", name), sep="")
     
@@ -83,55 +95,38 @@ for (name in comp_keep){
 
 # tpm = tpm[!is.na(tpm[,1]),]
 save_file(tpm,"counts_tpm_with_fc.csv", path_results)
-```
 
+```
 
 ```{r load-go-setup}
-# https://www.biostars.org/p/52101/#68158
-library(biomaRt)
-ensembl = useMart("ensembl",dataset="mmusculus_gene_ensembl") #uses 
-
-asd_files = list.files("~/orch/scratch/greenberg_rnaseq/lgn2/final/", pattern = "txt", full.names = T)
-
-asd_terms = do.call(rbind, lapply(asd_files, function(fn){
-    
-    if (!grepl("term", fn)){
-        goterms =  readr::read_tsv(fn, col_names = F) %>% mutate(gene=X1)
-        gene.goterms <- getBM(attributes=c('external_gene_name', 'ensembl_gene_id'),
-                              filters = 'external_gene_name', 
-                              values = goterms$gene, 
-                              mart = ensembl)
-        return(data.frame(go=basename(fn), genes=as.character(gene.goterms$ensembl_gene_id)))
-    }else{
-        goterms =  readr::read_tsv(fn, 
-                           col_names = FALSE) %>%
-        tidyr::separate(X1, into=c("id", "term"), sep="  ")    
-        gene.goterms <- getBM(attributes=c('ensembl_gene_id', 'go_id'),
-                   filters = 'go_id', values = goterms$id, mart = ensembl)
-
-        return(data.frame(go=basename(fn), genes=unique(as.character(gene.goterms$ensembl_gene_id))))
-    }
-}))
-
-trasnmembrane_domain = getBM(attributes=c("ensembl_gene_id", "mgi_symbol",
-                                "transmembrane_domain"), mart=ensembl)
-
-asd_terms = rbind(asd_terms, data.frame(go="transmembrane",
-                                        genes=unique(as.character(trasnmembrane_domain$ensembl_gene_id[trasnmembrane_domain$transmembrane_domain!=""]))))
-
-write.csv(asd_terms, "~/orch/scratch/greenberg_rnaseq/lgn2/final/all-terms.csv")
+asd_terms = read.csv("~/orch/scratch/greenberg_rnaseq/lgn2/final/all-terms.csv", row.names=1)
 ```
 
-## GO enrichment using DE genes
+# GO enrichment using DE genes
 
-We considered DE genes as genes with FDR < 5%.
+We considered DE genes as genes with FDR < 10% and abs(log2FC) > 0.5.
+
+## Standard GO analysis
+```{r go-standard, results='asis'}
+for (i in 1:length(comp)){
+    cat("### Go enrichment for:", names(comp)[i], "\n\n")
+    keep = comp[[i]]$padj<0.1 & !is.na(comp[[i]]$padj) & abs(comp[[i]]$log2FoldChange) > 0.5
+    cat("Working with ", sum(keep), " genes\n\n")
+    ego <- enrichGO(as.character(comp[[i]]$id[keep]), org.Mm.eg.db, keytype = "ENSEMBL", ont = "BP", universe = as.character(comp[[i]]$id))
+    ego <- simplify(ego)
+    cat("\n\n")
+    print(kable(ego@result[,1:7]))
+    cat("\n\n")
+}
+```
+
+## Custom GO analysis
 
 ```{r clusterprofile, results='asis'}
-asd_terms = read.csv("~/orch/scratch/greenberg_rnaseq/lgn2/final/all-terms.csv", row.names=1)
 go_res = data.frame()
 for (i in 1:length(comp)){
     cat("### Go enrichment for:", names(comp)[i], "\n\n")
-    keep = comp[[i]]$padj<0.05 & !is.na(comp[[i]]$padj)
+    keep = comp[[i]]$padj<0.1 & !is.na(comp[[i]]$padj) & abs(comp[[i]]$log2FoldChange) > 0.5
     cat("Working with ", sum(keep), " genes\n\n")
     go_fake = rbind(asd_terms, data.frame(go="GO_control", genes=comp[[i]]$id))
     
@@ -142,7 +137,7 @@ for (i in 1:length(comp)){
     if (sum(keep) == 0){
         cat("\n\nNo DE genes in this comparison\n\n");next}
     
-    write.csv(tpm[as.character(comp[[i]]$id[keep]),], file.path(path_results, paste0(names(comp)[i], "used4go-tpm.csv")))
+    write.csv(tpm[as.character(comp[[i]]$id[keep]),], file.path(path_results, paste0( names(comp)[i], "used4go-tpm.csv")))
     cp = enricher( as.character(comp[[i]]$id[keep]), universe = as.character(comp[[i]]$id), 
                    pvalueCutoff = 1, qvalueCutoff = 1, 
                    TERM2GENE = go_fake, maxGSSize = 8000,
@@ -153,7 +148,6 @@ for (i in 1:length(comp)){
         
     print(kable(cp@result[,1:6]))
     # cat("\n\ngenes in GO term\n\n")
-    # print(paste(
     symbol = paste(convertIDs(unique(unlist(strsplit(cp@result$geneID,"/"))),
                           "ENSEMBL", "SYMBOL", 
                           org.Mm.eg.db, "useFirst"), collapse = " ")
@@ -164,9 +158,8 @@ for (i in 1:length(comp)){
     go_res = rbind(go_res, dt)
 }
 
-write.csv(go_res, file.path(path_results, "go-res.csv"))
+write.csv(go_res, "~/orch/scratch/greenberg_rnaseq/ldr_model/final/files/ctl_over_time-go_res.csv")
 ```
-
 
 #R Session Info
 

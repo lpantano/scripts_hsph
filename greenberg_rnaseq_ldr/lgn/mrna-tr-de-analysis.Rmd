@@ -1,0 +1,259 @@
+---
+title: "RNA-seq analysis."
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    code_folding: hide
+    theme: readable
+    highlight: zenburn
+---
+
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project=" Brain Kalish  - tx RNAseq "
+labPI="Greenberg"
+lablocation="Longwood"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+```
+
+RNA-seq analysis for `r labPI` group at `r lablocation`.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+# Report for differential expression of transcripts using sailfish + sleuth.
+
+```{r knitrsetup, echo=FALSE}
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",echo=FALSE,
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+
+```{r project-options, echo=FALSE}
+library(myRfunctions)
+path_results = "~/orch/scratch/greenberg_rnaseq/lgn2/final/2016-05-06_lgn2/files_tx"
+dir.create(path_results, showWarnings = FALSE)
+```
+
+```{r create-report, echo=FALSE, eval=FALSE}
+#render_2_drop("mrna-tr-de-analysis.Rmd", "greenberg/lgn_tx_model")
+```
+
+
+```{r qc-setup}
+library(ggplot2)
+library(reshape)
+library(gplots)
+library(edgeR)
+library(CHBUtils)
+library(pheatmap)
+library(DESeq2)
+library(tximport)
+library(logging)
+library(gridExtra)
+library(clusterProfiler)
+library(org.Mm.eg.db)
+library(cluster)
+library(dplyr)
+source("~/repos/DEGreport/R/clustering.R")
+# library(DT)
+
+basicConfig()
+root_path = "~/orch/scratch/greenberg_rnaseq/lgn2/final/2016-05-06_lgn2"
+project_summary = file.path(root_path, "project-summary.csv")
+counts_file = file.path(root_path, "combined.counts")
+tx2genes_file = file.path(root_path, "tx2gene.csv")
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
+"#0072B2", "#D55E00", "#CC79A7")
+
+summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
+summarydata$Name = rownames(summarydata)
+summarydata = summarydata[order(summarydata$Name),]
+
+  loginfo("Using gene counts calculated from the Sailfish transcript counts.")
+  sf_files = file.path(root_path, "..",
+                       rownames(summarydata), "sailfish",
+                       "quant")
+  names(sf_files) = summarydata$Name
+  tx2gene = read.table(tx2genes_file, sep=",")
+
+# this is a list of all non user-supplied metadata columns that could appear
+known_columns = c("Name", "X.GC", "Exonic.Rate", "Sequences.flagged.as.poor.quality",
+    "rRNA_rate", "Fragment.Length.Mean", "Intronic.Rate", "Intergenic.Rate",
+    "Mapping.Rate", "Quality.format", "Duplication.Rate.of.Mapped", "Mapped",
+    "rRNA", "Sequence.length", "Transcripts.Detected", "Mean.Per.Base.Cov.",
+    "Genes.Detected", "Unique.Starts.Per.Read", "unique_starts_per_read",
+    "complexity", "X5.3.bias", "Duplicates.pct", "Duplicates", "Mapped.reads",
+    "Average.insert.size", "Mapped.reads.pct", "Total.reads",
+    "avg_coverage_per_region", "Mapped.Reads", "description", "name2")
+metadata = summarydata[, !colnames(summarydata) %in% known_columns, drop=FALSE]
+rownames(metadata) = summarydata$Name
+metadata$group = as.factor(metadata$group)
+```
+
+```{r sleuth}
+library(sleuth)
+sfdata = metadata[, "group", drop = FALSE]
+sfdata$sample = rownames(sfdata)
+sfdata$path = sf_files
+design = ~group
+mart <- biomaRt::useMart(biomart = "ensembl", dataset = "mmusculus_gene_ensembl")
+t2g <- biomaRt::getBM(attributes = c("ensembl_transcript_id", "ensembl_gene_id", 
+     "external_gene_name"), mart = mart)
+t2g <- dplyr::rename(t2g, target_id = ensembl_transcript_id, ens_gene = ensembl_gene_id, 
+     ext_gene = external_gene_name)
+```
+
+```{r sleuth-run}
+create_design<-function(df, level){
+    group = df$group
+    group = relevel(group, level)
+    model.matrix(~group)
+}
+do_de <- function(sfdata, comps, level){
+    design_matrix <- create_design(sfdata, level)
+    so = sleuth_prep(sfdata, design_matrix, target_mapping = t2g) %>% sleuth_fit()
+    res <- lapply(comps, function(comp){
+        sleuth_wt(so, comp) %>% sleuth_results(comp, show_all=TRUE)
+    })
+    names(res) <- paste0(comps, "vs", level)
+    res
+}
+
+so = sleuth_prep(sfdata, design, target_mapping = t2g)
+```
+
+## transcript expression PCA
+
+```{r sleuth-pca}
+plot_pca(so, color_by = "group", use_filtered = TRUE)
+```
+
+## Differential expression
+
+```{r sleuth-8}
+res8 = do_de(sfdata, list("group0", "group1", "group3"), "8")
+```
+
+```{r sleuth-3}
+res3 = do_de(sfdata, list("group0", "group1"), "3")
+```
+```{r sleuth-1}
+res1 = do_de(sfdata, list("group0"), "1")
+```
+```{r sleuth-res}
+res = c(res8, res3, res1)
+```
+
+### Methods 
+
+We used sailfish for transcript quantification and sleuth for differential expression.
+
+There is no a direct way to get a differentially spliced event. What we did is to
+find these cases as more than DE transcripts in one gene. If there is spliced event
+that happens in one group but not another, we should see one transcript with higher
+expression in one group, and another trasncript with higher expression in group two.
+
+I assume the ideal case is if there is two transcript DE belonging to the same gene,
+and in opposite direction.
+
+The output of sleuth is different, the next section explain each of the
+columns of the tables.
+
+### Output header
+
+**Meaning of the columns in the next tables**
+
+a data.frame with the following columns:
+
+target_id: transcript name, e.g. "ENSXX#####" (dependent on the transcriptome used in kallisto)
+
+pval: p-value of the chosen model
+
+qval: false discovery rate adjusted p-value, using Benjamini-Hochberg (see p.adjust)
+
+b: 'beta' value (effect size). Technically a biased estimator of the fold change
+
+se_b: standard error of the beta
+
+mean_obs: mean of natural log counts of observations
+
+var_obs: variance of observation
+
+tech_var: technical variance of observation from the bootstraps
+
+sigma_sq: raw estimator of the variance once the technical variance has been removed
+
+smooth_sigma_sq: smooth regression fit for the shrinkage estimation
+
+final_simga_sq: max(sigma_sq, smooth_sigma_sq); used for covariance estimation of beta
+
+### Splicing events
+
+We tried to find the cases explained before, but only one gene seems to have
+more than 1 transcript DE, but the direction is the same.
+
+```{r sleuth-plot, results='asis'}
+plot_iso <- function(so, txs){
+    # message(txs)
+    #df = do.call(rbind,
+    # v=lapply(txs, function(tx){
+    #      f = get_bootstraps(so, tx)
+    #      message(class(f))
+    # })#)
+    # ggplot(df, aes(sample, est_counts + 1, fill = group)) + geom_boxplot() +
+    #     facet_wrap(~target_id, ncol = 1) + theme_bw() + scale_y_log10() +
+    #     theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ylab("estimated counts") + xlab("")
+    tab = so$obs_norm[so$obs_norm$target_id %in% txs,]
+    ma = reshape(tab[,c(1,2,4)], direction="wide", timevar=c("sample"), idvar = c("target_id"))
+    rownames(ma) = ma$target_id
+    ma = ma[, 2:ncol(ma)]
+    colnames(ma) = gsub("tpm.Lucas_", "", colnames(ma))
+    pheatmap(ma, clustering_distance_cols = "correlation", clustering_method = "ward.D2")
+}
+
+for (name in names(res)){
+    cat("\n\n**", name , "**\n\n")
+    tab = res[name][[1]]
+    save_file(tab,paste0(name, "_tx_de.csv"),path_results)
+    genes = as.character(unlist((tab %>% dplyr::filter(qval<0.05))["ext_gene"]))
+    txs = (tab %>% filter(qval<0.01))["target_id"][,1]
+    message(txs)
+    if (length(txs)>3)
+        plot_iso(so, txs)
+    for (g in genes){
+        sub = subset(tab,ext_gene==g & qval<0.1)
+        # txs_g = unlist((sub %>% filter(ext_gene==g))["target_id"])
+        if (nrow(sub)>1){
+            cat("\n\n")
+            print(kable(sub))
+            cat("\n\n")
+        }
+    }
+}
+```
+
+
+#R Session Info
+
+```{r compress, echo=FALSE, cache=FALSE, eval=FALSE}
+name_res = compress_results(path_results,prefix = "lgn_tx_results")
+```
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
