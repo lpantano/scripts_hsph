@@ -72,7 +72,7 @@ comp = list()
 for (name in comp_keep){
     comp[[name]] = readr::read_tsv(file.path(path_results, name))
 }
-metadata = read.csv(file.path(path_results, "..", "2016-02-29_ldr_model","project-summary.csv"), row.names="Name")
+metadata_full = read.csv(file.path(path_results, "..", "2016-02-29_ldr_model","project-summary.csv"), row.names="Name")
 ```
 
 Used genes with peaks at P4/P10/P16: 
@@ -95,7 +95,7 @@ samples = (grepl("ctl", names(tpm))) & !grepl("log2", names(tpm)) & !grepl("padj
 # samples = !grepl("log2", names(tpm)) & !grepl("padj", names(tpm)) & !(grepl("symbol", names(tpm)))
 ma=as.matrix(tpm[as.character(comp[[1]]$id[keep]),samples])
 ma[is.na(ma)] = 0
-metadata = metadata[colnames(ma),]
+metadata = metadata_full[colnames(ma),]
 metadata$type=metadata$group
 metadata$group=droplevels(as.factor(paste0(metadata$type, metadata$time)))
 pattern = degPatterns(ma, metadata = metadata, col = "type", time = "time", summarize = "group", minc = 15)
@@ -119,7 +119,6 @@ asd_terms = read.csv("~/orch/scratch/greenberg_rnaseq/lgn2/final/all-terms.csv",
 ```{r write-used, echo=FALSE}
 write.csv(tpm[genes_keep,], file.path(path_results, "P4P10P16_time-tpm.csv"))
 ```
-
 
 We considered DE genes as genes with FDR < 10% and abs(log2FC) > 0.5.
 
@@ -175,6 +174,46 @@ for (name in names(comp_run)){
 }
 write.csv(go_res, file.path(path_results, paste0("P4P10P16", "_time-go_res.csv")))
 ```
+
+# Difference between CDR and Ctl
+
+```{r cdr-vs-ctl}
+keep = comp[[1]]$padj<0.01 & !is.na(comp[[1]]$padj) & abs(comp[[1]]$log2FoldChange) > 2
+#samples = (grepl("ctl", names(tpm))) & !grepl("log2", names(tpm)) & !grepl("padj", names(tpm))
+samples = !grepl("log2", names(tpm)) & !grepl("padj", names(tpm)) & !(grepl("symbol", names(tpm)))
+ma=as.matrix(tpm[as.character(comp[[1]]$id[keep]),samples])
+ma[is.na(ma)] = 0
+metadata = metadata_full[colnames(ma),]
+metadata$type=metadata$group
+metadata$group=droplevels(as.factor(paste0(metadata$type, metadata$time)))
+pattern = degPatterns(ma, metadata = metadata, col = "type", time = "time", summarize = "group", minc = 15)
+```
+
+
+```{r cdr-vs-ctl-inspection, results='asis'}
+library(pheatmap)
+chosen = list("1"="P16", "2"="P16", "3"="P16", "4"="P16", "6"="P16", 
+              "7"="P16","9"="P16", "10"="P16", "11"="P16", "12"="P16", "13"="P16")
+for (c in names(chosen)){
+    cat(paste0("## Cluster ", c, " at time point ", chosen[c]),"\n\n")
+    t <- chosen[c]
+    g <- as.character(pattern$df$genes[pattern$df$cluster==c])
+    s <- colnames(ma)[grepl(t, colnames(ma))]
+    cat("\n### heatmap of genes only in that point\n\n")
+    pheatmap(log2(ma[g,s]+1), clustering_distance_cols = "correlation", clustering_method = "ward.D2", show_rownames = FALSE, annotation = metadata[,c("type", "time")], main = c)
+    cat("\n### PCA of genes only in that point\n\n")
+    print(mds(ma[g,s], d = "cor", k =2, condition = metadata[s, "type"]) + ggtitle(c))
+    cat("\n### GO standard analysis\n\n")
+    cat("\nWorking with ", length(g), " genes\n\n")
+    ego <- enrichGO(g, org.Mm.eg.db, keytype = "ENSEMBL", ont = "BP", universe = as.character(comp[[1]]$id))
+    ego <- simplify(ego)
+    cat("\n\n")
+    print(kable(ego@result[,1:7]))
+    cat("\n\n")
+
+}
+```
+
 
 #R Session Info
 
