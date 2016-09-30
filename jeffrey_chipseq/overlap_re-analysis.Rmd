@@ -162,7 +162,7 @@ k4me1 = k4me1[mcols(k4me1)[,"foldchange"]>cutoff[["k4me1"]],]
 sprintf("K27ac cutoff %s: %s peaks\n", cutoff[["k27ac"]], length(k27ac))
 sprintf("K27me3 cutoff %s: %s peaks\n", cutoff[["k27me3"]], length(k27me3))
 sprintf("K4me3 cutoff %s: %s peaks\n", cutoff[["k4me3"]], length(k4me3))
-sprintf("K4me3 cutoff %s: %s peaks\n", cutoff[["k4me1"]], length(k4me1))
+sprintf("K4me1 cutoff %s: %s peaks\n", cutoff[["k4me1"]], length(k4me1))
 sprintf("SP140_0h cutoff %s: %s peaks\n", cutoff[["sp140_0h"]], length(peaks$sp140_0h))
 sprintf("SP140_4h cutoff %s: %s peaks\n", cutoff[["sp140_4h"]], length(peaks$sp140_4h))
 ```
