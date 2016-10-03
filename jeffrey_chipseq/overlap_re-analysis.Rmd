@@ -343,9 +343,25 @@ Promoter defined as the region at +/- 5Kb from TSS
 
 Enhancer defined as peaks that overlap H3K27ac +  (+/- 5kb far aways from any TSS or gene)
 
+```{r top-annotation}
+require(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+
+top10 = list()
+idx = order(mcols(peaks[[1]])$foldchange, decreasing = T)
+top10[[1]] = peaks[[1]][idx[1:round(length(idx)/10)],]
+idx = order(mcols(peaks[[2]])$foldchange, decreasing = T)
+top10[[2]] = peaks[[2]][idx[1:round(length(idx)/10)],]
+
+topPeakAnnoList <- lapply(top10, annotatePeak, TxDb = txdb, tssRegion = c(-5000,5000),annoDb = "org.Hs.eg.db", verbose = FALSE)
+names(topPeakAnnoList) = c("top_SP140_0h","top_SP140_4h")
+```
+
+
 ```{r new-annotation, results='asis'}
-peakAnnoList_mod = lapply(names(peakAnnoList), function(name){
-    class_anno = peakAnnoList[[name]]
+all = c(peakAnnoList, topPeakAnnoList)
+peakAnnoList_mod = lapply(names(all), function(name){
+    class_anno = all[[name]]
     range = slot(class_anno,"anno")
     idx = findOverlaps(range[,"annotation"], k27ac, maxgap = 501)
     mcols(range)[,"enhancer"] = FALSE
@@ -402,6 +418,7 @@ peakAnnoList_mod = lapply(names(peakAnnoList), function(name){
               enh_file_name, baseDirSP)
     class_anno
 })
+peakAnnoList_mod = peakAnnoList_mod[1:2]
 names(peakAnnoList_mod) = names(peakAnnoList)
 ```
 
