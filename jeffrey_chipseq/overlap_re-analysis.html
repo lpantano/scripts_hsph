@@ -267,7 +267,7 @@ div.tocify {
 <h1>Chip-seq analysis</h1>
 <p>Analysis forKate Jeffrey’s group.</p>
 <p>Contact Lorena Pantano (<a href="mailto:lpantano@hsph.harvard.edu">lpantano@hsph.harvard.edu</a>) for additional details.</p>
-<p>The most recent update of this html document occurred: Thu Oct 6 09:46:35 2016</p>
+<p>The most recent update of this html document occurred: Thu Oct 6 17:32:13 2016</p>
 <p>The sections below provide code to reproduce the included results and plots.</p>
 <hr />
 <div id="setup" class="section level2">
@@ -324,6 +324,9 @@ div.tocify {
 &gt;<span class="st"> </span><span class="kw">names</span>(k27me3) =<span class="st"> </span>broad_header
 &gt;<span class="st"> </span>k27me3 =<span class="st"> </span><span class="kw">makeGRangesFromDataFrame</span>(k27me3, <span class="dt">keep.extra.columns =</span> <span class="ot">TRUE</span>, <span class="dt">ignore.strand =</span> <span class="ot">TRUE</span>, 
 +<span class="st">     </span><span class="dt">end.field =</span> <span class="st">&quot;end&quot;</span>, <span class="dt">start.field =</span> <span class="st">&quot;start&quot;</span>, <span class="dt">seqnames.field =</span> <span class="st">&quot;chrom&quot;</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>basic_stat =<span class="st"> </span><span class="kw">data.frame</span>(<span class="dt">type =</span> <span class="kw">c</span>(<span class="st">&quot;K27ac&quot;</span>, <span class="st">&quot;K27me3&quot;</span>, <span class="st">&quot;K4me3&quot;</span>, <span class="st">&quot;K4me1&quot;</span>, <span class="st">&quot;SP140_0h&quot;</span>, 
++<span class="st">     &quot;SP140_4h&quot;</span>), <span class="dt">peaks =</span> <span class="kw">c</span>(<span class="kw">length</span>(k27ac), <span class="kw">length</span>(k27me3), <span class="kw">length</span>(k4me3), <span class="kw">length</span>(k4me1), 
++<span class="st">     </span><span class="kw">length</span>(peaks$sp140_0h), <span class="kw">length</span>(peaks$sp140_4h)))</code></pre></div>
 </div>
 </div>
 <div id="choosing-the-best-cutoff" class="section level2">
@@ -373,6 +376,51 @@ div.tocify {
 <p>[1] “SP140_0h cutoff 3.5: 45336 peaks”</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span><span class="kw">sprintf</span>(<span class="st">&quot;SP140_4h cutoff %s: %s peaks</span><span class="ch">\n</span><span class="st">&quot;</span>, cutoff[[<span class="st">&quot;sp140_4h&quot;</span>]], <span class="kw">length</span>(peaks$sp140_4h))</code></pre></div>
 <p>[1] “SP140_4h cutoff 3.5: 68089 peaks”</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">&gt;<span class="st"> </span>basic_stat =<span class="st"> </span><span class="kw">cbind</span>(basic_stat, <span class="kw">data.frame</span>(<span class="dt">cleaned_peaks =</span> <span class="kw">c</span>(<span class="kw">length</span>(k27ac), <span class="kw">length</span>(k27me3), 
++<span class="st">     </span><span class="kw">length</span>(k4me3), <span class="kw">length</span>(k4me1), <span class="kw">length</span>(peaks$sp140_0h), <span class="kw">length</span>(peaks$sp140_4h))))
+&gt;<span class="st"> </span>
+<span class="er">&gt;</span><span class="st"> </span>knitr::<span class="kw">kable</span>(basic_stat)</code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="left">type</th>
+<th align="right">peaks</th>
+<th align="right">cleaned_peaks</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">K27ac</td>
+<td align="right">76577</td>
+<td align="right">50013</td>
+</tr>
+<tr class="even">
+<td align="left">K27me3</td>
+<td align="right">71030</td>
+<td align="right">23995</td>
+</tr>
+<tr class="odd">
+<td align="left">K4me3</td>
+<td align="right">40550</td>
+<td align="right">32341</td>
+</tr>
+<tr class="even">
+<td align="left">K4me1</td>
+<td align="right">73566</td>
+<td align="right">53599</td>
+</tr>
+<tr class="odd">
+<td align="left">SP140_0h</td>
+<td align="right">113714</td>
+<td align="right">45336</td>
+</tr>
+<tr class="even">
+<td align="left">SP140_4h</td>
+<td align="right">171648</td>
+<td align="right">68089</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div id="standard-annotation" class="section level2">
 <h2>Standard annotation</h2>
