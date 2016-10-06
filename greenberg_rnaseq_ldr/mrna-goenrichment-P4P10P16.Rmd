@@ -124,6 +124,7 @@ We considered DE genes as genes with FDR < 10% and abs(log2FC) > 0.5.
 
 ## Standard GO analysis
 ```{r go-standard, results='asis'}
+go_res = data.frame()
 for (name in names(comp_run)){
     cat("### Go enrichment for cluster:", name, "\n\n")
     keep = as.character(comp_run[[name]])
@@ -133,7 +134,18 @@ for (name in names(comp_run)){
     cat("\n\n")
     print(kable(ego@result[,1:7]))
     cat("\n\n")
+    if (nrow(ego@result)==0) next;
+    symbol = sapply(ego@result$geneID, function(x){
+        paste(convertIDs(unique(unlist(strsplit(x,"/"))),
+                         "ENSEMBL", "SYMBOL", 
+                         org.Mm.eg.db, "useFirst"), collapse = " ")
+    })
+    dt = ego@result
+    dt$symbol = symbol
+    dt$comparision = name
+    go_res = rbind(go_res, dt)
 }
+write.csv(go_res, file.path(path_results, paste0("P4P10P16", "_time-go_res_standard.csv")))
 ```
 
 ## Custom GO analysis
@@ -163,9 +175,11 @@ for (name in names(comp_run)){
         
     print(kable(cp@result[,1:6]))
     # cat("\n\ngenes in GO term\n\n")
-    symbol = paste(convertIDs(unique(unlist(strsplit(cp@result$geneID,"/"))),
-                          "ENSEMBL", "SYMBOL", 
-                          org.Mm.eg.db, "useFirst"), collapse = " ")
+    symbol = sapply(cp@result$geneID, function(x){
+        paste(convertIDs(unique(unlist(strsplit(x,"/"))),
+                         "ENSEMBL", "SYMBOL", 
+                         org.Mm.eg.db, "useFirst"), collapse = " ")
+    })
     cat("\n\n")
     dt = cp@result
     dt$symbol = symbol
@@ -187,6 +201,7 @@ metadata = metadata_full[colnames(ma),]
 metadata$type=metadata$group
 metadata$group=droplevels(as.factor(paste0(metadata$type, metadata$time)))
 pattern = degPatterns(ma, metadata = metadata, col = "type", time = "time", summarize = "group", minc = 15)
+save_file(pattern$df, "clusters_CDRvsCtl.csv", path_results)
 ```
 
 
