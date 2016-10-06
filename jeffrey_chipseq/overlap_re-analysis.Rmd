@@ -53,9 +53,9 @@ The sections below provide code to reproduce the included results and plots.
 
 ---
 
-# Setup
+## Setup
 
-## Libraries
+### Libraries
 
 ```{r functions, warning=FALSE, message=FALSE}
 ## loading packages
@@ -125,6 +125,11 @@ k27me3 = makeGRangesFromDataFrame(k27me3, keep.extra.columns = TRUE,
 
 ```
 
+```{r raw-peaks}
+basic_stat = data.frame(type=c("K27ac", "K27me3", "K4me3", "K4me1", "SP140_0h", "SP140_4h"),
+           peaks=c(length(k27ac), length(k27me3), length(k4me3), length(k4me1), length(peaks$sp140_0h), length(peaks$sp140_4h)))
+```
+
 
 ## Choosing the best cutoff
 
@@ -167,6 +172,14 @@ sprintf("SP140_0h cutoff %s: %s peaks\n", cutoff[["sp140_0h"]], length(peaks$sp1
 sprintf("SP140_4h cutoff %s: %s peaks\n", cutoff[["sp140_4h"]], length(peaks$sp140_4h))
 ```
 
+```{r stats-after, results='asis'}
+basic_stat = cbind(basic_stat,
+                   data.frame(
+           cleaned_peaks=c(length(k27ac), length(k27me3), length(k4me3), length(k4me1), length(peaks$sp140_0h), length(peaks$sp140_4h))) )
+
+knitr::kable(basic_stat)
+
+```
 
 ## Standard annotation
 
@@ -343,14 +356,33 @@ Promoter defined as the region at +/- 5Kb from TSS
 
 Enhancer defined as peaks that overlap H3K27ac +  (+/- 5kb far aways from any TSS or gene)
 
+```{r dist-top, eval=FALSE, echo=FALSE}
+p = peakAnnoList[[1]]@anno
+#p = p[width(p)>1000,]
+#idx = order(p$foldchange, decreasing = T)
+#p = p[1:round(length(idx)*0.1),]
+pro = (grepl("Promoter",p$annotation))
+plot(log10(width(p[pro,])),
+     mcols(p[pro,])$foldchange)
+hist(log10(width(p[pro,])))
+hist(mcols(p[pro,])$foldchange)
+
+dis = (grepl("Distal", p$annotation))
+plot(log10(width(p[dis,])),
+     mcols(p[dis,])$foldchange)
+hist(log10(width(p[dis,])))
+hist(mcols(p[dis,])$foldchange)
+```
+
+
 ```{r top-annotation}
 require(TxDb.Hsapiens.UCSC.hg19.knownGene)
 txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
 
 top10 = list()
-idx = order(mcols(peaks[[1]])$foldchange, decreasing = T)
+idx = order(mcols(peaks[[1]])$foldchange*width(peaks[[1]]), decreasing = T)
 top10[[1]] = peaks[[1]][idx[1:round(length(idx)/10)],]
-idx = order(mcols(peaks[[2]])$foldchange, decreasing = T)
+idx = order(mcols(peaks[[2]])$foldchange*width(peaks[[2]]), decreasing = T)
 top10[[2]] = peaks[[2]][idx[1:round(length(idx)/10)],]
 
 topPeakAnnoList <- lapply(top10, annotatePeak, TxDb = txdb, tssRegion = c(-5000,5000),annoDb = "org.Hs.eg.db", verbose = FALSE)
@@ -402,12 +434,13 @@ peakAnnoList_mod = lapply(names(all), function(name){
     slot(class_anno, "anno") <- range
     slot(class_anno, "annoStat") <- df
     slot(class_anno, "detailGenomicAnnotation") <- logic_df
-    cat("\n###",name,"\n")
+    cat("\n\n ###",name,"\n\n")
     print(kable(df))
-    cat("\n")
+    cat("\n\n")
     print(plotAnnoBar(class_anno))
+    cat("\n\n")
     plotAnnoPie(class_anno)
-    
+    cat("\n\n")
     
     save_file(as.data.frame(range), paste0(name, "_ann.txt"), baseDirSP,csv = FALSE)
     pro_file_name = paste0(name,"_promoter.txt")
