@@ -1,0 +1,434 @@
+---
+title: "Proteomic analysis"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+    theme: readable
+    highlight: zenburn
+---
+ 
+The most recent update of this html document occurred: `r date()`
+
+```{r opts, echo=FALSE}
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heigh=6,
+               cache=TRUE, highlight=TRUE, autodep=TRUE, 
+               warning=FALSE, error=FALSE,
+               message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+```
+
+```{r setup}
+library(knitr)
+library(ggplot2)
+library(reshape)
+library(DESeq2)
+library(CHBUtils)
+library(limma)
+library(gtools)
+library(gridExtra)
+library(devtools)
+library(dplyr)
+library(tidyr)
+library(pheatmap)
+library(rio)
+```
+
+```{r load-files}
+exp1 = import("Experiment1_Data.xlsx")
+exp1$Gene_Name = gsub("\\'", "", exp1$Gene_Name)
+colnames(exp1) = gsub("\\+", "p", colnames(exp1))
+exp2 = import("Experiment2_Data.xlsx")
+exp2$Gene_Name = gsub("\\'", "", exp2$Gene_Name)
+colnames(exp2) = gsub("\\+", "p", colnames(exp2))
+
+data = inner_join(exp1[,1:11] %>% filter(Gene_Name != ""), 
+                  exp2[,1:11] %>% filter(Gene_Name != ""), by="Gene_Name") %>%
+    select(Gene_Name, Entrez_Gene_ID=Entrez_Gene_ID.x, Description=Description.x,
+           d1_nt=nt.x, d1_sh17=sh17.x, d1_sh16=sh16.x,
+           d1_ntp=ntp.x, d1_sh17p=sh17p.x, d1_sh16p=sh16p.x,
+           d2_nt=nt.y, d2_sh17=sh17.y, d2_sh16=sh16.y,
+           d2_ntp=ntp.y, d2_sh17p=sh17p.y, d2_sh16p=sh16p.y)
+
+counts = data[,4:15]
+row.names(counts) = data$Gene_Name
+
+
+metadata = rbind(data.frame(donor = "donor1", group = colnames(exp1)[3:8]) %>%
+                     mutate(name=paste0("d1_", group)),
+                 data.frame(donor = "donor2", group = colnames(exp2)[3:8])  %>%
+                     mutate(name=paste0("d2_", group))) %>% 
+                     mutate(treat = ifelse(grepl("p$", group), "plus", "minus")) %>%
+                     mutate(type = gsub("p$", "", group))
+rownames(metadata) = metadata$name
+metadata = metadata[colnames(counts),]
+metadata
+
+
+```
+
+## Distribution of expression values
+
+```{r description}
+
+counts = counts[rowSums(counts[,1:6]>0)>2 & rowSums(counts[,6:12]>0)>2,]
+
+log2counts = log2(counts+1)
+
+ggplot(melt(log2counts), aes(x=value, color=variable)) +
+    geom_density() + theme_bw()
+mds(log2counts, k=2, condition = metadata$donor) + theme_bw()
+```
+## Differential analysis with DESeq2
+
+Just using DESeq2 without any further addition to the analysis
+
+## Dispersion values
+```{r dispersion}
+dds = DESeqDataSetFromMatrix(counts, metadata, design = ~ donor + treat + type)
+# rdds = rlog(dds)
+dds = DESeq(dds)
+DESeq2::plotDispEsts(dds)
+```
+
+```{r simple-de}
+sf <- sizeFactors(dds)
+disp <- dispersions(dds)
+dds_group = DESeqDataSetFromMatrix(counts, metadata, design = ~ donor + group)
+sizeFactors(dds_group) <- sf
+dispersions(dds_group) <- disp
+dds_group <- nbinomWaldTest(dds_group)
+```
+
+How the gene SET looks like:
+```{r set-gene}
+res_sh16_vs_control = results(dds_group, list("groupsh16", "groupnt"))
+suppressWarnings(DEGreport::degPlot(dds_group, res_sh16_vs_control["SET",,drop=FALSE] , n=1, xs="treat", group = "type", batch = "donor" ))
+```
+
+### WT treatment effect
+
+* nt vs nt+
+
+```{r deseq2-nt-alone, results='asis'}
+res_nt_vs_plus = results(dds_group, list("groupntp", "groupnt"))
+DESeq2::plotMA(res_nt_vs_plus)
+res =  res_nt_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
+    arrange(padj) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+volcano_density_plot(res[,c("log2FoldChange", "pvalue")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res , n=9, xs = "treat", group = "type", batch = "donor" ))
+
+deseq2_ntplus_effect = res
+
+```
+
+### sh16 treatment effect
+
+* sh16 vs sh16+
+
+```{r deseq2-sh16-alone, results='asis'}
+res_sh16_vs_plus = results(dds_group, list("groupsh16p", "groupsh16"))
+DESeq2::plotMA(res_sh16_vs_plus)
+res =  res_sh16_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
+    arrange(padj) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+volcano_density_plot(res[,c("log2FoldChange", "pvalue")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res , n=9, xs = "treat", group = "type", batch = "donor" ))
+
+deseq2_sh16plus_effect = res
+
+```
+
+### sh17 treatment effect
+
+* sh17 vs sh17+
+
+```{r deseq2-sh117-alone, results='asis'}
+res_sh17_vs_plus = results(dds_group, list("groupsh17p", "groupsh17"))
+DESeq2::plotMA(res_sh17_vs_plus)
+res =  res_sh17_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
+    arrange(padj) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+volcano_density_plot(res[,c("log2FoldChange", "pvalue")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res , n=9, xs = "treat", group = "type", batch = "donor" ))
+
+deseq2_sh17plus_effect = res
+
+```
+
+
+### Proteins induced by SET in WT but not in SET-KD
+
+The idea is to use the DE genes from nt vs nt+ and remove the ones that changed
+due to sh6 vs sh16+ or sh17 vs sh17+.
+
+We used the FDR < 0.05 to get the DE and pvalue>0.2 to get the non-changed genes.
+
+```{r deseq2-dependet-nt}
+deseq2_sh_dependent =
+    inner_join(deseq2_ntplus_effect 
+           %>% tibble::rownames_to_column("id") %>% filter(padj<0.05) %>%
+               select(id,nt_padj=padj),
+           inner_join(
+           deseq2_sh16plus_effect  %>% 
+               tibble::rownames_to_column("id") %>% filter(pvalue>0.2) %>%
+               select(id,sh16_padj=pvalue),
+           deseq2_sh17plus_effect  %>% 
+               tibble::rownames_to_column("id") %>% filter(pvalue>0.2) %>%
+               select(id,sh17_padj=pvalue),
+           by="id"),
+           by ="id") %>% rowwise() %>% 
+    mutate(sh_max = max(sh16_padj, sh17_padj)) %>%
+    mutate(diff = nt_padj - sh_max) %>% arrange((nt_padj))
+
+suppressWarnings(DEGreport::degPlot(dds_group, deseq2_ntplus_effect[deseq2_sh_dependent$id,], n=9, xs = "treat", group = "type", batch = "donor" ))
+
+
+```
+
+```{r dependet-nt, eval=FALSE, echo=FALSE}
+### Proteins induced by SET in WT but not in KD, complex model
+
+dds_depend = DESeqDataSetFromMatrix(counts, metadata, design = ~ donor + type + treat)
+d = colData(dds_depend)
+d$type = relevel(d$type, "sh17")
+full = model.matrix(~ donor + type + treat + type:treat, d)
+reduce = full[,-6]
+dds_depend = DESeq(dds_depend, test = "LRT", reduced=reduce, full=full)
+
+deseq2_res_nt_depend = results(dds_depend)
+
+DESeq2::plotMA(deseq2_res_nt_depend)
+
+res =  deseq2_res_nt_depend %>% as.data.frame() %>% 
+    tibble::rownames_to_column("id") %>%
+    arrange(pvalue) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
+
+
+```
+
+```{r sh16-treatment, results='asis', eval=FALSE, echo=FALSE}
+### Different in treatments with sh16
+keep = !grepl("sh17", row.names(metadata))
+dds_complex = DESeqDataSetFromMatrix(counts[,keep], metadata[keep,], design = ~ donor + type + treat +  type*treat)
+dds_complex = DESeq(dds_complex)
+# sizeFactors(dds_complex) <- sf[keep]
+# dispersions(dds_complex) <- disp
+# dds_complex <- nbinomWaldTest(dds_complex)
+dds_complex <- DESeq2::nbinomLRT(dds_complex, reduced = ~ donor + type + treat)
+
+res_sh16_treatment = results(dds_complex)
+
+DESeq2::plotMA(res_sh16_treatment)
+
+res =  res_sh16_treatment %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
+    arrange(pvalue) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+volcano_density_plot(res[,c("log2FoldChange", "padj")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_complex, res, n=6, xs = "treat", group = "type", batch = "donor" ))
+
+```
+
+## Differential analysis with lima-voom as microarray data
+
+```{r limma-fn}
+d = model.matrix(~ 0 + donor + treat,  metadata)
+y =normalizeBetweenArrays(log2(counts), 
+                            method = "quantile")
+
+limma_ma = voomaByGroup(y, group = metadata$type,
+                 d, plot=FALSE)
+
+limmaPlot = function (counts, genes, metadata, xs = "time", group = "condition", 
+    batch = NULL) 
+{
+    pp = lapply(genes, function(gene) {
+        dd = data.frame(count = counts[gene,], time=metadata[,xs])
+        if (is.null(group)) {
+            dd$treatment = "one_group"
+        }
+        else {
+            dd$treatment = metadata[row.names(dd), group]
+        }
+        if (!is.null(batch)) {
+            dd$batch = metadata[row.names(dd), batch]
+            p = ggplot(dd, aes(x = time, y = count, color = batch, 
+                shape = treatment))
+        }
+        else {
+            p = ggplot(dd, aes(x = time, y = count, color = treatment, 
+                shape = treatment))
+        }
+        p = p + stat_smooth(aes(x = time, y = count, group = treatment, 
+            color = treatment), fill = "grey80") + geom_jitter(size = 1, 
+            alpha = 0.7, height = 0, width = 0.2) + theme_bw(base_size = 7) + 
+            ggtitle(gene)
+        if (length(unique(dd$treatment)) == 1) {
+            p = p + scale_color_brewer(guide = FALSE, palette = "Set1") + 
+                scale_fill_brewer(guide = FALSE, palette = "Set1")
+        }
+        p
+    })
+    n = ceiling(length(pp))
+    do.call(grid.arrange, pp)
+}
+```
+
+
+### WT treatment effect
+
+```{r lima-voom-array-nt, results='asis'}
+library(limma)
+keep = grepl("nt", row.names(metadata))
+d = model.matrix(~ 0 + donor + treat,  metadata[keep,])
+y =normalizeBetweenArrays(log2(counts[,keep]), 
+                            method = "quantile")
+
+v = voomaByGroup(y, group = metadata$type[keep],
+                 d, plot=TRUE)
+
+f = lmFit(v, d)
+fb = eBayes(f)
+
+
+res = topTable(fb,coef = "treatplus", sort.by = "p", number = Inf)
+
+knitr::kable(head(res, 15))
+
+volcano_density_plot(res[,c("logFC", "P.Value")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
+
+ntplus_effect = res
+```
+
+### sh16/sh17 treatment effect
+
+```{r lima-voom-array-sh, results='asis'}
+library(limma)
+keep = !grepl("nt", row.names(metadata))
+d = model.matrix(~ 0 + donor + treat + type,  metadata[keep,])
+y =normalizeBetweenArrays(log2(counts[,keep]), 
+                            method = "quantile")
+
+v = voomaByGroup(y, group = metadata$type[keep],
+                 d, plot=TRUE)
+
+f = lmFit(v, d)
+fb = eBayes(f)
+
+res = topTable(fb,coef = "treatplus", sort.by = "p", number = Inf)
+
+knitr::kable(head(res, 15))
+
+volcano_density_plot(res[,c("logFC", "P.Value")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
+
+shplus_effect = res
+```
+
+```{r lima-voom-array-sh16, eval=FALSE, echo=FALSE}
+### sh16 vs control over treatment
+library(limma)
+keep = !grepl("sh17", row.names(metadata))
+d = model.matrix(~ 0 + donor + type + treat + type*treat, metadata[keep,])
+y =normalizeBetweenArrays(log2(counts[,keep]), 
+                            method = "quantile")
+
+v = voomaByGroup(y, group = metadata$type[keep],
+                 d, plot=TRUE)
+
+# cont.matrix <- makeContrasts("typesh16-treatplus",levels=d)
+f = lmFit(v, d)
+# fc = contrasts.fit(f, cont.matrix)
+fb = eBayes(f)
+# topTable(fb, coef="typesh16")
+# topTable(fb, coef="typesh16:treatplus", sort.by = "p")
+res = topTable(fb,coef = "typesh16:treatplus", sort.by = "p", number = Inf)
+
+knitr::kable(head(res, 15))
+
+volcano_density_plot(res[,c("logFC", "P.Value")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
+
+sh16_vs_nt_over_plus_effect = res
+
+```
+
+```{r lima-voom-array-sh17, results='asis', eval=FALSE, echo=FALSE}
+### sh17 vs control over treatment
+library(limma)
+keep = !grepl("sh16", row.names(metadata))
+d = model.matrix(~ 0 + donor + type + treat + type*treat, metadata[keep,])
+y =normalizeBetweenArrays(log2(counts[,keep]), 
+                            method = "quantile")
+
+v = voomaByGroup(y, group = metadata$type[keep],
+                 d, plot=TRUE)
+
+f = lmFit(v, d)
+fb = eBayes(f)
+res = topTable(fb,coef = "typesh17:treatplus", sort.by = "p", number = Inf)
+
+knitr::kable(head(res, 15))
+
+volcano_density_plot(res[,c("logFC", "P.Value")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
+
+sh17_vs_nt_over_plus_effect = res
+
+```
+
+
+### Proteins induced by SET in WT but not in KD
+```{r vooma-dependet-nt}
+sh_dependent =
+    inner_join(ntplus_effect 
+           %>% tibble::rownames_to_column("id") %>% filter(adj.P.Val<0.1),
+           shplus_effect  %>% 
+               tibble::rownames_to_column("id") %>% filter(adj.P.Val>0.2),
+           by ="id")
+
+suppressWarnings(DEGreport::degPlot(dds_group, ntplus_effect[sh_dependent$id,], n=8, xs = "treat", group = "type", batch = "donor" ))
+
+# suppressWarnings(limmaPlot(limma_ma$E, sh_dependent$id, metadata, xs = "treat", group = "type", batch = "donor" ))
+
+```
+
+## Normalize with RUVseq
+
+It doesn't help a lot this time. I guess too few replicates to remove noise from any of them.
+
+```{r ruvseq}
+library(RUVSeq)
+ruv = RUVs(counts(dds_group), cIdx=row.names(counts), k=1, scIdx = matrix(c(1:6, 7:12), nrow=6))
+mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("1 factor")
+ruv = RUVs(as.matrix(counts), cIdx=row.names(counts), k=2, scIdx = matrix(c(1:6, 7:12), nrow=6))
+mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("2 factors")
+ruv = RUVs(as.matrix(counts), cIdx=row.names(counts), k=3, scIdx = matrix(c(1:6, 7:12), nrow=6))
+mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("3 factors")
+
+```
+
+
