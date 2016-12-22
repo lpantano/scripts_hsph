@@ -45,10 +45,20 @@ basicConfig(level='INFO')
 ```
 
 ```{r fn}
+.convert <- function(ids, from, to, db) {
+    suppressMessages( selRes <- AnnotationDbi::select(
+    db, keys=ids, keytype=from, columns=c(to), multiVals="list" ) )
+    as.character(unique(selRes[,2]))
+}
 
-intersect_fa <- function(.df, fa_de, universe){
-    all_genes=convertIDs(unique(c(fa_de)), "ENSEMBL", "UNIPROT", org.Mm.eg.db, ifMultiple = 'useFirst')
-    all_genes = all_genes[!is.na(all_genes)]
+intersect_fa <- function(.df, fa_de, universe, convert=TRUE){
+    if (convert){
+        all_genes=.convert(unique(c(fa_de)), "ENSEMBL", "UNIPROT", org.Mm.eg.db)
+        all_genes = all_genes[!is.na(all_genes)]
+    }else{
+        all_genes=fa_de
+    }
+        
     .t=lapply(unique(.df$cluster), function(nc){
         cat("\n\ncluster:", nc, "\n\n")
         .this=as.character(.df$genes[which(.df$cluster==nc)])
@@ -147,14 +157,12 @@ if (ORIGINAL){
     get_fc <- function(one, two){
         one - two
     }
-
-
 }
 FC=1
 FDR=0.05
 ```
 
-Loading FA data with logFC cutoff of `r FC` and FDR cutoff `r FDR`.
+Loading FA data with logFC cutoff of `r FC` and FDR cutoff `r FDR`. For phospho data I am using FDR < 0.1 to get more genes.
 
 ```{r load-extra}
 root_path_fa = "~/orch/scratch/vishal_mirna_kidney/publish/FA-model/protein/files_publish"
@@ -162,6 +170,12 @@ fa_matrix = read.csv(file.path(root_path_fa, "fa_model.tsv"), row.names = 1)
 fa_matrix$uniprot = convertIDs(rownames(fa_matrix), "ENSEMBL", "UNIPROT", org.Mm.eg.db, ifMultiple = 'useFirst')
 fa_de = rownames(fa_matrix[fa_matrix$adj.P.Val<FDR & rowMax(abs(as.matrix(fa_matrix[,1:11]))) >FC , ])
 save_file(fa_matrix, "prot_fa.csv", result_files)
+
+phospho_fa_matrix = read.csv("~/orch/scratch/jshah_fibrosis_rnaseq/protein/FA_vishal_files/fa_model.tsv", row.names = 1)
+rownames(phospho_fa_matrix) = gsub(";*$", "", rownames(phospho_fa_matrix))
+phospho_fa_de = rownames(phospho_fa_matrix[phospho_fa_matrix$adj.P.Val<0.1 & rowMax(abs(as.matrix(phospho_fa_matrix[,1:11]))) >FC , ])
+phospho_fa_matrix$ensembl = convertIDs(gsub(":.*", "", rownames(phospho_fa_matrix)), "UNIPROT", "ENSEMBL", org.Mm.eg.db, ifMultiple = 'useFirst')
+save_file(phospho_fa_matrix, "phospho-prot_fa.csv", result_files)
 ```
 
 In this study there are no replicates. I use log2(ratio) to filter genes
@@ -310,16 +324,17 @@ mds(cbind(early_res[keep,], late_res[keep,]), condition = col)
 ## Clustering analysis
 ```{r ann-cluster}
 ann_meta = function(prot_meta, clus, fa_de, prot_early_clusters, prot_late_clusters, fn){
-    fa_prot_de=convertIDs(unique(c(fa_de)), "ENSEMBL", "UNIPROT", org.Mm.eg.db, ifMultiple = 'useFirst')
-    prot_meta_fa = intersect_fa(clus, fa_de, rownames(prot_meta))
     prot_meta$absMaxFC = apply(abs(prot_meta), 1, max, na.rm=T)
     prot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
-    # add_fa = intersect(as.character(prot_meta_fa$id), rownames(prot_meta))
+ 
+    fa_prot_de=.convert(unique(c(fa_de)), "ENSEMBL", "UNIPROT", org.Mm.eg.db)
     prot_meta[fa_prot_de, "is_de_fa"] <- 1
     prot_meta$comb_is_de_fa <- sapply(!is.na(prot_meta$is_de_fa) & !is.na(prot_meta$cluster), sum)
+    prot_meta_fa = intersect_fa(clus, fa_de, rownames(prot_meta))
+
     prot_meta$symbol = convertIDs(rownames(prot_meta), "UNIPROT", "SYMBOL", org.Mm.eg.db, ifMultiple="useFirst")
     prot_meta$uniprot = convertIDs(rownames(prot_meta), "UNIPROT", "ENSEMBL", org.Mm.eg.db, ifMultiple="useFirst")
-    
+
     prot_meta[rownames(prot_early_clusters$df), "early_cluster"] = prot_early_clusters$df$cluster
     prot_meta[rownames(prot_early_clusters$ann), "early_qsp"] = prot_early_clusters$ann[,1]
     prot_meta$early_is_de_fa <- sapply(!is.na(prot_meta$is_de_fa) & !is.na(prot_meta$early_cluster), sum)
@@ -429,7 +444,7 @@ absMaxFC = rowMax(abs(as.matrix(early)))
 sign = row.names(early)[absMaxFC>1.5]
 pprot_early_clusters = degPatterns(as.matrix(early[sign,]), early_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2), cutoff = 0.1)
 .df=pprot_early_clusters$df[pprot_early_clusters$df$cluster %in% pprot_early_clusters$pass,]
-early_fa = intersect_fa(.df, fa_de, rownames(early))
+early_fa = intersect_fa(.df, phospho_fa_de, rownames(early), FALSE)
 pprot_early_clusters[['ann']] = counts[,c("Site.Position","Localization.score","Quantified.peptide")]
 save_file(.df, "phospho-prot_early_clusters_genes_cluster.tsv", result_files)
 ```
@@ -480,7 +495,7 @@ absMaxFC = rowMax(abs(as.matrix(late)))
 sign = row.names(late)[absMaxFC>1.5]
 pprot_late_clusters = degPatterns(as.matrix(late[sign,]), late_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2), cutoff = 0.1)
 .df=pprot_late_clusters$df[pprot_late_clusters$df$cluster %in% pprot_late_clusters$pass,]
-late_fa = intersect_fa(.df, fa_de, rownames(late))
+late_fa = intersect_fa(.df, phospho_fa_de, rownames(late), convert=F)
 pprot_late_clusters[['ann']] = counts[,c("Site.Position","Localization.score","Quantified.Spectral.Counts")]
 save_file(.df, "phospho-prot_late_clusters_genes_cluster.tsv", result_files)
 ```
@@ -510,9 +525,14 @@ mds(cbind(early_res[keep,], late_res[keep,]), condition = col)
 
 ## Clustering analysis
 ```{r ann-phospho-cluster}
-ann_meta = function(pprot_meta, pprot_early_clusters, pprot_late_clusters, fn){
+ann_meta = function(pprot_meta, clus, phospho_fa_de, pprot_early_clusters, pprot_late_clusters, fn){
     pprot_meta$absMaxFC = apply(abs(pprot_meta), 1, max, na.rm=T)
     pprot_meta[as.character(.df$genes), "cluster"] <- .df$cluster 
+    
+    pprot_meta[phospho_fa_de, "is_de_fa"] <- 1
+    pprot_meta$comb_is_de_fa <- sapply(!is.na(pprot_meta$is_de_fa) & !is.na(pprot_meta$cluster), sum)
+    pprot_meta_fa = intersect_fa(clus, phospho_fa_de, rownames(pprot_meta), convert=F)
+
     pprot_meta$symbol = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "SYMBOL", org.Mm.eg.db, ifMultiple="useFirst")
     pprot_meta$uniprot = convertIDs(gsub(":.*", "", rownames(pprot_meta)), "UNIPROT", "ENSEMBL", org.Mm.eg.db, ifMultiple="useFirst")
     
@@ -554,11 +574,11 @@ pprot_meta_col = rbind(early_col, late_col)
 absMaxFC = rowMax(abs(as.matrix(pprot_meta[keep,])))
 names(absMaxFC) = rownames(pprot_meta[keep,])
 sign = keep[absMaxFC>1.5]
-pprot_clusters = degPatterns(as.matrix(pprot_meta[sign,]), prot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
+pprot_clusters = degPatterns(as.matrix(pprot_meta[sign,]), pprot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
 .df=pprot_clusters$df[pprot_clusters$df$cluster %in% pprot_clusters$pass,]
 save_file(.df, "phospho-prot_clusters_genes_cluster.tsv", result_files)
 
-pprot_meta = ann_meta(pprot_meta, pprot_early_clusters, pprot_late_clusters, "phospho-prot_meta.tsv")
+pprot_meta = ann_meta(pprot_meta, .df, phospho_fa_de, pprot_early_clusters, pprot_late_clusters, "phospho-prot_meta.tsv")
 ```
 
 ## Clustering analysis with batch normalization
@@ -574,11 +594,11 @@ pprot_meta_col = rbind(early_col, late_col)
 absMaxFC = rowMax(abs(as.matrix(pprot_meta[keep,])))
 names(absMaxFC) = rownames(pprot_meta[keep,])
 sign = keep[absMaxFC>1.5]
-pprot_clusters = degPatterns(as.matrix(pprot_meta[sign,]), prot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
+pprot_clusters = degPatterns(as.matrix(pprot_meta[sign,]), pprot_meta_col, minc = 15, summarize = "group", time="group", col = NULL, reduce=TRUE, scale=FALSE, fixy=c(-2,2))
 .df=pprot_clusters$df[pprot_clusters$df$cluster %in% pprot_clusters$pass,]
 save_file(.df, "phospho-prot_norm_clusters_genes_cluster.tsv", result_files)
 
-pprot_meta = ann_meta(pprot_meta, pprot_early_clusters, pprot_late_clusters, "phospho-prot_norm_meta.tsv")
+pprot_meta = ann_meta(pprot_meta, .df, phospho_fa_de, pprot_early_clusters, pprot_late_clusters, "phospho-prot_norm_meta.tsv")
 ```
 
 
@@ -663,10 +683,6 @@ pathview(g_c_s, pathway.id = p, species = "mmu", kegg.native = T,gene.idtype="UN
 ```
 
 # R Session Info
-
-```{r compress, echo=FALSE, cache=FALSE}
-#name_res = compress_results(result_files, prefix = "model_omic_ournorm", zip = TRUE)
-```
 
 (useful if replicating these results)
 

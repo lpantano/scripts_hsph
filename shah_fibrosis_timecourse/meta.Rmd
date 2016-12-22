@@ -134,8 +134,8 @@ mds(ma[keep,]) + ggtitle("Removing XY chromosomes")
 
 I chose genes according to log2FoldChange and FDR:
 
-* early data: FDR < 0.1 and abs(log2FC) > 0
-* late data: FDR < 0.05 and abs(log2FC) > 0.1
+* early data: FDR < 0.1 and abs(log2FC) > 0: `r length(early_keep)`
+* late data: FDR < 0.05 and abs(log2FC) > 0.1: `r length(late_keep)`
 
 In the late data you have more genes, so it is good to keep the ones with stronger signal,
 since it will help the clustering to separate better.

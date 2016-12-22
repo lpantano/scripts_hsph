@@ -11,20 +11,6 @@ output:
 
 Report last updated `r date()`.
 
-
-```{r knitrsetup-only, echo=FALSE}
-library(myRfunctions)
-library(rmarkdown)
-library(knitr)
-knitr::opts_chunk$set(dev="png",
-                      highlight=TRUE, autodep=TRUE,
-                      comment='', fig.cap='',
-                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
-                      cache=FALSE,warning=FALSE,message=FALSE,
-                      error=FALSE, fig.width = 12, fig.height = 9)
-options(bitmapType = 'cairo')
-```
-
 ```{r create-report-only, echo=FALSE, eval=FALSE}
 # library(rmarkdown);library(knitr);render("meta_proteomic.Rmd")
 # render_2_drop("meta_proteomic.Rmd", "shah_fibrosis/proteomics_original")
@@ -32,3 +18,8 @@ options(bitmapType = 'cairo')
 
 ```{r, child="main_proteomic.Rmd"}
 ```
+
+```{r compress, echo=FALSE, eval=FALSE}
+name_res = compress_results("~/orch/scratch/jshah_fibrosis_rnaseq/protein/files/*meta*", prefix = "model_omic_tmm_norm", zip = TRUE)
+```
+

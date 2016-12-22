@@ -1,0 +1,117 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    code_folding: hide
+    toc_float: true
+    theme: readable
+    highlight: zenburn
+---
+
+Report last updated `r date()`.
+
+
+```{r knitrsetup, echo=FALSE}
+library(myRfunctions)
+library(rmarkdown)
+library(knitr)
+knitr::opts_chunk$set(dev="png",
+                      highlight=TRUE, autodep=TRUE,
+                      comment='', fig.cap='',
+                      tidy.opts=list(keep.blank.line=FALSE, width.cutoff=200),
+                      cache=TRUE,warning=FALSE,message=FALSE,
+                      error=FALSE, fig.width = 12, fig.height = 9)
+options(bitmapType = 'cairo')
+```
+This report analyzes FA model from Vishal data for Jsha group.
+
+```{r libraries}
+library(ggplot2)
+library(reshape)
+library(limma)
+library(CHBUtils)
+library(biomaRt)
+library(dplyr)
+library(cluster)
+library(gridExtra)
+library(logging)
+library(org.Mm.eg.db)
+library(DEGreport)
+library(dplyr)
+order_group=c("control", "day1", "day2", "day7", "day14")
+root_path = "~/orch/scratch/jshah_fibrosis_rnaseq/protein"
+result_files = file.path(root_path, "FA_vishal_files")
+dir.create(result_files, showWarnings = F, recursive = T)
+basicConfig(level='INFO')
+```
+
+# Protein analysis {.tabset}
+
+FC > 2 and FDR < 1%
+
+```{r protein-de, results='asis'}
+counts = read.csv(file.path(root_path, "FA_vishal_phosquant_summedSN.csv")) %>% tidyr::separate(Protein.ID, c("sp", "Uniprot.ID", "type"),sep = "[::|::]", extra = "merge") %>%
+             mutate(site_position=gsub("NA", "", paste(site1, site2, site3, site4, sep=";"))) %>%
+             mutate(localization=gsub("NA", "", paste(loc1, loc2, loc3, loc4, sep=";")))
+             
+    
+row.names(counts) = paste0(counts$Uniprot.ID, ":", counts$site_position)
+
+clean_counts = counts[,19:28]
+names(clean_counts)[1:10] = c("control-1", "control-2", "day1-1", "day1-2",
+                       "day2-1", "day2-2", "day7-1", "day7-2", "day14-1", "day14-2")
+
+cat("## Expression density of 'raw' data\n\n")
+ggplot(melt(clean_counts), aes(x=log2(value), colour=variable)) + geom_density()
+
+dge = edgeR::DGEList(clean_counts)
+dge = edgeR::calcNormFactors(dge, method="TMM")
+
+coldata = data.frame(row.names=colnames(clean_counts), samples=colnames(clean_counts)) %>% tidyr::separate(samples,into = c("group"), extra = "drop")
+coldata$group = sapply(coldata$group, tolower)
+norm_counts = edgeR::cpm(dge, log=T)
+
+MA <- normalizeBetweenArrays(as.matrix(norm_counts), method="none")
+
+cat("## Expression density of normalize data\n\n")
+ggplot(melt(as.data.frame(MA)), aes(x=value, colour=variable)) + geom_density()
+
+cat("## MDS plot\n\n")
+mds(MA, condition = coldata$group)
+save_file(MA, "fa_model_log2_counts.tsv", result_files)
+design <- model.matrix(~ 0 + coldata$group)
+colnames(design) = c("normal", "day1", "day14", "day2", "day7")
+fit <- lmFit(MA, design)
+contrast.matrix <- makeContrasts(day1-normal, day2-day1, day7-day2, day14-day7, 
+                                 day2-normal, day7-normal, day14-normal,
+                                 day7-day1, day7-day2, 
+                                 day14-day1, day14-day2,
+                                 levels=design)
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2)
+res = topTable(fit2, adjust="BH", n="Inf")
+save_file(res, "fa_model.tsv", result_files)
+absMaxFC = rowMax(as.matrix(abs(res[,1:11])))
+sign = row.names(res[absMaxFC>1 & res$adj.P.Val<0.1,])
+
+cat("## MDS plot of DE proteins\n\n")
+mds(MA[sign,], condition = coldata$group)
+
+coldata$group = factor(coldata$group, levels=order_group)
+cat("## Clustering analysis\n\n")
+clusters = degPatterns(MA[sign,], coldata, minc = 15, summarize = "group", time="group", col = NULL)
+.df=clusters$df
+save_file(.df, "clusters_genes_cluster.tsv", result_files)
+
+```
+
+# R Session Info
+
+(useful if replicating these results)
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+
