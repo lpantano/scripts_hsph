@@ -41,7 +41,7 @@ root_file = file.path(root_path, "srna_out_files")
 dir.create(root_file, showWarnings = FALSE)
 
 metadata_fn =  list.files(file.path(root_path), pattern = "summary.csv",recursive = T, full.names = T)
-metadata = read.csv(metadata_fn[2], row.names="sample_id")
+metadata = read.csv(metadata_fn[1], row.names="sample_id")
 # metadata = metadata[2:nrow(metadata), ,drop=FALSE]
 condition = names(metadata)[1]
 design = metadata
@@ -334,7 +334,12 @@ ma_rank = do.call(cbind, lapply(colnames(counts), function(col){
 row.names(ma_rank) = row.names(counts)
 colnames(ma_rank) = colnames(counts)
 
+dge = DGEList(counts)
+dge = calcNormFactors(dge,method = 'upperquartile')
+counts_norm = cpm(dge, normalized.lib.sizes = T, log = T)
+
 save_file(counts, "mirna_counts.csv", root_file)
+save_file(counts_norm, "mirna_norm_counts.csv", root_file)
 save_file(ma_rank, "mirna_rank_counts.csv", root_file)
 ```
 
@@ -345,16 +350,29 @@ mac_rank = do.call(cbind, lapply(colnames(clus_ma), function(col){
     r <- 1:length(idx$ix)
     r[order(idx$ix)]
 }))
+
+
+dgec = DGEList(clus_ma)
+dgec = calcNormFactors(dgec,method = 'upperquartile')
+clus_norm = cpm(dgec, normalized.lib.sizes = T, log = T)
+
+
 row.names(mac_rank) = row.names(clus_ma)
 colnames(mac_rank) = colnames(clus_ma)
-save_file(clus_ma, "clus_counts.csv", root_file)
-save_file(mac_rank, "clus_rank_counts.csv", root_file)
+save_file(clus_ma %>% mutate(ann=ann), "clus_counts.csv", root_file)
+save_file(clus_norm %>% as.data.frame() %>% mutate(ann=ann), "clus_norm_counts.csv", root_file)
+save_file(mac_rank %>% as.data.frame() %>% mutate(ann=ann), "clus_rank_counts.csv", root_file)
 ```
 
 
 # Files
 
 Files generated contains raw count, normalized counts, log2 normalized counts and DESeq2 results.
+
+```{r compress}
+compress_results(root_file, "srna", zip = TRUE)
+```
+
 
 #R Session Info
 

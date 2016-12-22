@@ -2,7 +2,7 @@
 output:
   html_document:
     toc: true
-    toc_depth: 3
+    toc_depth: 2
     toc_float: true
     code_folding: hide
     theme: readable
@@ -506,6 +506,36 @@ upset(ma, sets=comp)
 save_file(ma, paste0(comp[[1]], "_and_", comp[[2]],"_common.xls"), root_file)
 ```
 
+## Analysis for isomiRs {.tabset}
+
+```{r de-iso, results='asis', eval=(ismirbase & isde)}
+design$group = factor(design$group, levels=c("IsoF", "IsoM", "GroupedF", "GroupedM"))
+iso_obj = isoCounts(obj, ref = TRUE, iso5 = TRUE, iso3 = TRUE, 
+                       add = TRUE, subs = TRUE, seed = TRUE)
+iso_counts = counts(iso_obj)
+iso_dss = DESeqDataSetFromMatrix(countData = iso_counts[rowSums(iso_counts>0)>3,],
+                                 colData = design,
+                                 design = formula)
+iso_dss = DESeq(iso_dss)
+
+iso_all_results = handle_deseq2(iso_dss, design, condition, "iso_" )
+```
+
+## Intersection of DE isomiRs
+
+```{r iso-intersection}
+comp = c("IsoF_vs_GroupedF", "IsoM_vs_GroupedM")
+library(UpSetR)
+ma = do.call(rbind, lapply(comp, function(c){
+    iso_all_results[[c]] %>% as.data.frame() %>%
+        tibble::rownames_to_column("id") %>%
+        filter(padj<0.05) %>%
+        select(id) %>% mutate(is_de=1, comparison=c)
+})) %>% tidyr::spread(key="comparison", value="is_de")
+ma[is.na(ma)] = 0
+upset(ma, sets=comp)
+save_file(ma, paste0(comp[[1]], "_and_", comp[[2]],"_iso_common.xls"), root_file)
+```
 
 ## Analysis for novel miRNA {.tabset}
 
@@ -545,6 +575,11 @@ Files description:
 ```{r compress, eval=FALSE, echo=FALSE}
 name_res = myRfunctions::compress_results(root_file,prefix = "small_rna")
 ```
+```{r create-obj}
+DEGreport::degObj(assay(rlog(dss)), design, file.path(root_file, "obj_mirna.rda"))
+DEGreport::degObj(assay(rlog(iso_dss)), design, file.path(root_file, "obj_isomirs.rda"))
+```
+
 
 ```{r sessioninfo}
 sessionInfo()

@@ -413,7 +413,8 @@ volcano_plot <- function(stats, side="both", title="Volcano Plot with Marginal D
     names(stats) = c("logFC","adj.P.Val")
     stats[,2] = stats[,2] + 1e-10
     stats$color = point.colour
-    stats$color[stats[,2]<pval.cutoff & abs(stats[,1])>lfc.cutoff] = "red"
+    stats$color[stats[,2]<pval.cutoff & (stats[,1]) > lfc.cutoff] = "red"
+    stats$color[stats[,2]<pval.cutoff & (stats[,1]) < -lfc.cutoff] = "blue"
     # get range of log fold change and p-value values to setup plot borders
     range.lfc <- c(floor(min(stats$logFC)), ceiling(max(stats$logFC)))
     range.pval <- c(floor(min(-log10(stats$adj.P.Val))), ceiling(max(-log10(stats$adj.P.Val)))+1)
@@ -453,8 +454,8 @@ volcano_plot <- function(stats, side="both", title="Volcano Plot with Marginal D
         theme_bw()+
         theme(legend.position="none") +
         # theme(plot.margin=unit(c(3,-5.5,4,3), "mm") )+
-        scale_color_manual(values = rev(unique(stats$color))) + 
-        scale_fill_manual(values = rev(unique(stats$color))) + 
+        scale_color_manual(values = c("blue", point.colour, "red")) + 
+        scale_fill_manual(values = c("blue", point.colour, "red")) + 
         scale_x_continuous(limits = range.lfc, breaks = range.lfc[1]:range.lfc[2], expand = c(.05,.05))+
         scale_y_continuous(labels=fmt(), limits = range.pval)+ labs(list(title="Volcano plot"))
     # if (side=="both" | side=="up")
@@ -549,9 +550,13 @@ for (name in names(res)[2:3]){
     out_sort = cbind(data.frame(ensembl=hr$labels[hr$order], 
                           symbol=convertIDs(hr$labels[hr$order], "ENSEMBL", "SYMBOL", org.Hs.eg.db)), df[hr$labels[hr$order],])
     save_file(out_sort, fn_out, path_results)
-    stats = as.data.frame(df[,c(3,7)])
+    df = df[!is.na(df$symbol),]
+    stats = as.data.frame(df[!is.na(df$symbol),c(3,7)])
     text = read.csv(file.path(root_path, paste0(name, "_selected.csv")))
-    text = df[as.character(text$id),c(3,7,8)]
+    text = rbind(df[as.character(text$id),c(3,7,8)], 
+           (df[order(df$pvalue) ,c(3,7,8)])[1:5,],
+           (df[order(df$log2FoldChange, decreasing = T) ,c(3,7,8)])[1:5,],
+           (df[order(df$log2FoldChange) ,c(3,7,8)])[1:5,])
     p = volcano_plot(stats, title=name, lfc.cutoff=log2(1.5), pval.cutoff = 0.05, point.alpha=0.50, plot_text = text)
     print(p)
     p = volcano_plot(stats, title=name, lfc.cutoff=log2(1.5), pval.cutoff = 0.05, point.alpha=0.50)
@@ -582,6 +587,24 @@ out_sort = cbind(data.frame(ensembl=hr$labels[hr$order],
                             symbol=convertIDs(hr$labels[hr$order], "ENSEMBL", "SYMBOL",
                                               org.Hs.eg.db)),df[hr$labels[hr$order],])
 save_file(out_sort, fn_out, path_results)
+
+diff_genes_top = abs(df$log2FoldChange)>log2(1.5) & !is.na(df$padj)
+diff_genes_top = df$id[diff_genes_top]
+col_keep = c(2,6,4,8)
+hr = hclust(as.dist(1-cor(t(rlogMat[diff_genes_top,col_keep]))), method = "ward.D2")
+pheatmap(rlogMat[hr$labels[hr$order],col_keep],
+         annotation=metadata,
+         clustering_method = "ward.D2", 
+         clustering_distance_cols = "correlation",
+         scale='row', labels_row = "",
+         cluster_row=FALSE, cluster_cols=FALSE,
+         show_rownames=T, color=my_palette,main = paste0(name," only FC(1.5) cutoff"))
+fn_out = file.path(paste0(name, "_4honly_fconly_order_heatmap.csv"))
+out_sort = cbind(data.frame(ensembl=hr$labels[hr$order], 
+                            symbol=convertIDs(hr$labels[hr$order], "ENSEMBL", "SYMBOL",
+                                              org.Hs.eg.db)),df[hr$labels[hr$order],])
+save_file(out_sort, fn_out, path_results)
+
 ```
 
 

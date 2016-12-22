@@ -154,9 +154,18 @@ abline(v=3.5, col="red")
 
 ## Peaks after filtering
 
+```{r negatives}
+cutoff = list("k27me3"=3,"k4me1"=5,"k4me3"=6,"sp140_0h"=3.5,"sp140_4h"=3.5,"k27ac"=5)
+save_file(as.data.frame(peaks$sp140_0h[mcols(peaks$sp140_0h)[,"foldchange"]<cutoff[["sp140_0h"]],]), "sp140_0h_removed.txt", path_results)
+save_file(as.data.frame(peaks$sp140_4h[mcols(peaks$sp140_4h)[,"foldchange"]<cutoff[["sp140_4h"]],]), "sp140_4h_removed.txt", path_results)
+save_file(as.data.frame(k27me3[mcols(k27me3)[,"foldchange"]<cutoff[["k27me3"]],]), "k27me3_removed.txt", path_results)
+save_file(as.data.frame(k27ac[mcols(k27ac)[,"foldchange"]<cutoff[["k27ac"]],]), "k27ac_removed.txt", path_results)
+save_file(as.data.frame(k4me3[mcols(k4me3)[,"foldchange"]<cutoff[["k4me3"]],]), "k4me3_removed.txt", path_results)
+save_file(as.data.frame(k4me1[mcols(k4me1)[,"foldchange"]<cutoff[["k4me1"]],]), "k4me1_removed.txt", path_results)
+```
+
 
 ```{r stats, results='asis'}
-cutoff = list("k27me3"=3,"k4me1"=5,"k4me3"=6,"sp140_0h"=3.5,"sp140_4h"=3.5,"k27ac"=5)
 peaks$sp140_0h = peaks$sp140_0h[mcols(peaks$sp140_0h)[,"foldchange"]>cutoff[["sp140_0h"]],]
 peaks$sp140_4h = peaks$sp140_4h[mcols(peaks$sp140_4h)[,"foldchange"]>cutoff[["sp140_4h"]],]
 k27me3 = k27me3[mcols(k27me3)[,"foldchange"]>cutoff[["k27me3"]],]
@@ -220,6 +229,43 @@ save_file(as.data.frame(histAnnoList$k4me3@anno), "H3K4me3.txt", path_results)
 save_file(as.data.frame(histAnnoList$k4me1@anno), "H3K4me1.txt", path_results)
 save_file(as.data.frame(peakAnnoList$sp140_0h@anno), "SP140_0h.txt", path_results)
 save_file(as.data.frame(peakAnnoList$sp140_4h@anno), "SP140_4h.txt", path_results)
+
+```
+
+```{r, eval=FALSE, echo=FALSE}
+gene_k4me3 = mcols(histAnnoList$k4me3@anno)[,c("score","ENSEMBL","annotation")] %>% as.data.frame() %>% mutate(size=width(histAnnoList$k4me3@anno)) %>% dplyr::filter(grepl("Promoter",annotation)) %>% group_by(ENSEMBL) %>% summarise(averagek4=sum(score),k4=n(), sizek4=sum(size))
+
+gene_k27me3 = mcols(histAnnoList$k27me3@anno)[,c("score","ENSEMBL","annotation")] %>% as.data.frame() %>% mutate(size=width(histAnnoList$k27me3@anno))%>% dplyr::filter(grepl("Promoter",annotation)) %>% group_by(ENSEMBL) %>% summarise(averagek27=sum(score),k27=n(), sizek27=sum(size))
+
+gene_sp1400h = mcols(peakAnnoList$sp140_0h@anno)[,c("score","ENSEMBL","annotation")] %>% as.data.frame()  %>% mutate(size=width(peakAnnoList$sp140_0h@anno))%>% dplyr::filter(grepl("Promoter",annotation)) %>% group_by(ENSEMBL) %>% summarise(averagesp0h=sum(score),sp0h=n(), sizesp0h=sum(size))
+
+gene_sp1404h = mcols(peakAnnoList$sp140_4h@anno)[,c("score","ENSEMBL","annotation")] %>% as.data.frame() %>% dplyr::filter(grepl("Promoter",annotation)) %>% group_by(ENSEMBL) %>% summarise(averagesp4h=sum(foldchange), size=sum(size))
+
+
+df = left_join(gene_k4me3, gene_sp1400h)
+df = df[order(df$averagek4, decreasing = T),]
+df$rank = 1:nrow(df)
+# df[is.na(df)] = 0
+ggplot(df, aes(x=averagek4, y=averagesp0h)) + geom_point(alpha=.1) + scale_x_log10() + scale_y_log10()
+ggplot(df, aes(x=averagek4/sizek4, y=averagesp0h/sizesp0h)) + geom_point(alpha=.1) + scale_x_log10() + scale_y_log10()
+ggplot(df, aes(x=rank, y=averagesp0h/sp0h)) + geom_point(alpha=.3) + scale_x_log10() + scale_y_log10() + xlim(0,100)
+ggplot(df, aes(x=sizek4*averagek4, y=sizesp0h*averagesp0h)) + geom_point(alpha=.3) + scale_x_log10() + scale_y_log10()
+ggplot(df, aes(x=sizek4/rank, y=sizesp0h/averagesp4h)) + geom_point()
+
+
+df = left_join(gene_k27me3, gene_sp1400h)
+df = df[order(df$averagek27),]
+df$rank = 1:nrow(df)
+# df[is.na(df)] = 0
+ggplot(df, aes(x=averagek27, y=averagesp0h)) + geom_point(alpha=.3) + scale_x_log10() + scale_y_log10()
+ggplot(df, aes(x=rank, y=averagesp4h)) + geom_point(alpha=.3)
+
+
+df = left_join(gene_k27me3, gene_k4me3)
+df = df[order(df$averagek27),]
+df$rank = 1:nrow(df)
+ggplot(df, aes(x=averagek27, y=averagek4)) + geom_point(alpha=.3) + scale_x_log10() + scale_y_log10()
+
 
 ```
 
