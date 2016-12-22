@@ -33,9 +33,25 @@ library(dplyr)
 library(tidyr)
 library(pheatmap)
 library(rio)
+library(biomaRt)
+dselect = dplyr::select
 ```
 
 ```{r load-files}
+library(EnsDb.Hsapiens.v79)
+get_human = function(ids){
+    names(ids)[1] = "external_gene_name"
+    ensembl = useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl", 
+                      host = "useast.ensembl.org")
+    annot = getBM(attributes = c("hsapiens_homolog_ensembl_gene","external_gene_name"), 
+                  filters = c("external_gene_name"), 
+                  values = ids$external_gene_name, mart = ensembl)
+    left_join(annot, ids, by="external_gene_name") %>% filter(hsapiens_homolog_ensembl_gene != "") %>%
+        mutate(gene=convertIDs(hsapiens_homolog_ensembl_gene, "GENEID", "GENENAME", EnsDb.Hsapiens.v79, "useFirst"))
+}
+fig1 = get_human(import("f1b.csv"))
+fig1narrow = get_human(import("f1bnarrow.csv"))
+
 exp1 = import("Experiment1_Data.xlsx")
 exp1$Gene_Name = gsub("\\'", "", exp1$Gene_Name)
 colnames(exp1) = gsub("\\+", "p", colnames(exp1))
@@ -45,7 +61,7 @@ colnames(exp2) = gsub("\\+", "p", colnames(exp2))
 
 data = inner_join(exp1[,1:11] %>% filter(Gene_Name != ""), 
                   exp2[,1:11] %>% filter(Gene_Name != ""), by="Gene_Name") %>%
-    select(Gene_Name, Entrez_Gene_ID=Entrez_Gene_ID.x, Description=Description.x,
+    dselect(Gene_Name, Entrez_Gene_ID=Entrez_Gene_ID.x, Description=Description.x,
            d1_nt=nt.x, d1_sh17=sh17.x, d1_sh16=sh16.x,
            d1_ntp=ntp.x, d1_sh17p=sh17p.x, d1_sh16p=sh16p.x,
            d2_nt=nt.y, d2_sh17=sh17.y, d2_sh16=sh16.y,
@@ -59,8 +75,9 @@ metadata = rbind(data.frame(donor = "donor1", group = colnames(exp1)[3:8]) %>%
                      mutate(name=paste0("d1_", group)),
                  data.frame(donor = "donor2", group = colnames(exp2)[3:8])  %>%
                      mutate(name=paste0("d2_", group))) %>% 
-                     mutate(treat = ifelse(grepl("p$", group), "plus", "minus")) %>%
-                     mutate(type = gsub("p$", "", group))
+    mutate(treat = ifelse(grepl("p$", group), "plus", "minus")) %>%
+    mutate(type = gsub("p$", "", group)) %>%
+    mutate(type_simple=gsub("[0-9]", "", type))
 rownames(metadata) = metadata$name
 metadata = metadata[colnames(counts),]
 metadata
@@ -80,11 +97,13 @@ ggplot(melt(log2counts), aes(x=value, color=variable)) +
     geom_density() + theme_bw()
 mds(log2counts, k=2, condition = metadata$donor) + theme_bw()
 ```
+
+
 ## Differential analysis with DESeq2
 
 Just using DESeq2 without any further addition to the analysis
 
-## Dispersion values
+### Dispersion values
 ```{r dispersion}
 dds = DESeqDataSetFromMatrix(counts, metadata, design = ~ donor + treat + type)
 # rdds = rlog(dds)
@@ -112,7 +131,10 @@ suppressWarnings(DEGreport::degPlot(dds_group, res_sh16_vs_control["SET",,drop=F
 * nt vs nt+
 
 ```{r deseq2-nt-alone, results='asis'}
-res_nt_vs_plus = results(dds_group, list("groupntp", "groupnt"))
+dds_nt = dds_group[,c(1,4,7,10)]
+dds_nt$group <- droplevels(dds_nt$group)
+dds_nt = DESeq(dds_nt)
+res_nt_vs_plus = results(dds_nt, list("groupntp", "groupnt"))
 DESeq2::plotMA(res_nt_vs_plus)
 res =  res_nt_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
     arrange(padj) %>% tibble::column_to_rownames("id")
@@ -127,14 +149,17 @@ deseq2_ntplus_effect = res
 
 ```
 
-### sh16 treatment effect
+### sh treatment effect
 
-* sh16 vs sh16+
-
-```{r deseq2-sh16-alone, results='asis'}
-res_sh16_vs_plus = results(dds_group, list("groupsh16p", "groupsh16"))
-DESeq2::plotMA(res_sh16_vs_plus)
-res =  res_sh16_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
+* sh16/17  vs sh16/17+
+```{r deseq2-sh-alone, results='asis'}
+dds_sh = dds[,c(2:3,5:6,8:9,11:12)]
+dds_sh$type <- droplevels(dds_sh$type)
+design(dds_sh) = ~treat
+dds_sh = DESeq(dds_sh)
+res_sh_vs_plus = results(dds_sh, list("treatplus", "treatminus"))
+DESeq2::plotMA(res_sh_vs_plus)
+res =  res_sh_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
     arrange(padj) %>% tibble::column_to_rownames("id")
 
 res %>% head(15) %>% knitr::kable()
@@ -143,30 +168,9 @@ volcano_density_plot(res[,c("log2FoldChange", "pvalue")], shade.colour = "orange
 
 suppressWarnings(DEGreport::degPlot(dds_group, res , n=9, xs = "treat", group = "type", batch = "donor" ))
 
-deseq2_sh16plus_effect = res
+deseq2_shplus_effect = res
 
 ```
-
-### sh17 treatment effect
-
-* sh17 vs sh17+
-
-```{r deseq2-sh117-alone, results='asis'}
-res_sh17_vs_plus = results(dds_group, list("groupsh17p", "groupsh17"))
-DESeq2::plotMA(res_sh17_vs_plus)
-res =  res_sh17_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
-    arrange(padj) %>% tibble::column_to_rownames("id")
-
-res %>% head(15) %>% knitr::kable()
-
-volcano_density_plot(res[,c("log2FoldChange", "pvalue")], shade.colour = "orange")
-
-suppressWarnings(DEGreport::degPlot(dds_group, res , n=9, xs = "treat", group = "type", batch = "donor" ))
-
-deseq2_sh17plus_effect = res
-
-```
-
 
 ### Proteins induced by SET in WT but not in SET-KD
 
@@ -179,17 +183,12 @@ We used the FDR < 0.05 to get the DE and pvalue>0.2 to get the non-changed genes
 deseq2_sh_dependent =
     inner_join(deseq2_ntplus_effect 
            %>% tibble::rownames_to_column("id") %>% filter(padj<0.05) %>%
-               select(id,nt_padj=padj),
-           inner_join(
-           deseq2_sh16plus_effect  %>% 
-               tibble::rownames_to_column("id") %>% filter(pvalue>0.2) %>%
-               select(id,sh16_padj=pvalue),
-           deseq2_sh17plus_effect  %>% 
-               tibble::rownames_to_column("id") %>% filter(pvalue>0.2) %>%
-               select(id,sh17_padj=pvalue),
-           by="id"),
-           by ="id") %>% rowwise() %>% 
-    mutate(sh_max = max(sh16_padj, sh17_padj)) %>%
+               dselect(id,nt_padj=padj),
+           deseq2_shplus_effect %>% tibble::rownames_to_column("id") %>%
+               filter(pvalue>0.1) %>%
+               dselect(id,sh_pval=padj)
+           ) %>% rowwise() %>% 
+    mutate(sh_max = sh_pval) %>%
     mutate(diff = nt_padj - sh_max) %>% arrange((nt_padj))
 
 suppressWarnings(DEGreport::degPlot(dds_group, deseq2_ntplus_effect[deseq2_sh_dependent$id,], n=9, xs = "treat", group = "type", batch = "donor" ))
@@ -197,65 +196,48 @@ suppressWarnings(DEGreport::degPlot(dds_group, deseq2_ntplus_effect[deseq2_sh_de
 
 ```
 
-```{r dependet-nt, eval=FALSE, echo=FALSE}
-### Proteins induced by SET in WT but not in KD, complex model
+### Common proteins among comparisons
 
-dds_depend = DESeqDataSetFromMatrix(counts, metadata, design = ~ donor + type + treat)
-d = colData(dds_depend)
-d$type = relevel(d$type, "sh17")
-full = model.matrix(~ donor + type + treat + type:treat, d)
-reduce = full[,-6]
-dds_depend = DESeq(dds_depend, test = "LRT", reduced=reduce, full=full)
+```{r deseq2-export}
+deseq2_full_table = right_join(
+as.data.frame(assay(rlog(dds))) %>% tibble::rownames_to_column("id"),
+full_join(
+    as.data.frame(deseq2_ntplus_effect) %>% 
+        tibble::rownames_to_column("id") %>%
+        dselect(id, nt_neg_vs_pos_logFC=log2FoldChange, 
+               nt_neg_vs_pos_pval=pvalue,
+               nt_neg_vs_pos_FDR=padj),
+    as.data.frame(deseq2_shplus_effect) %>% 
+        tibble::rownames_to_column("id") %>%
+        dselect(id, sh_neg_vs_pos_logFC=log2FoldChange, 
+               sh_neg_vs_pos_pval=pvalue,
+               sh_neg_vs_pos_FDR=padj),
+    by="id"), by="id") %>%
+    mutate(nt_stimulus_dependent=ifelse(nt_neg_vs_pos_FDR<0.1, "Yes", "No"),
+           sh_stimulus_dependent=ifelse(sh_neg_vs_pos_FDR<0.1, "Yes", "No"),
+           SET_dependent=ifelse(nt_neg_vs_pos_FDR<0.1 & sh_neg_vs_pos_pval>0.1, "Yes", "No"))
 
-deseq2_res_nt_depend = results(dds_depend)
+write.table(deseq2_full_table, "deseq2_table.xls", sep="\t", row.names=FALSE)
 
-DESeq2::plotMA(deseq2_res_nt_depend)
+ma = deseq2_full_table %>% dselect(nt_stimulus_dependent, 
+                             sh_stimulus_dependent, SET_dependent)
+ma = ma=="Yes"
+ma = ma*1
+ma[is.na(ma)] = 0
+UpSetR::upset(as.data.frame(ma), sets = c("nt_stimulus_dependent","sh_stimulus_dependent","SET_dependent"))
 
-res =  deseq2_res_nt_depend %>% as.data.frame() %>% 
-    tibble::rownames_to_column("id") %>%
-    arrange(pvalue) %>% tibble::column_to_rownames("id")
-
-res %>% head(15) %>% knitr::kable()
-
-suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
-
-
+DT::datatable(deseq2_full_table %>% filter(SET_dependent=="Yes" | nt_stimulus_dependent=="Yes"))
 ```
 
-```{r sh16-treatment, results='asis', eval=FALSE, echo=FALSE}
-### Different in treatments with sh16
-keep = !grepl("sh17", row.names(metadata))
-dds_complex = DESeqDataSetFromMatrix(counts[,keep], metadata[keep,], design = ~ donor + type + treat +  type*treat)
-dds_complex = DESeq(dds_complex)
-# sizeFactors(dds_complex) <- sf[keep]
-# dispersions(dds_complex) <- disp
-# dds_complex <- nbinomWaldTest(dds_complex)
-dds_complex <- DESeq2::nbinomLRT(dds_complex, reduced = ~ donor + type + treat)
-
-res_sh16_treatment = results(dds_complex)
-
-DESeq2::plotMA(res_sh16_treatment)
-
-res =  res_sh16_treatment %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
-    arrange(pvalue) %>% tibble::column_to_rownames("id")
-
-res %>% head(15) %>% knitr::kable()
-
-volcano_density_plot(res[,c("log2FoldChange", "padj")], shade.colour = "orange")
-
-suppressWarnings(DEGreport::degPlot(dds_complex, res, n=6, xs = "treat", group = "type", batch = "donor" ))
-
-```
 
 ## Differential analysis with lima-voom as microarray data
 
 ```{r limma-fn}
 d = model.matrix(~ 0 + donor + treat,  metadata)
-y =normalizeBetweenArrays(log2(counts), 
+y =normalizeBetweenArrays(log2(counts+1), 
                             method = "quantile")
 
-limma_ma = voomaByGroup(y, group = metadata$type,
-                 d, plot=FALSE)
+limma_ma = vooma(y, plot=FALSE)
 
 limmaPlot = function (counts, genes, metadata, xs = "time", group = "condition", 
     batch = NULL) 
@@ -320,12 +302,38 @@ suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "
 ntplus_effect = res
 ```
 
+### sh vs nt in treatment
+
+```{r lima-voom-array-sh-nt-plus, results='asis'}
+library(limma)
+keep = grepl("p$", row.names(metadata))
+d = model.matrix(~ 0 + donor + type_simple,  metadata[keep,])
+y =normalizeBetweenArrays(log2(counts[,keep]), 
+                            method = "quantile")
+
+v = voom(y, d, plot=TRUE)
+
+f = lmFit(v, d)
+fb = eBayes(f)
+
+res = topTable(fb,coef = "type_simplesh", sort.by = "p", number = Inf)
+
+knitr::kable(head(res, 15))
+
+volcano_density_plot(res[,c("logFC", "P.Value")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
+
+shplus_ntplus_effect = res
+```
+
+
 ### sh16/sh17 treatment effect
 
 ```{r lima-voom-array-sh, results='asis'}
 library(limma)
 keep = !grepl("nt", row.names(metadata))
-d = model.matrix(~ 0 + donor + treat + type,  metadata[keep,])
+d = model.matrix(~ 0 + donor + type + treat,  metadata[keep,])
 y =normalizeBetweenArrays(log2(counts[,keep]), 
                             method = "quantile")
 
@@ -344,6 +352,172 @@ volcano_density_plot(res[,c("logFC", "P.Value")], shade.colour = "orange")
 suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
 
 shplus_effect = res
+```
+
+### Proteins induced by SET in WT but not in KD
+```{r vooma-dependet-nt}
+sh_dependent =
+    inner_join(ntplus_effect 
+           %>% tibble::rownames_to_column("id") %>% filter(adj.P.Val<0.1),
+           shplus_effect  %>% 
+               tibble::rownames_to_column("id") %>% filter(adj.P.Val>0.2),
+           by ="id")
+
+suppressWarnings(DEGreport::degPlot(dds_group, ntplus_effect[sh_dependent$id,], n=8, xs = "treat", group = "type", batch = "donor" ))
+
+# suppressWarnings(limmaPlot(limma_ma$E, sh_dependent$id, metadata, xs = "treat", group = "type", batch = "donor" ))
+
+```
+
+
+### Common proteins among comparisons
+
+```{r limma-export}
+full_table = full_join(
+as.data.frame(limma_ma$E) %>% tibble::rownames_to_column("id"),
+full_join(
+    as.data.frame(ntplus_effect) %>% tibble::rownames_to_column("id") %>%
+        dselect(id, nt_neg_vs_pos_logFC=logFC, 
+               nt_neg_vs_pos_pval=P.Value,
+               nt_neg_vs_pos_FDR=adj.P.Val),
+    as.data.frame(shplus_effect) %>% tibble::rownames_to_column("id") %>%
+        dselect(id, sh_neg_vs_pos_logFC=logFC, 
+               sh_neg_vs_pos_pval=P.Value,
+               sh_neg_vs_pos_FDR=adj.P.Val),
+    by="id"), by="id") %>% 
+    full_join(as.data.frame(shplus_ntplus_effect) %>%
+                  tibble::rownames_to_column("id") %>%
+                  dselect(id, SET_dependet_in_stimulus_FDR=adj.P.Val), 
+              by="id") %>%
+    mutate(nt_stimulus_dependent=ifelse(nt_neg_vs_pos_FDR<0.1, "Yes", "No"),
+           sh_stimulus_dependent=ifelse(sh_neg_vs_pos_FDR<0.1, "Yes", "No"),
+           SET_dependent=ifelse(nt_neg_vs_pos_FDR<0.1 & sh_neg_vs_pos_pval>0.1, "Yes", "No")) %>%
+    left_join(fig1 %>% dselect(id=gene, fig1b=cluster), by="id") %>%
+    left_join(fig1narrow %>% dselect(id=gene, fig1bnarrow=cluster), by="id")
+
+write.table(full_table, "limma_table.xls", sep="\t", row.names=FALSE)
+
+ma = full_table %>% mutate(fig1=!is.na(fig1b), 
+                           fig1narrow=!is.na(fig1bnarrow)) %>%
+    dselect(nt_stimulus_dependent, 
+            sh_stimulus_dependent, 
+            SET_dependent, fig1, fig1narrow)
+ma = ma=="Yes" | ma==TRUE
+ma = ma*1
+ma[is.na(ma)] = 0
+UpSetR::upset(as.data.frame(ma), sets = colnames(ma))
+export(ma, "limma_commons.xls", "tsv")
+
+DT::datatable(full_table %>% filter(SET_dependent=="Yes" | nt_stimulus_dependent=="Yes"))
+```
+
+
+## Normalize with RUVseq
+
+It doesn't help a lot this time. I guess too few replicates to remove noise from any of them.
+
+```{r ruvseq}
+library(RUVSeq)
+ruv = RUVs(counts(dds_group), cIdx=row.names(counts), k=1, scIdx = matrix(c(1:6, 7:12), nrow=6))
+mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("1 factor")
+ruv = RUVs(as.matrix(counts), cIdx=row.names(counts), k=2, scIdx = matrix(c(1:6, 7:12), nrow=6))
+mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("2 factors")
+ruv = RUVs(as.matrix(counts), cIdx=row.names(counts), k=3, scIdx = matrix(c(1:6, 7:12), nrow=6))
+mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("3 factors")
+
+```
+
+## Other code used for exploration
+
+### sh16 treatment effect
+
+* sh16 vs sh16+
+
+```{r deseq2-sh16-alone, results='asis'}
+res_sh16_vs_plus = results(dds_group, list("groupsh16p", "groupsh16"))
+DESeq2::plotMA(res_sh16_vs_plus)
+res =  res_sh16_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
+    arrange(padj) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+volcano_density_plot(res[,c("log2FoldChange", "pvalue")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res , n=9, xs = "treat", group = "type", batch = "donor" ))
+
+deseq2_sh16plus_effect = res
+
+```
+
+### sh17 treatment effect
+
+* sh17 vs sh17+
+
+```{r deseq2-sh117-alone, results='asis'}
+res_sh17_vs_plus = results(dds_group, list("groupsh17p", "groupsh17"))
+DESeq2::plotMA(res_sh17_vs_plus)
+res =  res_sh17_vs_plus %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
+    arrange(padj) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+volcano_density_plot(res[,c("log2FoldChange", "pvalue")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_group, res , n=9, xs = "treat", group = "type", batch = "donor" ))
+
+deseq2_sh17plus_effect = res
+
+```
+
+
+```{r dependet-nt, eval=FALSE, echo=FALSE}
+### Proteins induced by SET in WT but not in KD, complex model
+
+dds_depend = DESeqDataSetFromMatrix(counts, metadata, design = ~ donor + type + treat)
+d = colData(dds_depend)
+d$type = relevel(d$type, "sh17")
+full = model.matrix(~ donor + type + treat + type:treat, d)
+reduce = full[,-6]
+dds_depend = DESeq(dds_depend, test = "LRT", reduced=reduce, full=full)
+
+deseq2_res_nt_depend = results(dds_depend)
+
+DESeq2::plotMA(deseq2_res_nt_depend)
+
+res =  deseq2_res_nt_depend %>% as.data.frame() %>% 
+    tibble::rownames_to_column("id") %>%
+    arrange(pvalue) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "type", batch = "donor" ))
+
+
+```
+
+```{r sh16-treatment, results='asis', eval=FALSE, echo=FALSE}
+### Different in treatments with sh16
+keep = !grepl("sh17", row.names(metadata))
+dds_complex = DESeqDataSetFromMatrix(counts[,keep], metadata[keep,], design = ~ donor + type + treat +  type*treat)
+dds_complex = DESeq(dds_complex)
+# sizeFactors(dds_complex) <- sf[keep]
+# dispersions(dds_complex) <- disp
+# dds_complex <- nbinomWaldTest(dds_complex)
+dds_complex <- DESeq2::nbinomLRT(dds_complex, reduced = ~ donor + type + treat)
+
+res_sh16_treatment = results(dds_complex)
+
+DESeq2::plotMA(res_sh16_treatment)
+
+res =  res_sh16_treatment %>% as.data.frame() %>% tibble::rownames_to_column("id") %>%
+    arrange(pvalue) %>% tibble::column_to_rownames("id")
+
+res %>% head(15) %>% knitr::kable()
+
+volcano_density_plot(res[,c("log2FoldChange", "padj")], shade.colour = "orange")
+
+suppressWarnings(DEGreport::degPlot(dds_complex, res, n=6, xs = "treat", group = "type", batch = "donor" ))
+
 ```
 
 ```{r lima-voom-array-sh16, eval=FALSE, echo=FALSE}
@@ -399,36 +573,4 @@ suppressWarnings(DEGreport::degPlot(dds_group, res, n=9, xs = "treat", group = "
 sh17_vs_nt_over_plus_effect = res
 
 ```
-
-
-### Proteins induced by SET in WT but not in KD
-```{r vooma-dependet-nt}
-sh_dependent =
-    inner_join(ntplus_effect 
-           %>% tibble::rownames_to_column("id") %>% filter(adj.P.Val<0.1),
-           shplus_effect  %>% 
-               tibble::rownames_to_column("id") %>% filter(adj.P.Val>0.2),
-           by ="id")
-
-suppressWarnings(DEGreport::degPlot(dds_group, ntplus_effect[sh_dependent$id,], n=8, xs = "treat", group = "type", batch = "donor" ))
-
-# suppressWarnings(limmaPlot(limma_ma$E, sh_dependent$id, metadata, xs = "treat", group = "type", batch = "donor" ))
-
-```
-
-## Normalize with RUVseq
-
-It doesn't help a lot this time. I guess too few replicates to remove noise from any of them.
-
-```{r ruvseq}
-library(RUVSeq)
-ruv = RUVs(counts(dds_group), cIdx=row.names(counts), k=1, scIdx = matrix(c(1:6, 7:12), nrow=6))
-mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("1 factor")
-ruv = RUVs(as.matrix(counts), cIdx=row.names(counts), k=2, scIdx = matrix(c(1:6, 7:12), nrow=6))
-mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("2 factors")
-ruv = RUVs(as.matrix(counts), cIdx=row.names(counts), k=3, scIdx = matrix(c(1:6, 7:12), nrow=6))
-mds(ruv$normalizedCounts, k=2, metadata$group) + ggtitle("3 factors")
-
-```
-
 
