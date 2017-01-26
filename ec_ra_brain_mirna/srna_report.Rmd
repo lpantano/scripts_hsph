@@ -20,7 +20,6 @@ knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png", fig.width=6,fig.heig
 
 ```{r setup}
 library(knitr)
-
 library(ggplot2)
 library(reshape)
 library(DESeq2)
@@ -576,6 +575,8 @@ Files description:
 name_res = myRfunctions::compress_results(root_file,prefix = "small_rna")
 ```
 ```{r create-obj}
+design$group = factor(design$group, 
+                      levels=c("GroupedM", "IsoM", "GroupedF", "IsoF"))
 DEGreport::degObj(assay(rlog(dss)), design, file.path(root_file, "obj_mirna.rda"))
 DEGreport::degObj(assay(rlog(iso_dss)), design, file.path(root_file, "obj_isomirs.rda"))
 ```
