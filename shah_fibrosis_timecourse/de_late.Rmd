@@ -80,7 +80,7 @@ cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442",
 summarydata = data.frame(read.table(project_summary, header=TRUE, sep=","), row.names="Name", check.rows=FALSE)
 summarydata$Name = rownames(summarydata)
 summarydata = summarydata[order(summarydata$Name),]
-summarydata$Alias = paste(summarydata$Name, summarydata$condition, summarydata$time, sep = "_")
+summarydata$Alias = paste(summarydata$Name, summarydata$genotype, summarydata$age, sep = "_")
 
 if (file.exists(tx2genes_file)) {
     loginfo("Using gene counts calculated from the Sailfish transcript counts.")
