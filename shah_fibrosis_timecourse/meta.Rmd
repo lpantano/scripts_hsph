@@ -77,7 +77,8 @@ early_path = "~/orch/scratch/jshah_fibrosis_rnaseq/time_course_1/final/2016-03-2
 
 late_exp = readr::read_csv(file.path(late_path, "mice_model_late_log2_counts.csv"))
 early_exp = readr::read_csv(file.path(early_path, "mice_model_log2_counts.csv"))
-meta_exp = full_join(early_exp, late_exp, by="id")
+meta_exp = full_join(early_exp, late_exp, by="id") %>% rio::export("early_late_log2_count.csv")
+
 
 late_df = read.table(file.path(late_path, "mice_model_late_fold_changes_attime.tsv"), sep=",", header=T, row.names=1)
 early_df = read.table(file.path(early_path, "mice_model_early_fold_changes_attime.tsv"), sep=",", header=T, row.names=1)
