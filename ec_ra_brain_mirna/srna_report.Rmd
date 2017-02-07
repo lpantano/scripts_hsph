@@ -415,17 +415,17 @@ do_de = function(raw, summarydata, condition, minc=3){
 
 do_norm = function(dss, path, prefix){
     rlog_ma = assay(rlog(dss))
-    count_ma = counts(dss, normalized=TRUE)
-    raw = counts(dss, normalized=FALSE)
+    #count_ma = counts(dss, normalized=TRUE)
+    #raw = counts(dss, normalized=FALSE)
     
     fn_log = paste0(prefix, "_log_matrix.txt")
     save_file(rlog_ma, fn_log, path)
     
-    fn_count = paste0(prefix, "_norm_matrix.txt")
-    save_file(count_ma, fn_count, path)
+    #fn_count = paste0(prefix, "_norm_matrix.txt")
+    #save_file(count_ma, fn_count, path)
     
-    fn_raw = paste0(prefix, "_raw_matrix.txt")
-    save_file(raw, fn_raw, path)
+    #fn_raw = paste0(prefix, "_raw_matrix.txt")
+    #save_file(raw, fn_raw, path)
 }
 
 print_out = function(dss, rlog=NULL, res=NULL, prefix="standard_", samples=NULL){
@@ -486,7 +486,7 @@ dss = DESeqDataSetFromMatrix(countData = counts[rowSums(counts>0)>3,],
 dss = DESeq(dss)
 
 all_results = handle_deseq2(dss, design, condition, "mirna_" )
-
+do_norm(dds, root_file, "mirna_")
 ```
 
 ## Intersection of DE miRNAs
@@ -518,6 +518,8 @@ iso_dss = DESeqDataSetFromMatrix(countData = iso_counts[rowSums(iso_counts>0)>3,
 iso_dss = DESeq(iso_dss)
 
 iso_all_results = handle_deseq2(iso_dss, design, condition, "iso_" )
+do_norm(iso_dss, root_file, "isomir_")
+
 ```
 
 ## Intersection of DE isomiRs
