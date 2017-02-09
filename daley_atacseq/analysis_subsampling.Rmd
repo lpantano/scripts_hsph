@@ -1,0 +1,192 @@
+---
+title: "chip-seq overlap and annotation"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+    theme: readable
+    highlight: zenburn
+---
+   
+```{r projsetup, echo=FALSE, warning=FALSE, message=FALSE}
+project="atac-seq"
+labPI="Daley’s"
+lablocation="Longwood"
+analystname="Lorena Pantano"
+analystemail="lpantano@hsph.harvard.edu"
+
+```
+
+
+```{r knitrsetup, echo=FALSE, cache=FALSE}
+library(rmarkdown)
+library(myRfunctions)
+library(knitr)
+knitr::opts_chunk$set(tidy=TRUE, highlight=TRUE, dev="png",
+                      cache=TRUE, highlight=TRUE, autodep=TRUE, 
+                      warning=FALSE, error=FALSE,
+                      eval=TRUE, fig.width= 11, fig.height = 11,
+                      message=FALSE, prompt=TRUE, comment='', fig.cap='', bootstrap.show.code=FALSE)
+options(bitmapType = 'cairo')
+```
+
+
+```{r render,echo=FALSE,eval=FALSE}
+# render_2_drop("analysis.Rmd", "daley/atacseq")
+```
+
+---
+
+# Chip-seq analysis
+
+Analysis for`r labPI` group.  
+
+Contact `r analystname` (`r analystemail`) for additional details.
+
+The most recent update of this html document occurred: `r date()`
+
+The sections below provide code to reproduce the included results and plots. 
+
+---
+
+```{r functions}
+## loading packages
+require(ChIPseeker)
+require(clusterProfiler)
+library(dplyr)
+library(ggplot2)
+library(UpSetR)
+library(GenomicRanges)
+library(CHBUtils)
+library(org.Hs.eg.db)
+path_results = "/Users/lpantano/orch/scratch/daley_atac-seq/atac_1-merged/final/files"
+dir.create(path_results,showWarnings = F, recursive = T)
+
+```
+
+```{r fn}
+.summary <- function(obj){
+    require(ggplot2)
+    r <- slot(obj, "anno")
+    df <- data.frame(FE=mcols(r)$score, A=as.character(mcols(r)$annotation),
+                     stringsAsFactors = F)
+    df$A[grepl("Intron", df$A)] <- "Intron"
+    df$A[grepl("Exon", df$A)] <- "Exon"
+    ggplot(df, aes(x=FE, fill=A)) + geom_density() +
+        xlab("log10(Fold Enrichment)") +
+        scale_x_log10() + facet_wrap(~A)
+}
+
+.go <- function(obj){
+    r <- slot(obj, "anno")
+    tb <- mcols(r)[grepl("Promoter", mcols(r)$annotation),]
+    tb <- tb[order(tb$score, decreasing = TRUE),]
+    # print(head(tb))
+    g <- unique(tb$ENSEMBL)[1:1000]
+    cat("Number of genes", length(g))
+    # ego <- runGO(g, org.Hs.eg.db, from = "ENSEMBL", ont="BP")    
+    ego <- enrichGO(gene = g, keytype = "ENSEMBL",
+        OrgDb = org.Hs.eg.db, ont = "BP", pAdjustMethod = "BH", pvalueCutoff = 0.01, 
+        qvalueCutoff = 0.05, readable = TRUE)
+    ego = simplify(ego)
+}
+```
+
+
+## Peak detection
+
+We used macs2 with these parameters:
+
+`/opt/bcbio/centos/bin/macs2 callpeak -t /n/data1/cores/bcbio/daley_atac-seq/atac_1-merged/work/align/EHT3d/EHT3d-sort.unique_filter.bam --nomodel  -f BAMPE -g 2.7e9 -n EHT3d -B  --nolambda --keep-dup all`
+
+```{r load}
+baseDir = "/Users/lpantano/orch/scratch/daley_atac-seq/atac_1-merged/final/idr_analysis/random1"
+
+files <- list(EHT3d = c(file.path(baseDir, "EHT3d_0.2-idr")))
+
+
+EHT3d = read.table(files$EHT3d, header=F, stringsAsFactors = F, comment.char = "#") %>%
+    filter(abs(V5)>540)  %>%
+    mutate(score=round(V15 * 10)) %>%
+    dplyr::select(chr=V1,start=V2,end=V3,score)
+
+EHT3d_chip = makeGRangesFromDataFrame(EHT3d, keep.extra.columns = TRUE, 
+                                    ignore.strand = TRUE, end.field = "end",
+                                    start.field = "start", seqnames.field = "chr")
+
+```
+
+
+```{r anno}
+require(TxDb.Hsapiens.UCSC.hg19.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+
+peakAnnoList <- lapply(list(EHT3d_chip), annotatePeak,
+                       TxDb = txdb, tssRegion = c(-5000,5000), 
+                       annoDb = "org.Hs.eg.db", verbose = FALSE)
+
+names(peakAnnoList) = c("EHT3d")
+```
+
+## Annotation
+
+```{r print-info, results='asis'}
+sprintf("We have %d peaks for EHT3d", 
+        length(EHT3d_chip))
+```
+
+```{r write-ann}
+save_file(as.data.frame(peakAnnoList[["EHT3d"]]@anno), "EHT3d_macs_alone_idr.csv" ,path_results  )
+```
+
+
+### Genome annotation
+
+Promoter defined as the region at +/- 5Kb from TSS
+
+```{r plot-annotation, results='asis'}
+ann = data.frame()
+for (name in names(peakAnnoList)){
+    .dt = peakAnnoList[[name]]@annoStat
+    .dt$cells = name
+    ann = rbind(ann, .dt)
+}
+cat("\n\n")
+kable(ann)
+cat("\n\n")
+ggplot(ann, aes(x=Feature, y=Frequency, fill=cells)) +
+    geom_bar(stat = 'identity', position = 'dodge') +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+### Go enrichment of top 1000 genes DE peaks
+
+I took the top 100 genes with higest fold enrichment values for a GO enrichment analysis.
+
+```{r go-diff, results='asis'}
+for (name in names(peakAnnoList)){
+    cat("\n\n", name, "\n\n")
+    e = .go(peakAnnoList[[name]])
+    print(dotplot(e))
+    cat("\n\n")
+    knitr::kable(e@result[,1:7])
+    cat("\n\n")
+}
+```
+
+
+#R Session Info
+
+(useful if replicating these results)
+
+```{r compress, echo=FALSE, cache=FALSE, eval=FALSE}
+name_res = compress_results(path_results,prefix = "atacseq_results")
+```
+
+```{r sessioninfo}
+sessionInfo()
+```
+
+

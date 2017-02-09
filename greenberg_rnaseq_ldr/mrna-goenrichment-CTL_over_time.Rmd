@@ -66,7 +66,11 @@ library(dplyr)
 
 basicConfig()
 
-comp_keep = c("ctl_over_time.tsv", "Ctrl_E18_vs_P04.tsv", "Ctrl_P04_vs_P10.tsv", "Ctrl_P10_vs_P16.tsv")
+comp_keep = c("ctl_over_time.tsv", "Ctrl_E18_vs_P04.tsv",
+              "Ctrl_P04_vs_P10.tsv", "Ctrl_P10_vs_P16.tsv",
+              "Ctrl_P16_vs_P20.tsv", "Ctrl_P20_vs_P27.tsv",
+              "Ctrl_P27_vs_P32.tsv"
+              )
 comp = list()
 for (name in comp_keep){
     comp[[name]] = readr::read_tsv(file.path(path_results, name))
@@ -74,7 +78,7 @@ for (name in comp_keep){
 ```
 
 ```{r create-tpm}
-comp_keep = list.files(path_results, "vs")
+
 comp_tpm = list()
 for (name in comp_keep){
     if (!grepl("go", name))
@@ -112,10 +116,11 @@ for (i in 1:length(comp)){
     cat("### Go enrichment for:", names(comp)[i], "\n\n")
     keep = comp[[i]]$padj<0.1 & !is.na(comp[[i]]$padj) & abs(comp[[i]]$log2FoldChange) > 0.5
     cat("Working with ", sum(keep), " genes\n\n")
-    ego <- enrichGO(as.character(comp[[i]]$id[keep]), org.Mm.eg.db, keytype = "ENSEMBL", ont = "BP", universe = as.character(comp[[i]]$id))
+    # cat(sum(!is.na(convertIDs(as.character(comp[[i]]$id[keep]), "ENSEMBL", "GO", org.Mm.eg.db,ifMultiple = "useFirst"))))
+    ego <- enrichGO(as.character(comp[[i]]$id[keep]), org.Mm.eg.db, keytype = "ENSEMBL", ont = "BP", universe = as.character(comp[[i]]$id), pvalueCutoff = 0.3, qvalueCutoff = 0.5)
     ego <- simplify(ego)
     cat("\n\n")
-    print(kable(ego@result[,1:7]))
+    print(kable(ego@result[,1:7] %>% filter(qvalue<0.1)))
     cat("\n\n")
 }
 ```

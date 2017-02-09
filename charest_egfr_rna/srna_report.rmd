@@ -334,9 +334,13 @@ ma_rank = do.call(cbind, lapply(colnames(counts), function(col){
 row.names(ma_rank) = row.names(counts)
 colnames(ma_rank) = colnames(counts)
 
+
 dge = DGEList(counts)
 dge = calcNormFactors(dge,method = 'upperquartile')
 counts_norm = cpm(dge, normalized.lib.sizes = T, log = T)
+
+hk = spike %>% filter(name=="MS2") %>% select(-name) %>% as.data.frame()
+counts_hk = sweep(counts, 2, unlist(hk[,colnames(counts)]), "/")
 
 save_file(counts, "mirna_counts.csv", root_file)
 save_file(counts_norm, "mirna_norm_counts.csv", root_file)
